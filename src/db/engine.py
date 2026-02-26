@@ -19,9 +19,8 @@ async def init_db():
     """Initialize the database schema."""
     logger.info("Initializing database...")
     async with engine.begin() as conn:
-        # Avoid creating tables with existing engine schema, we drop first for a fresh schema
-        # if this isn't handled via migrations
-        # await conn.run_sync(SQLModel.metadata.drop_all)
+        # For our test scripts we drop everything first for a clean run
+        await conn.run_sync(SQLModel.metadata.drop_all)
         await conn.run_sync(SQLModel.metadata.create_all)
     logger.info("Database initialization complete.")
 

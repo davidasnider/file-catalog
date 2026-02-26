@@ -58,13 +58,20 @@ async def test_process_document_success(db_session, reset_registry):
     await db_session.refresh(doc)
     doc_id = doc.id
 
+    # Create session maker for TaskEngine
+    async_session = sessionmaker(
+        db_session.bind, class_=AsyncSession, expire_on_commit=False
+    )
+
     # Run engine
-    engine = TaskEngine(max_concurrent_tasks=2)
-    await engine.process_document(doc_id, db_session)
+    engine = TaskEngine(async_session_maker=async_session, max_concurrent_tasks=2)
+    # Process concurrently MUST be outside the session scope, since TaskEngine provides its own local sessions
+    await engine.process_document(doc_id)
 
     # Verify document success
-    updated_doc = await db_session.get(Document, doc_id)
-    assert updated_doc.status == DocumentStatus.COMPLETED
+    # First forcefully expire the db_session cache so it re-reads from the DB connection rather than returning the PENDING cached object
+    await db_session.refresh(doc)
+    assert doc.status == DocumentStatus.COMPLETED
 
     # Verify task success, need to query it out
     # For a pure sqlmodel/sqlalchemy approach we would run a select
@@ -97,13 +104,18 @@ async def test_process_document_failure(db_session, reset_registry):
     await db_session.refresh(doc)
     doc_id = doc.id
 
+    # Create session maker for TaskEngine
+    async_session = sessionmaker(
+        db_session.bind, class_=AsyncSession, expire_on_commit=False
+    )
+
     # Run engine
-    engine = TaskEngine(max_concurrent_tasks=2)
-    await engine.process_document(doc_id, db_session)
+    engine = TaskEngine(async_session_maker=async_session, max_concurrent_tasks=2)
+    await engine.process_document(doc_id)
 
     # Verify document marked as failed
-    updated_doc = await db_session.get(Document, doc_id)
-    assert updated_doc.status == DocumentStatus.FAILED
+    await db_session.refresh(doc)
+    assert doc.status == DocumentStatus.FAILED
 
     # Verify task marked as failed
     from sqlmodel import select
