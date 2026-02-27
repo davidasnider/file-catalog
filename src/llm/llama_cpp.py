@@ -2,7 +2,9 @@ import os
 from pathlib import Path
 import asyncio
 import logging
+from contextlib import redirect_stdout, redirect_stderr
 from typing import AsyncGenerator
+from concurrent.futures import ThreadPoolExecutor
 from src.llm.provider import LLMProvider
 
 try:
@@ -46,7 +48,6 @@ class LlamaCppProvider(LLMProvider):
                 repo_id=repo_id,
                 filename=filename,
                 local_dir=str(Path(model_path).parent),
-                local_dir_use_symlinks=False,
             )
 
             if downloaded_path != model_path and os.path.exists(downloaded_path):
@@ -70,12 +71,28 @@ class LlamaCppProvider(LLMProvider):
         logger.info(f"Initializing Llama with model: {model_path}")
         # Note: In a true async app, this initialization might block the event loop heavily.
         # It's best loaded in an executor or at startup.
-        self.llm = Llama(
-            model_path=model_path,
-            n_ctx=n_ctx,
-            n_gpu_layers=n_gpu_layers,  # -1 for all layers to GPU (if applicable)
-            verbose=False,
-        )
+
+        # Llama cpp output falls back to C-level print streams, suppress them to keep CLI clean
+        with open(os.devnull, "w") as fnull:
+            with redirect_stdout(fnull), redirect_stderr(fnull):
+                self.llm = Llama(
+                    model_path=model_path,
+                    n_ctx=n_ctx,
+                    n_gpu_layers=n_gpu_layers,  # -1 for all layers to GPU (if applicable)
+                    verbose=False,
+                )
+
+        # Dedicated executor to cleanly manage worker threads
+        self.executor = ThreadPoolExecutor(max_workers=1)
+
+    def close(self):
+        """Cleanup resources and shutdown the executor."""
+        if hasattr(self, "executor"):
+            self.executor.shutdown(wait=True)
+
+    # For async contexts to ensure cleanup
+    def __del__(self):
+        self.close()
 
     async def generate(self, prompt: str, **kwargs) -> str:
         """Run Llama generation in a thread pool executor to avoid blocking the event loop."""
@@ -92,7 +109,7 @@ class LlamaCppProvider(LLMProvider):
             response = self.llm(prompt, **gen_kwargs)
             return response["choices"][0]["text"].strip()
 
-        return await loop.run_in_executor(None, _run_sync)
+        return await loop.run_in_executor(self.executor, _run_sync)
 
     async def generate_stream(self, prompt: str, **kwargs) -> AsyncGenerator[str, None]:
         # Steaming async iterator over thread executor requires custom queueing or wrapper,
