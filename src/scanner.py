@@ -12,10 +12,11 @@ from src.db.engine import init_db, async_session_maker
 from src.db.models import Document, DocumentStatus, AnalysisTask
 from src.core.task_engine import TaskEngine
 from src.core.file_type import detect_file_type
-from src.plugin_registry import load_plugins
+from src.core.plugin_registry import load_plugins
 
 # Ensure plugins are loaded dynamically from the plugin registry
-load_plugins()
+plugin_dir = os.path.join(os.path.dirname(__file__), "plugins")
+load_plugins(plugin_dir)
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
