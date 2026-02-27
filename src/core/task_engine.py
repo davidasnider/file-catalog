@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from datetime import datetime, timezone
 from typing import Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 import json
@@ -130,6 +131,7 @@ class TaskEngine:
                         if existing_task:
                             task = existing_task
                             task.status = TaskStatus.PENDING
+                            task.updated_at = datetime.now(timezone.utc)
                             logger.info(
                                 f"Re-running {plugin_name} for {document_id} (Status: {existing_task.status}, Version: {existing_task.plugin_version} -> {current_version})"
                             )
