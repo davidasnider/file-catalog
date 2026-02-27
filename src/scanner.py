@@ -49,7 +49,8 @@ async def ingest_directory(directory: str, session: AsyncSession):
             if filename.startswith("."):
                 continue
 
-            file_path = str(Path(root) / filename)
+            # Ensure file path is absolute to prevent duplicate DB identities
+            file_path = str((Path(root) / filename).resolve())
             try:
                 file_hash = compute_file_hash(file_path)
                 mime_type = detect_file_type(file_path)
