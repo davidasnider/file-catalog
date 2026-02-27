@@ -145,6 +145,20 @@ async def run_scanner(
         f"\n[bold blue]🚀 File Catalog Scanner[/bold blue]\n[dim]Scanning directory:[/dim] [green]{directory}[/green]\n"
     )
 
+    # 0. Pre-flight checks: Ensure LLM models are downloaded before hijacking the console with Rich Progress
+    try:
+        from src.llm.llama_cpp import LlamaCppProvider, HAS_HF_HUB
+        from src.plugins.summarizer import MODEL_PATH
+
+        if HAS_HF_HUB and not os.path.exists(MODEL_PATH):
+            console.print(
+                "[yellow]⬇️  Downloading Local LLM (Llama-3-8B). This may take a few minutes...[/yellow]"
+            )
+            LlamaCppProvider.download_model(MODEL_PATH)
+            console.print("[green]✅ Download complete![/green]\n")
+    except ImportError:
+        pass
+
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),

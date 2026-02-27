@@ -27,6 +27,37 @@ class LlamaCppProvider(LLMProvider):
     LLM Provider using llama-cpp-python for local inference.
     """
 
+    @classmethod
+    def download_model(cls, model_path: str):
+        if not HAS_HF_HUB or "Llama-3-8B" not in model_path:
+            raise FileNotFoundError(
+                f"Model file not found at {model_path} and auto-download not supported for this path."
+            )
+
+        logger.warning(
+            f"Model file not found at {model_path}. Attempting to download..."
+        )
+        try:
+            repo_id = "QuantFactory/Meta-Llama-3-8B-Instruct-GGUF"
+            filename = "Meta-Llama-3-8B-Instruct.Q4_K_M.gguf"
+
+            Path(model_path).parent.mkdir(parents=True, exist_ok=True)
+            downloaded_path = hf_hub_download(
+                repo_id=repo_id,
+                filename=filename,
+                local_dir=str(Path(model_path).parent),
+                local_dir_use_symlinks=False,
+            )
+
+            if downloaded_path != model_path and os.path.exists(downloaded_path):
+                os.rename(downloaded_path, model_path)
+
+        except Exception as e:
+            logger.error(f"Failed to download model: {e}")
+            raise FileNotFoundError(
+                f"Model file not found at {model_path} and download failed."
+            )
+
     def __init__(self, model_path: str, n_ctx: int = 4096, n_gpu_layers: int = -1):
         if not HAS_LLAMA_CPP:
             raise ImportError(
@@ -34,37 +65,7 @@ class LlamaCppProvider(LLMProvider):
             )
 
         if not os.path.exists(model_path):
-            if HAS_HF_HUB and "Llama-3-8B" in model_path:
-                logger.warning(
-                    f"Model file not found at {model_path}. Attempting to download..."
-                )
-                try:
-                    # For MVP we default to a known Quantized Llama-3 GGUF
-                    # In a real app, the config would specify the exact repo_id and filename
-                    repo_id = "QuantFactory/Meta-Llama-3-8B-Instruct-GGUF"
-                    filename = "Meta-Llama-3-8B-Instruct.Q4_K_M.gguf"
-
-                    Path(model_path).parent.mkdir(parents=True, exist_ok=True)
-                    downloaded_path = hf_hub_download(
-                        repo_id=repo_id,
-                        filename=filename,
-                        local_dir=str(Path(model_path).parent),
-                        local_dir_use_symlinks=False,
-                    )
-
-                    # Rename the downloaded file to match our expected generic name
-                    if downloaded_path != model_path and os.path.exists(
-                        downloaded_path
-                    ):
-                        os.rename(downloaded_path, model_path)
-
-                except Exception as e:
-                    logger.error(f"Failed to download model: {e}")
-                    raise FileNotFoundError(
-                        f"Model file not found at {model_path} and download failed."
-                    )
-            else:
-                raise FileNotFoundError(f"Model file not found at {model_path}")
+            self.download_model(model_path)
 
         logger.info(f"Initializing Llama with model: {model_path}")
         # Note: In a true async app, this initialization might block the event loop heavily.

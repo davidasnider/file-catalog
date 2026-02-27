@@ -8,3 +8,6 @@ __pycache__/
 data/
 output/
 docs/_build/
+models/
+
+file_catalog.db
