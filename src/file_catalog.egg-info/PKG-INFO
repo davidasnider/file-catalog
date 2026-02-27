@@ -1,0 +1,19 @@
+Metadata-Version: 2.4
+Name: file-catalog
+Version: 0.1.0
+Summary: Add your description here
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+Requires-Dist: aiosqlite>=0.22.1
+Requires-Dist: greenlet>=3.3.2
+Requires-Dist: llama-cpp-python>=0.3.16
+Requires-Dist: pdfplumber>=0.11.9
+Requires-Dist: pillow>=12.1.1
+Requires-Dist: pre-commit>=4.5.1
+Requires-Dist: pytesseract>=0.3.13
+Requires-Dist: pytest>=9.0.2
+Requires-Dist: pytest-asyncio>=1.3.0
+Requires-Dist: python-magic>=0.4.27
+Requires-Dist: ruff>=0.15.2
+Requires-Dist: sqlmodel>=0.0.37
+Requires-Dist: streamlit>=1.54.0
