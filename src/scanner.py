@@ -12,13 +12,10 @@ from src.db.engine import init_db, async_session_maker
 from src.db.models import Document, DocumentStatus, AnalysisTask
 from src.core.task_engine import TaskEngine
 from src.core.file_type import detect_file_type
+from src.plugin_registry import load_plugins
 
-# Ensure plugins are loaded
-import src.plugins.metadata  # noqa: F401
-import src.plugins.text_extractor  # noqa: F401
-import src.plugins.ocr_extractor  # noqa: F401
-import src.plugins.summarizer  # noqa: F401
-import src.plugins.estate_analyzer  # noqa: F401
+# Ensure plugins are loaded dynamically from the plugin registry
+load_plugins()
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
