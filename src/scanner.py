@@ -47,7 +47,11 @@ def compute_file_hash(file_path: str, chunk_size: int = 8192) -> str:
 
 
 async def ingest_directory(
-    directory: str, session: AsyncSession, progress: Progress = None, task_id=None
+    directory: str,
+    session: AsyncSession,
+    progress: Progress = None,
+    task_id=None,
+    limit: int = None,
 ) -> list[int]:
     """Walk directory, compute hashes, and insert/update documents."""
     base_path = Path(directory)
@@ -68,6 +72,9 @@ async def ingest_directory(
             if filename.startswith("."):
                 continue
             files_to_process.append(str((Path(root) / filename).resolve()))
+
+    if limit is not None:
+        files_to_process = files_to_process[:limit]
 
     if progress and task_id is not None:
         progress.update(task_id, total=len(files_to_process))
@@ -118,8 +125,19 @@ async def ingest_directory(
     return processed_doc_ids
 
 
-async def run_scanner(directory: str, max_concurrent: int = 5):
+async def run_scanner(
+    directory: str, max_concurrent: int = 5, clean: bool = False, limit: int = None
+):
     """Main scanner logic."""
+    if clean:
+        console = Console()
+        console.print("[yellow]Cleaning database...[/yellow]")
+        from src.db.engine import engine
+        from sqlmodel import SQLModel
+
+        async with engine.begin() as conn:
+            await conn.run_sync(SQLModel.metadata.drop_all)
+
     await init_db()
 
     console = Console()
@@ -140,7 +158,7 @@ async def run_scanner(directory: str, max_concurrent: int = 5):
         async with async_session_maker() as session:
             # 1. Ingest files
             ingested_ids = await ingest_directory(
-                directory, session, progress, ingest_task
+                directory, session, progress, ingest_task, limit
             )
             progress.update(
                 ingest_task,
@@ -220,9 +238,20 @@ def main():
         default=2,
         help="Maximum number of concurrent documents to process.",
     )
+    parser.add_argument(
+        "--clean",
+        action="store_true",
+        help="Clean the database before scanning.",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Limit the number of files to process.",
+    )
     args = parser.parse_args()
 
-    asyncio.run(run_scanner(args.directory, args.concurrency))
+    asyncio.run(run_scanner(args.directory, args.concurrency, args.clean, args.limit))
 
 
 if __name__ == "__main__":
