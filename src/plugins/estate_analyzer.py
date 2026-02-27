@@ -47,6 +47,18 @@ class EstateAnalyzerPlugin(AnalyzerBase):
                 "skipped": True,
                 "error": "LLM Provider uninitialized",
             }
+        elif llm == "MISSING_MODEL":
+            return {
+                "is_estate_document": False,
+                "skipped": True,
+                "error": "Llama model not found at models/Llama-3-8B.gguf",
+            }
+        elif llm == "MISSING_LIBRARY":
+            return {
+                "is_estate_document": False,
+                "skipped": True,
+                "error": "llama-cpp-python is not installed",
+            }
 
         prompt = f"""
 You are a legal AI checking file contents for an estate planning system.

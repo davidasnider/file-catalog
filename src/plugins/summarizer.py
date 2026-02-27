@@ -22,10 +22,12 @@ def get_llm_provider():
             logger.warning(
                 f"Llama model not found at {MODEL_PATH}. Skipping LLM initialization."
             )
+            return "MISSING_MODEL"
         except ImportError:
             logger.warning(
                 "llama-cpp-python not installed. Skipping LLM initialization."
             )
+            return "MISSING_LIBRARY"
     return provider
 
 
@@ -64,6 +66,18 @@ class SummarizerPlugin(AnalyzerBase):
                 "summary": "",
                 "skipped": True,
                 "error": "LLM Provider uninitialized",
+            }
+        elif llm == "MISSING_MODEL":
+            return {
+                "summary": "",
+                "skipped": True,
+                "error": f"Llama model not found at {MODEL_PATH}",
+            }
+        elif llm == "MISSING_LIBRARY":
+            return {
+                "summary": "",
+                "skipped": True,
+                "error": "llama-cpp-python is not installed",
             }
 
         prompt = f"""

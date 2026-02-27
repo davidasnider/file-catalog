@@ -185,6 +185,8 @@ async def run_scanner(
         )
 
         active_tasks = {}
+        missing_models = set()
+        missing_libraries = set()
 
         def on_doc_start(doc_id):
             active_tasks[doc_id] = progress.add_task(
@@ -209,6 +211,30 @@ async def run_scanner(
                     pass
             progress.advance(overall_task)
 
+            # Briefly check the DB to see if any tasks on this doc failed due to missing LLM dependencies
+            # We do this quickly to aggregate the end-of-run warning
+            async def check_doc_errors():
+                async with async_session_maker() as session:
+                    result = await session.execute(
+                        select(AnalysisTask).where(AnalysisTask.document_id == doc_id)
+                    )
+                    import json
+
+                    for t in result.scalars().all():
+                        if t.result_data:
+                            try:
+                                data = json.loads(t.result_data)
+                                err = data.get("error", "")
+                                if "Llama model not found" in err:
+                                    missing_models.add(err)
+                                elif "llama-cpp-python is not installed" in err:
+                                    missing_libraries.add(err)
+                            except Exception:
+                                pass
+
+            # Fire-and-forget the check
+            asyncio.create_task(check_doc_errors())
+
         callbacks = {
             "doc_start": on_doc_start,
             "plugin_start": on_plugin_start,
@@ -224,7 +250,23 @@ async def run_scanner(
         tasks = [task_engine.process_document(doc_id) for doc_id in docs_to_process]
         await asyncio.gather(*tasks)
 
+    # Let background tasks (like our check_doc_errors quick checks) settle
+    await asyncio.sleep(0.1)
+
     console.print("\n[bold green]✨ Analysis Complete![/bold green]\n")
+
+    if missing_models or missing_libraries:
+        console.print(
+            "[bold yellow]⚠️  Notice: Local LLMs were skipped for some tasks.[/bold yellow]"
+        )
+        for model_err in missing_models:
+            console.print(f"  [dim]- {model_err}[/dim]")
+        for lib_err in missing_libraries:
+            console.print(f"  [dim]- {lib_err}[/dim]")
+        console.print(
+            "[dim]  (Documents successfully ingested, but summaries and estate analysis were skipped. "
+            "Install models or dependencies to enable full processing next run.)[/dim]\n"
+        )
 
 
 def main():
