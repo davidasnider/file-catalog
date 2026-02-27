@@ -44,11 +44,17 @@ class AnalysisTask(SQLModel, table=True):
     task_name: str = Field(
         description="Name of the analysis task (e.g., OCR, Text Splitting)"
     )
+    plugin_version: str = Field(
+        default="1.0", description="Version of the plugin that executed this task"
+    )
     status: TaskStatus = Field(default=TaskStatus.PENDING)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     error_message: Optional[str] = Field(
         default=None, description="Error message if the task failed"
+    )
+    result_data: Optional[str] = Field(
+        default=None, description="JSON serialized results of the task execution"
     )
 
     document: Document = Relationship(back_populates="tasks")

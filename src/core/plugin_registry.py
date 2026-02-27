@@ -33,13 +33,14 @@ class AnalyzerBase(ABC):
         pass
 
 
-def register_analyzer(name: str, depends_on: List[str] = None):
+def register_analyzer(name: str, depends_on: List[str] = None, version: str = "1.0"):
     """
     Decorator to register an analyzer class in the global registry.
 
     Args:
         name: A unique string identifier for this analyzer.
         depends_on: A list of names of other analyzers this depends on.
+        version: The version string for this plugin logic (e.g "1.0").
     """
 
     def decorator(cls: Type[AnalyzerBase]):
@@ -50,6 +51,7 @@ def register_analyzer(name: str, depends_on: List[str] = None):
 
         cls._analyzer_name = name
         cls._depends_on = depends_on or []
+        cls._analyzer_version = version
         ANALYZER_REGISTRY[name] = cls
         return cls
 

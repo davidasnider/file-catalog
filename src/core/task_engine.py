@@ -2,9 +2,11 @@ import asyncio
 import logging
 from typing import Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import sessionmaker
+import json
 from src.db.models import Document, AnalysisTask, DocumentStatus, TaskStatus
 from src.core.plugin_registry import ANALYZER_REGISTRY
+from sqlalchemy.orm import sessionmaker
+from sqlmodel import select
 
 logger = logging.getLogger(__name__)
 
@@ -24,19 +26,28 @@ class TaskEngine:
         context: Dict[str, Any],
         session: AsyncSession,
         task_id: int,
-    ) -> Tuple[bool, str]:
+    ) -> Tuple[bool, str, Dict[str, Any]]:
         """Execute a single plugin with robust exception handling."""
         plugin_class = ANALYZER_REGISTRY.get(task_name)
         if not plugin_class:
-            return False, f"Plugin {task_name} not found in registry"
+            available_plugins = ", ".join(sorted(ANALYZER_REGISTRY.keys())) or "<none>"
+            return (
+                False,
+                f"Plugin '{task_name}' not found in registry. "
+                f"Available plugins: {available_plugins}. "
+                "If this is unexpected, ensure all analyzer plugins have been imported and registered.",
+                {},
+            )
 
         try:
             # Rehydrate the task to update status
             task = await session.get(AnalysisTask, task_id)
             if not task:
-                return False, f"Task {task_id} not found in DB"
+                return False, f"Task {task_id} not found in DB", {}
 
             task.status = TaskStatus.IN_PROGRESS
+            task.plugin_version = plugin_class._analyzer_version
+            task.error_message = None
             await session.commit()
 
             # Instantiate and run
@@ -46,10 +57,17 @@ class TaskEngine:
             # Successful completion
             task = await session.get(AnalysisTask, task_id)
             task.status = TaskStatus.COMPLETED
+            try:
+                task.result_data = json.dumps(result)
+            except TypeError:
+                logger.warning(
+                    f"Could not serialize result for {task_name}, storing empty dict."
+                )
+                task.result_data = "{}"
+
             await session.commit()
 
-            context[task_name] = result  # Make result available to next plugins
-            return True, ""
+            return True, "", result
 
         except Exception as e:
             logger.error(f"Error executing plugin {task_name} on {document_path}: {e}")
@@ -59,7 +77,7 @@ class TaskEngine:
                 task.status = TaskStatus.FAILED
                 task.error_message = str(e)
                 await session.commit()
-            return False, str(e)
+            return False, str(e), {}
 
     async def process_document(self, document_id: int):
         """Process a document through all registered plugins using a bounded semaphore."""
@@ -81,18 +99,72 @@ class TaskEngine:
                     # For this V2 MVP we iterate through them.
                     all_success = True
 
-                    for plugin_name in ANALYZER_REGISTRY.keys():
-                        # Create DB record for this specific task
-                        task = AnalysisTask(
-                            document_id=doc.id,
-                            task_name=plugin_name,
-                            status=TaskStatus.PENDING,
-                        )
-                        session.add(task)
+                    # Query existing tasks to handle versioning and skips
+                    existing_tasks_result = await session.execute(
+                        select(AnalysisTask).where(AnalysisTask.document_id == doc.id)
+                    )
+                    existing_tasks = {
+                        t.task_name: t for t in existing_tasks_result.scalars().all()
+                    }
+
+                    all_success = True
+
+                    for plugin_name, plugin_class in ANALYZER_REGISTRY.items():
+                        current_version = plugin_class._analyzer_version
+                        existing_task = existing_tasks.get(plugin_name)
+
+                        # Check if we can skip this task
+                        if (
+                            existing_task
+                            and existing_task.status == TaskStatus.COMPLETED
+                            and existing_task.plugin_version == current_version
+                        ):
+                            logger.info(
+                                f"Skipping {plugin_name} (v{current_version}) for {document_id}, already completed."
+                            )
+                            if existing_task.result_data:
+                                try:
+                                    context[plugin_name] = json.loads(
+                                        existing_task.result_data
+                                    )
+                                except json.JSONDecodeError as e:
+                                    logger.warning(
+                                        "Failed to decode cached result_data for plugin %s on document %s; "
+                                        "using empty context instead. Error: %s",
+                                        plugin_name,
+                                        document_id,
+                                        e,
+                                    )
+                                    context[plugin_name] = {}
+                            else:
+                                context[plugin_name] = {}
+                            continue
+
+                        # We need to run or re-run the task
+                        if existing_task:
+                            task = existing_task
+                            task.status = TaskStatus.PENDING
+                            task.error_message = None
+                            task.plugin_version = current_version
+                            logger.info(
+                                f"Re-running {plugin_name} for {document_id} (Status: {existing_task.status}, Version: {existing_task.plugin_version} -> {current_version})"
+                            )
+                        else:
+                            task = AnalysisTask(
+                                document_id=doc.id,
+                                task_name=plugin_name,
+                                status=TaskStatus.PENDING,
+                                plugin_version=current_version,
+                            )
+                            session.add(task)
+                            logger.info(
+                                f"Running new task {plugin_name} (v{current_version}) for {document_id}"
+                            )
+
                         await session.commit()
                         await session.refresh(task)
 
-                        success, err = await self.execute_plugin(
+                        success, err, result = await self.execute_plugin(
                             task_name=plugin_name,
                             document_path=doc.path,
                             mime_type=doc.mime_type,
@@ -100,9 +172,12 @@ class TaskEngine:
                             session=session,
                             task_id=task.id,
                         )
-                        if not success:
+
+                        if success:
+                            context[plugin_name] = result
+                        else:
                             all_success = False
-                            break  # Stop pipeline for this doc on first failure (or we could continue depending on requirements)
+                            break  # Stop pipeline for this doc on first failure
 
                     doc = await session.get(Document, document_id)
                     if all_success:

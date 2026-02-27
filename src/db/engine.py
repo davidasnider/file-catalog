@@ -16,11 +16,21 @@ async_session_maker = sessionmaker(engine, class_=AsyncSession, expire_on_commit
 
 
 async def init_db():
+    from sqlalchemy import text
+    from sqlalchemy.exc import OperationalError
+
     """Initialize the database schema."""
     logger.info("Initializing database...")
     async with engine.begin() as conn:
-        # For our test scripts we drop everything first for a clean run
-        await conn.run_sync(SQLModel.metadata.drop_all)
+        try:
+            # Check if our new plugin_version column exists. If it fails, our schema is old.
+            await conn.execute(text("SELECT plugin_version FROM analysistask LIMIT 1"))
+        except OperationalError:
+            logger.info(
+                "Outdated schema detected, dropping all tables for migration..."
+            )
+            await conn.run_sync(SQLModel.metadata.drop_all)
+
         await conn.run_sync(SQLModel.metadata.create_all)
     logger.info("Database initialization complete.")
 

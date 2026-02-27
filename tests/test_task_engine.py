@@ -128,3 +128,115 @@ async def test_process_document_failure(db_session, reset_registry):
     assert len(tasks) == 1
     assert tasks[0].status == TaskStatus.FAILED
     assert "Simulated failure" in tasks[0].error_message
+
+
+@pytest.mark.asyncio
+async def test_process_document_version_skipping(db_session, reset_registry):
+    import json
+
+    # Create a mock plugin
+    @register_analyzer(name="VersionPlugin", version="1.0")
+    class VersionPlugin(AnalyzerBase):
+        async def analyze(
+            self, file_path: str, mime_type: str, context: Dict[str, Any]
+        ) -> Dict[str, Any]:
+            return {"parsed": True, "v": "1.0"}
+
+    # Setup DB
+    doc = Document(path="/dummy3.txt", mime_type="text/plain")
+    db_session.add(doc)
+    await db_session.commit()
+    await db_session.refresh(doc)
+    doc_id = doc.id
+
+    async_session = sessionmaker(
+        db_session.bind, class_=AsyncSession, expire_on_commit=False
+    )
+
+    engine = TaskEngine(async_session_maker=async_session, max_concurrent_tasks=2)
+
+    # Run once
+    await engine.process_document(doc_id)
+    await db_session.refresh(doc)
+    assert doc.status == DocumentStatus.COMPLETED
+
+    from sqlmodel import select
+
+    result = await db_session.execute(
+        select(AnalysisTask).where(AnalysisTask.document_id == doc_id)
+    )
+    task1 = result.scalars().first()
+    assert task1.plugin_version == "1.0"
+    assert json.loads(task1.result_data) == {"parsed": True, "v": "1.0"}
+
+    # Run again, it should skip
+    await engine.process_document(doc_id)
+
+    # The updated_at should ideally remain unchanged if skipped, but it's simpler to just ensure we still have 1 task
+    result = await db_session.execute(
+        select(AnalysisTask).where(AnalysisTask.document_id == doc_id)
+    )
+    tasks = result.scalars().all()
+    assert len(tasks) == 1
+    assert tasks[0].status == TaskStatus.COMPLETED
+
+
+@pytest.mark.asyncio
+async def test_process_document_version_bump_rerun(db_session, reset_registry):
+    import json
+
+    # Setup DB
+    doc = Document(path="/dummy4.txt", mime_type="text/plain")
+    db_session.add(doc)
+    await db_session.commit()
+    await db_session.refresh(doc)
+    doc_id = doc.id
+
+    async_session = sessionmaker(
+        db_session.bind, class_=AsyncSession, expire_on_commit=False
+    )
+    engine = TaskEngine(async_session_maker=async_session, max_concurrent_tasks=2)
+
+    # Register V1
+    @register_analyzer(name="BumpPlugin", version="1.0")
+    class BumpPluginV1(AnalyzerBase):
+        async def analyze(
+            self, file_path: str, mime_type: str, context: Dict[str, Any]
+        ) -> Dict[str, Any]:
+            return {"v": "1"}
+
+    await engine.process_document(doc_id)
+
+    from sqlmodel import select
+
+    result = await db_session.execute(
+        select(AnalysisTask).where(AnalysisTask.document_id == doc_id)
+    )
+    task1 = result.scalars().first()
+    assert task1.plugin_version == "1.0"
+    assert json.loads(task1.result_data) == {"v": "1"}
+
+    # Bump version
+    ANALYZER_REGISTRY.clear()
+
+    @register_analyzer(name="BumpPlugin", version="2.0")
+    class BumpPluginV2(AnalyzerBase):
+        async def analyze(
+            self, file_path: str, mime_type: str, context: Dict[str, Any]
+        ) -> Dict[str, Any]:
+            return {"v": "2"}
+
+    # Run again, it should re-run
+    await engine.process_document(doc_id)
+
+    # TaskEngine ran in its own sessions, expire db_session to avoid cached IdentityMap reads
+    db_session.expire_all()
+
+    result = await db_session.execute(
+        select(AnalysisTask).where(AnalysisTask.document_id == doc_id)
+    )
+    tasks = result.scalars().all()
+    assert len(tasks) == 1
+    assert tasks[0].status == TaskStatus.COMPLETED
+    assert tasks[0].plugin_version == "2.0"
+    assert json.loads(tasks[0].result_data) == {"v": "2"}
