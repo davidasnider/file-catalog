@@ -1,0 +1,112 @@
+import pytest
+
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
+from sqlmodel import SQLModel, select
+
+from src.db.models import Document, DocumentStatus
+from src.scanner import compute_file_hash, ingest_directory
+
+TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+
+@pytest.fixture(scope="function")
+async def test_engine():
+    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+    yield engine
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.drop_all)
+    await engine.dispose()
+
+
+@pytest.fixture(scope="function")
+async def db_session(test_engine):
+    async_session = sessionmaker(
+        test_engine, class_=AsyncSession, expire_on_commit=False
+    )
+    async with async_session() as session:
+        yield session
+
+
+@pytest.fixture
+def temp_dir(tmp_path):
+    """Provide a temporary directory with some mock files."""
+    test_dir = tmp_path / "test_docs"
+    test_dir.mkdir()
+
+    file1 = test_dir / "doc1.txt"
+    file1.write_text("Hello World!")
+
+    file2 = test_dir / "doc2.txt"
+    file2.write_text("Second file")
+
+    return test_dir
+
+
+def test_compute_file_hash(temp_dir):
+    file_path = str(temp_dir / "doc1.txt")
+    hash1 = compute_file_hash(file_path)
+    assert isinstance(hash1, str)
+    assert len(hash1) == 64  # SHA-256
+
+
+@pytest.mark.asyncio
+async def test_ingest_directory_new_files(db_session, temp_dir):
+    processed_ids = await ingest_directory(str(temp_dir), db_session)
+    assert len(processed_ids) == 2
+
+    result = await db_session.execute(select(Document))
+    docs = result.scalars().all()
+    assert len(docs) == 2
+    assert docs[0].status == DocumentStatus.PENDING
+    assert "doc1.txt" in docs[0].path or "doc1.txt" in docs[1].path
+
+
+@pytest.mark.asyncio
+async def test_ingest_directory_modified_files(db_session, temp_dir):
+    # First ingestion
+    await ingest_directory(str(temp_dir), db_session)
+
+    result = await db_session.execute(select(Document))
+    doc1 = result.scalars().first()
+    original_hash = doc1.file_hash
+
+    # Modify a file
+    with open(doc1.path, "a") as f:
+        f.write("Appended content")
+
+    # Second ingestion
+    processed_ids = await ingest_directory(str(temp_dir), db_session)
+    assert len(processed_ids) == 2
+
+    # Reload mapping
+    result = await db_session.execute(select(Document).where(Document.id == doc1.id))
+    updated_doc = result.scalars().first()
+
+    assert updated_doc.file_hash != original_hash
+    assert updated_doc.status == DocumentStatus.PENDING
+
+
+@pytest.mark.asyncio
+async def test_ingest_directory_unchanged_files_skips_reset(db_session, temp_dir):
+    # First ingestion
+    await ingest_directory(str(temp_dir), db_session)
+
+    # Mark a document as completed
+    result = await db_session.execute(select(Document))
+    doc1 = result.scalars().first()
+    doc1.status = DocumentStatus.COMPLETED
+    await db_session.commit()
+
+    # Second ingestion (no files changed)
+    processed_ids = await ingest_directory(str(temp_dir), db_session)
+    assert len(processed_ids) == 2
+
+    # Reload mapping
+    result = await db_session.execute(select(Document).where(Document.id == doc1.id))
+    updated_doc = result.scalars().first()
+
+    # It should STILL be completed, because the hash matched, so we didn't reset it
+    assert updated_doc.status == DocumentStatus.COMPLETED

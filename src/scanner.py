@@ -61,7 +61,7 @@ async def ingest_directory(directory: str, session: AsyncSession):
                 if doc:
                     if doc.file_hash != file_hash:
                         logger.info(f"File modified: {file_path}. Resetting tasks.")
-                        # File changed, delete old tasks and reset status
+                        # File changed, delete old tasks and reset status using session to maintain SQLAlchemy cache consistency
                         await session.execute(
                             AnalysisTask.__table__.delete().where(
                                 AnalysisTask.document_id == doc.id
@@ -71,6 +71,7 @@ async def ingest_directory(directory: str, session: AsyncSession):
                         doc.mime_type = mime_type
                         doc.status = DocumentStatus.PENDING
                         await session.commit()
+                        await session.refresh(doc)
                     processed_doc_ids.append(doc.id)
                 else:
                     logger.info(f"New file found: {file_path}")

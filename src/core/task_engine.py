@@ -30,7 +30,14 @@ class TaskEngine:
         """Execute a single plugin with robust exception handling."""
         plugin_class = ANALYZER_REGISTRY.get(task_name)
         if not plugin_class:
-            return False, f"Plugin {task_name} not found in registry", {}
+            available_plugins = ", ".join(sorted(ANALYZER_REGISTRY.keys())) or "<none>"
+            return (
+                False,
+                f"Plugin '{task_name}' not found in registry. "
+                f"Available plugins: {available_plugins}. "
+                "If this is unexpected, ensure all analyzer plugins have been imported and registered.",
+                {},
+            )
 
         try:
             # Rehydrate the task to update status
@@ -120,7 +127,14 @@ class TaskEngine:
                                     context[plugin_name] = json.loads(
                                         existing_task.result_data
                                     )
-                                except json.JSONDecodeError:
+                                except json.JSONDecodeError as e:
+                                    logger.warning(
+                                        "Failed to decode cached result_data for plugin %s on document %s; "
+                                        "using empty context instead. Error: %s",
+                                        plugin_name,
+                                        document_id,
+                                        e,
+                                    )
                                     context[plugin_name] = {}
                             else:
                                 context[plugin_name] = {}
@@ -130,6 +144,8 @@ class TaskEngine:
                         if existing_task:
                             task = existing_task
                             task.status = TaskStatus.PENDING
+                            task.error_message = None
+                            task.plugin_version = current_version
                             logger.info(
                                 f"Re-running {plugin_name} for {document_id} (Status: {existing_task.status}, Version: {existing_task.plugin_version} -> {current_version})"
                             )
