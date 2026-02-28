@@ -22,14 +22,16 @@ def get_llm_provider():
             logger.warning(
                 f"Llama model not found at {MODEL_PATH}. Skipping LLM initialization."
             )
+            return "MISSING_MODEL"
         except ImportError:
             logger.warning(
                 "llama-cpp-python not installed. Skipping LLM initialization."
             )
+            return "MISSING_LIBRARY"
     return provider
 
 
-@register_analyzer(name="Summarizer", depends_on=["TextExtractor", "OCRExtractor"])
+@register_analyzer(name="Summarizer", depends_on=["TextExtractor"], version="1.2")
 class SummarizerPlugin(AnalyzerBase):
     """
     Summarizes the extracted text from a document using a local LLM.
@@ -42,15 +44,12 @@ class SummarizerPlugin(AnalyzerBase):
 
         # 1. Fetch text from upstream Extractors Context
         text_data = context.get("TextExtractor", {})
-        ocr_data = context.get("OCRExtractor", {})
 
         extracted_text = text_data.get("text", "")
-        if not extracted_text:  # Fallback to OCR if text extraction failed/skipped
-            extracted_text = ocr_data.get("text", "")
 
         if not extracted_text:
             logger.debug(f"No text extracted for {file_path}. Skipping summarization.")
-            return {"summary": "", "skipped": True}
+            return {"summary": "", "skipped": True, "error": "No text extracted."}
 
         # Truncate text aggressively for local context limits (MVP behavior)
         max_chars = 15000
@@ -64,6 +63,18 @@ class SummarizerPlugin(AnalyzerBase):
                 "summary": "",
                 "skipped": True,
                 "error": "LLM Provider uninitialized",
+            }
+        elif llm == "MISSING_MODEL":
+            return {
+                "summary": "",
+                "skipped": True,
+                "error": f"Llama model not found at {MODEL_PATH}",
+            }
+        elif llm == "MISSING_LIBRARY":
+            return {
+                "summary": "",
+                "skipped": True,
+                "error": "llama-cpp-python is not installed",
             }
 
         prompt = f"""

@@ -4,7 +4,7 @@ from typing import Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 import json
 from src.db.models import Document, AnalysisTask, DocumentStatus, TaskStatus
-from src.core.plugin_registry import ANALYZER_REGISTRY
+from src.core.plugin_registry import ANALYZER_REGISTRY, get_ordered_analyzers
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import select
 
@@ -13,10 +13,21 @@ logger = logging.getLogger(__name__)
 
 class TaskEngine:
     def __init__(
-        self, async_session_maker: sessionmaker, max_concurrent_tasks: int = 5
+        self,
+        async_session_maker: sessionmaker,
+        max_concurrent_tasks: int = 5,
+        callbacks: Dict[str, Any] = None,
     ):
         self.semaphore = asyncio.Semaphore(max_concurrent_tasks)
         self.async_session_maker = async_session_maker
+        self.callbacks = callbacks or {}
+
+    def _trigger(self, event_name: str, *args, **kwargs):
+        if event_name in self.callbacks:
+            try:
+                self.callbacks[event_name](*args, **kwargs)
+            except Exception:
+                pass
 
     async def execute_plugin(
         self,
@@ -81,6 +92,7 @@ class TaskEngine:
 
     async def process_document(self, document_id: int):
         """Process a document through all registered plugins using a bounded semaphore."""
+        self._trigger("doc_start", document_id)
         async with self.semaphore:
             async with self.async_session_maker() as session:
                 doc = await session.get(Document, document_id)
@@ -109,7 +121,7 @@ class TaskEngine:
 
                     all_success = True
 
-                    for plugin_name, plugin_class in ANALYZER_REGISTRY.items():
+                    for plugin_name, plugin_class in get_ordered_analyzers():
                         current_version = plugin_class._analyzer_version
                         existing_task = existing_tasks.get(plugin_name)
 
@@ -164,6 +176,8 @@ class TaskEngine:
                         await session.commit()
                         await session.refresh(task)
 
+                        self._trigger("plugin_start", document_id, plugin_name)
+
                         success, err, result = await self.execute_plugin(
                             task_name=plugin_name,
                             document_path=doc.path,
@@ -202,3 +216,5 @@ class TaskEngine:
                     if doc:
                         doc.status = DocumentStatus.FAILED
                         await session.commit()
+
+        self._trigger("doc_end", document_id)

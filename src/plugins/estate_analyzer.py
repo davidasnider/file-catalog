@@ -8,7 +8,7 @@ from src.plugins.summarizer import get_llm_provider
 logger = logging.getLogger(__name__)
 
 
-@register_analyzer(name="EstateAnalyzer", depends_on=["TextExtractor", "OCRExtractor"])
+@register_analyzer(name="EstateAnalyzer", depends_on=["TextExtractor"], version="1.3")
 class EstateAnalyzerPlugin(AnalyzerBase):
     """
     Analyzes extracted text to find estate, legal, or financial relevance.
@@ -21,17 +21,15 @@ class EstateAnalyzerPlugin(AnalyzerBase):
 
         # 1. Fetch text from upstream Extractors Context
         text_data = context.get("TextExtractor", {})
-        ocr_data = context.get("OCRExtractor", {})
 
         extracted_text = text_data.get("text", "")
-        if not extracted_text:
-            extracted_text = ocr_data.get("text", "")
 
         if not extracted_text:
             return {
                 "is_estate_document": False,
                 "analysis": "No text content found",
                 "skipped": True,
+                "error": "No text extracted.",
             }
 
         # Truncate text aggressively for local context limits
@@ -46,6 +44,18 @@ class EstateAnalyzerPlugin(AnalyzerBase):
                 "is_estate_document": False,
                 "skipped": True,
                 "error": "LLM Provider uninitialized",
+            }
+        elif llm == "MISSING_MODEL":
+            return {
+                "is_estate_document": False,
+                "skipped": True,
+                "error": "Llama model not found at models/Llama-3-8B.gguf",
+            }
+        elif llm == "MISSING_LIBRARY":
+            return {
+                "is_estate_document": False,
+                "skipped": True,
+                "error": "llama-cpp-python is not installed",
             }
 
         prompt = f"""
@@ -62,8 +72,22 @@ Text:
 
         try:
             # We urge the LLM towards JSON. Advanced models support forced schemas.
-            # Local models might sometimes prepend markdown or extra text.
-            llm_response = await llm.generate(prompt, max_tokens=150, temperature=0.1)
+            llm_response = await llm.generate(
+                prompt,
+                max_tokens=150,
+                temperature=0.1,
+                response_format={
+                    "type": "json_object",
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "is_estate_document": {"type": "boolean"},
+                            "reasoning": {"type": "string"},
+                        },
+                        "required": ["is_estate_document", "reasoning"],
+                    },
+                },
+            )
 
             # Very basic cleanup of output for MVP parsing
             clean_str = llm_response.strip()
