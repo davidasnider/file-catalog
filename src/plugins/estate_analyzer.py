@@ -77,8 +77,22 @@ Text:
 
         try:
             # We urge the LLM towards JSON. Advanced models support forced schemas.
-            # Local models might sometimes prepend markdown or extra text.
-            llm_response = await llm.generate(prompt, max_tokens=150, temperature=0.1)
+            llm_response = await llm.generate(
+                prompt,
+                max_tokens=150,
+                temperature=0.1,
+                response_format={
+                    "type": "json_object",
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "is_estate_document": {"type": "boolean"},
+                            "reasoning": {"type": "string"},
+                        },
+                        "required": ["is_estate_document", "reasoning"],
+                    },
+                },
+            )
 
             # Very basic cleanup of output for MVP parsing
             clean_str = llm_response.strip()

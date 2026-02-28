@@ -105,6 +105,9 @@ class LlamaCppProvider(LLMProvider):
             "echo": False,
         }
 
+        if "response_format" in kwargs:
+            gen_kwargs["response_format"] = kwargs["response_format"]
+
         def _run_sync():
             response = self.llm(prompt, **gen_kwargs)
             return response["choices"][0]["text"].strip()

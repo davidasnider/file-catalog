@@ -71,6 +71,22 @@ def get_status_color(status_str: str) -> str:
     return color_map.get(status_base, "⚪")
 
 
+def get_task_status_color(task: AnalysisTask) -> str:
+    status_base = (
+        task.status.name.split(".")[-1] if "." in task.status.name else task.status.name
+    )
+
+    if status_base == "COMPLETED" and task.result_data:
+        try:
+            data = json.loads(task.result_data)
+            if data.get("skipped"):
+                return "⚪"
+        except json.JSONDecodeError:
+            pass
+
+    return get_status_color(task.status.name)
+
+
 def main():
     st.title("📂 Local AI File Catalog")
     st.markdown("Analyze and interact with your digitally archived documents.")
@@ -149,9 +165,7 @@ def main():
             table_data = []
             for doc in filtered_docs:
                 doc_tasks = tasks_by_doc.get(doc.id, [])
-                task_badges = "".join(
-                    [get_status_color(t.status.name) for t in doc_tasks]
-                )
+                task_badges = "".join([get_task_status_color(t) for t in doc_tasks])
 
                 table_data.append(
                     {
@@ -213,7 +227,7 @@ def main():
                 else:
                     for task in tasks:
                         with st.expander(
-                            f"{get_status_color(task.status.name)} {task.task_name} (v{task.plugin_version})",
+                            f"{get_task_status_color(task)} {task.task_name} (v{task.plugin_version})",
                             expanded=True,
                         ):
                             if task.status.name == "FAILED":
