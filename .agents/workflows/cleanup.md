@@ -23,5 +23,5 @@ fi
 
 git checkout main
 git pull origin main
-git branch -D -- "$CURRENT_BRANCH"
+git branch -D $CURRENT_BRANCH
 ```
