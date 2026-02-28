@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 @register_analyzer(
-    name="EstateAnalyzer", depends_on=["TextExtractor", "OCRExtractor"], version="1.1"
+    name="EstateAnalyzer", depends_on=["TextExtractor", "OCRExtractor"], version="1.2"
 )
 class EstateAnalyzerPlugin(AnalyzerBase):
     """

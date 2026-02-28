@@ -109,8 +109,19 @@ class LlamaCppProvider(LLMProvider):
             gen_kwargs["response_format"] = kwargs["response_format"]
 
         def _run_sync():
-            response = self.llm(prompt, **gen_kwargs)
-            return response["choices"][0]["text"].strip()
+            # If using response_format, we MUST use the chat completion API
+            if "response_format" in gen_kwargs:
+                response = self.llm.create_chat_completion(
+                    messages=[
+                        {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": prompt},
+                    ],
+                    **gen_kwargs,
+                )
+                return response["choices"][0]["message"]["content"].strip()
+            else:
+                response = self.llm(prompt, **gen_kwargs)
+                return response["choices"][0]["text"].strip()
 
         return await loop.run_in_executor(self.executor, _run_sync)
 
