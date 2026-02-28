@@ -3,6 +3,7 @@ from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
+from sqlalchemy import event
 
 logger = logging.getLogger(__name__)
 
@@ -10,6 +11,15 @@ DATABASE_URL = "sqlite+aiosqlite:///./file_catalog.db"
 
 # Create async engine
 engine = create_async_engine(DATABASE_URL, echo=False, future=True)
+
+
+@event.listens_for(engine.sync_engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.close()
+
 
 # Create an async session maker
 async_session_maker = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
