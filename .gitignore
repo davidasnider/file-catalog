@@ -10,4 +10,4 @@ output/
 docs/_build/
 models/
 
-file_catalog.db
+file_catalog.db*
