@@ -58,6 +58,39 @@ def register_analyzer(name: str, depends_on: List[str] = None, version: str = "1
     return decorator
 
 
+def get_ordered_analyzers() -> List[tuple]:
+    """
+    Returns a list of (name, class) tuples sorted topologically
+    based on their depends_on definitions.
+    """
+    ordered = []
+    visited = set()
+    visiting = set()
+
+    def visit(name: str):
+        if name in visited:
+            return
+        if name in visiting:
+            raise ValueError(f"Circular dependency detected involving {name}")
+        visiting.add(name)
+
+        cls = ANALYZER_REGISTRY.get(name)
+        if cls:
+            for dep in getattr(cls, "_depends_on", []):
+                if dep in ANALYZER_REGISTRY:
+                    visit(dep)
+
+        visiting.remove(name)
+        visited.add(name)
+        if cls:
+            ordered.append((name, cls))
+
+    for name in sorted(ANALYZER_REGISTRY.keys()):
+        visit(name)
+
+    return ordered
+
+
 def load_plugins(plugin_dir: str):
     """
     Dynamically discover and import all Python files in the given directory.

@@ -4,7 +4,7 @@ from typing import Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 import json
 from src.db.models import Document, AnalysisTask, DocumentStatus, TaskStatus
-from src.core.plugin_registry import ANALYZER_REGISTRY
+from src.core.plugin_registry import ANALYZER_REGISTRY, get_ordered_analyzers
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import select
 
@@ -121,7 +121,7 @@ class TaskEngine:
 
                     all_success = True
 
-                    for plugin_name, plugin_class in ANALYZER_REGISTRY.items():
+                    for plugin_name, plugin_class in get_ordered_analyzers():
                         current_version = plugin_class._analyzer_version
                         existing_task = existing_tasks.get(plugin_name)
 
