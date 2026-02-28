@@ -4,6 +4,7 @@ on:
   push:
     branches: [ "main" ]
   pull_request:
+    types: [opened, synchronize, reopened]
     branches: [ "main" ]
 
 permissions:
@@ -33,15 +34,3 @@ jobs:
       uses: pre-commit/action@v3.0.1
       with:
         extra_args: --all-files
-
-  # Auto-merge depends on successful completion of pre-commit
-  automerge:
-    needs: pre-commit
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Enable auto-merge for PR
-        run: gh pr merge --auto --squash "$PR_URL"
-        env:
-          PR_URL: ${{github.event.pull_request.html_url}}
-          GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
