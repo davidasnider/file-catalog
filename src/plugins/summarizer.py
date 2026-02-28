@@ -31,7 +31,9 @@ def get_llm_provider():
     return provider
 
 
-@register_analyzer(name="Summarizer", depends_on=["TextExtractor", "OCRExtractor"])
+@register_analyzer(
+    name="Summarizer", depends_on=["TextExtractor", "OCRExtractor"], version="1.1"
+)
 class SummarizerPlugin(AnalyzerBase):
     """
     Summarizes the extracted text from a document using a local LLM.

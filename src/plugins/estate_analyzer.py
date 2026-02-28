@@ -8,7 +8,9 @@ from src.plugins.summarizer import get_llm_provider
 logger = logging.getLogger(__name__)
 
 
-@register_analyzer(name="EstateAnalyzer", depends_on=["TextExtractor", "OCRExtractor"])
+@register_analyzer(
+    name="EstateAnalyzer", depends_on=["TextExtractor", "OCRExtractor"], version="1.1"
+)
 class EstateAnalyzerPlugin(AnalyzerBase):
     """
     Analyzes extracted text to find estate, legal, or financial relevance.

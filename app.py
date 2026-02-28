@@ -188,7 +188,21 @@ def main():
                 st.markdown(f"**File:** `{selected_doc.path.split('/')[-1]}`")
 
                 # Fetch Tasks
-                tasks = tasks_by_doc.get(doc_id, [])
+                raw_tasks = tasks_by_doc.get(doc_id, [])
+
+                # Visually sort the tasks so Extractors appear before Analyzers
+                def task_sort_key(t):
+                    if t.task_name == "MetadataExtractor":
+                        return 0
+                    if t.task_name == "TextExtractor":
+                        return 1
+                    if t.task_name == "OCRExtractor":
+                        return 2
+                    if t.task_name == "Summarizer":
+                        return 3
+                    return 4
+
+                tasks = sorted(raw_tasks, key=task_sort_key)
 
                 if not tasks:
                     st.info("No analysis tasks recorded for this document.")

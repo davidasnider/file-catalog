@@ -7,7 +7,7 @@ from src.core.plugin_registry import AnalyzerBase, register_analyzer
 logger = logging.getLogger(__name__)
 
 
-@register_analyzer(name="TextExtractor", depends_on=[])
+@register_analyzer(name="TextExtractor", depends_on=[], version="1.1")
 class TextExtractorPlugin(AnalyzerBase):
     """
     Extracts raw text from common document types like text/plain and application/pdf.
