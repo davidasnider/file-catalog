@@ -81,6 +81,10 @@ def get_task_status_color(task: AnalysisTask) -> str:
             data = json.loads(task.result_data)
             if data.get("skipped"):
                 return "⚪"
+
+            # If an extractor explicitly tried but found NO text (and didn't gracefully skip), alert as RED.
+            if "extracted" in data and not data.get("extracted"):
+                return "🔴"
         except json.JSONDecodeError:
             pass
 

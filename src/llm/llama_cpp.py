@@ -111,12 +111,17 @@ class LlamaCppProvider(LLMProvider):
         def _run_sync():
             # If using response_format, we MUST use the chat completion API
             if "response_format" in gen_kwargs:
+                # Remove echo since it's unsupported in chat completion
+                chat_kwargs = dict(gen_kwargs)
+                if "echo" in chat_kwargs:
+                    del chat_kwargs["echo"]
+
                 response = self.llm.create_chat_completion(
                     messages=[
                         {"role": "system", "content": "You are a helpful assistant."},
                         {"role": "user", "content": prompt},
                     ],
-                    **gen_kwargs,
+                    **chat_kwargs,
                 )
                 return response["choices"][0]["message"]["content"].strip()
             else:
