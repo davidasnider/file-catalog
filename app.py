@@ -47,21 +47,12 @@ st.markdown(
 )
 
 
-async def fetch_documents():
-    """Fetch all documents from the database asynchronously."""
+async def fetch_all_data():
+    """Fetch all documents and tasks asynchronously to avoid N+1 queries."""
     async with async_session_maker() as session:
-        result = await session.execute(select(Document))
-        docs = result.scalars().all()
-        return docs
-
-
-async def fetch_tasks_for_doc(document_id: int):
-    """Fetch tasks for a specific document."""
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(AnalysisTask).where(AnalysisTask.document_id == document_id)
-        )
-        return result.scalars().all()
+        docs = (await session.execute(select(Document))).scalars().all()
+        tasks = (await session.execute(select(AnalysisTask))).scalars().all()
+        return docs, tasks
 
 
 def get_status_color(status_str: str) -> str:
@@ -81,9 +72,9 @@ def main():
     st.markdown("Analyze and interact with your digitally archived documents.")
 
     # Fetch data
-    with st.spinner("Loading documents from database..."):
+    with st.spinner("Loading database records..."):
         try:
-            documents = asyncio.run(fetch_documents())
+            documents, all_tasks = asyncio.run(fetch_all_data())
         except Exception as e:
             st.error(f"Failed to connect to database: {e}")
             return
@@ -92,25 +83,47 @@ def main():
         st.info("No documents found in the database. Run the scanner CLI first!")
         return
 
+    # Map tasks
+    tasks_by_doc = {}
+    for t in all_tasks:
+        tasks_by_doc.setdefault(t.document_id, []).append(t)
+
     # Sidebar Filters
     with st.sidebar:
         st.header("Filters")
 
-        all_statuses = [doc.status.name for doc in documents]
-        unique_statuses = sorted(list(set(all_statuses)))
-        selected_statuses = st.multiselect(
-            "Filter by Status", unique_statuses, default=unique_statuses
+        all_doc_statuses = [doc.status.name for doc in documents]
+        unique_doc_statuses = sorted(list(set(all_doc_statuses)))
+        selected_doc_statuses = st.multiselect(
+            "Filter by Document Status",
+            unique_doc_statuses,
+            default=unique_doc_statuses,
+        )
+
+        all_task_statuses = [t.status.name for t in all_tasks]
+        unique_task_statuses = sorted(list(set(all_task_statuses)))
+        selected_task_statuses = st.multiselect(
+            "Filter by Task Status", unique_task_statuses, default=unique_task_statuses
         )
 
         search_query = st.text_input("Search path...", "")
 
     # Apply filters
-    filtered_docs = [
-        doc
-        for doc in documents
-        if doc.status.name in selected_statuses
-        and search_query.lower() in doc.path.lower()
-    ]
+    filtered_docs = []
+    for doc in documents:
+        if doc.status.name not in selected_doc_statuses:
+            continue
+        if search_query.lower() not in doc.path.lower():
+            continue
+
+        doc_tasks = tasks_by_doc.get(doc.id, [])
+        if selected_task_statuses != unique_task_statuses:
+            if not doc_tasks:
+                continue
+            if not any(t.status.name in selected_task_statuses for t in doc_tasks):
+                continue
+
+        filtered_docs.append(doc)
 
     # Metrics Row
     col1, col2, col3, col4 = st.columns(4)
@@ -131,12 +144,18 @@ def main():
             # Prepare data for dataframe
             table_data = []
             for doc in filtered_docs:
+                doc_tasks = tasks_by_doc.get(doc.id, [])
+                task_badges = "".join(
+                    [get_status_color(t.status.name) for t in doc_tasks]
+                )
+
                 table_data.append(
                     {
-                        "Status": f"{get_status_color(doc.status.name)} {doc.status.name}",
+                        "Document Status": f"{get_status_color(doc.status.name)} {doc.status.name}",
+                        "Tasks": task_badges,
                         "File": doc.path.split("/")[-1],
-                        "Path": doc.path,
                         "Type": doc.mime_type or "Unknown",
+                        "Path": doc.path,
                         "ID": doc.id,
                     }
                 )
@@ -145,7 +164,7 @@ def main():
 
             # Interactive Dataframe
             event = st.dataframe(
-                df[["Status", "File", "Type", "Path"]],
+                df[["Document Status", "Tasks", "File", "Type", "Path"]],
                 width="stretch",
                 hide_index=True,
                 on_select="rerun",
@@ -169,7 +188,7 @@ def main():
                 st.markdown(f"**File:** `{selected_doc.path.split('/')[-1]}`")
 
                 # Fetch Tasks
-                tasks = asyncio.run(fetch_tasks_for_doc(doc_id))
+                tasks = tasks_by_doc.get(doc_id, [])
 
                 if not tasks:
                     st.info("No analysis tasks recorded for this document.")

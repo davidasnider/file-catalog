@@ -32,6 +32,7 @@ class EstateAnalyzerPlugin(AnalyzerBase):
                 "is_estate_document": False,
                 "analysis": "No text content found",
                 "skipped": True,
+                "error": "No text extracted.",
             }
 
         # Truncate text aggressively for local context limits

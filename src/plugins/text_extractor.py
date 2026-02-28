@@ -33,6 +33,14 @@ class TextExtractorPlugin(AnalyzerBase):
                         if text:
                             pages_text.append(text)
                     extracted_text = "\n\n".join(pages_text)
+            elif (
+                mime_type
+                == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            ):
+                import docx
+
+                doc = docx.Document(file_path)
+                extracted_text = "\n".join([p.text for p in doc.paragraphs])
             else:
                 # We skip non-textual types or types we don't support yet, returning empty text.
                 logger.debug(

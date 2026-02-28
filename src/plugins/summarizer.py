@@ -52,7 +52,7 @@ class SummarizerPlugin(AnalyzerBase):
 
         if not extracted_text:
             logger.debug(f"No text extracted for {file_path}. Skipping summarization.")
-            return {"summary": "", "skipped": True}
+            return {"summary": "", "skipped": True, "error": "No text extracted."}
 
         # Truncate text aggressively for local context limits (MVP behavior)
         max_chars = 15000
