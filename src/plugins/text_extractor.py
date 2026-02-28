@@ -1,16 +1,20 @@
 import logging
 from typing import Dict, Any
 import pdfplumber
+import pytesseract
+from PIL import Image
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
 
 logger = logging.getLogger(__name__)
 
+SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/bmp", "image/tiff"}
 
-@register_analyzer(name="TextExtractor", depends_on=[], version="1.1")
+
+@register_analyzer(name="TextExtractor", depends_on=[], version="1.2")
 class TextExtractorPlugin(AnalyzerBase):
     """
-    Extracts raw text from common document types like text/plain and application/pdf.
+    Extracts raw text from common document types (PDFs, docs) and images (OCR).
     """
 
     async def analyze(
@@ -41,6 +45,10 @@ class TextExtractorPlugin(AnalyzerBase):
 
                 doc = docx.Document(file_path)
                 extracted_text = "\n".join([p.text for p in doc.paragraphs])
+            elif mime_type in SUPPORTED_IMAGE_TYPES:
+                logger.info(f"Running OCR on {file_path}")
+                with Image.open(file_path) as img:
+                    extracted_text = pytesseract.image_to_string(img)
             else:
                 # We skip non-textual types or types we don't support yet, returning empty text.
                 logger.debug(

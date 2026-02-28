@@ -218,11 +218,9 @@ def main():
                         return 0
                     if t.task_name == "TextExtractor":
                         return 1
-                    if t.task_name == "OCRExtractor":
-                        return 2
                     if t.task_name == "Summarizer":
-                        return 3
-                    return 4
+                        return 2
+                    return 3
 
                 tasks = sorted(raw_tasks, key=task_sort_key)
 

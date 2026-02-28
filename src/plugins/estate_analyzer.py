@@ -8,9 +8,7 @@ from src.plugins.summarizer import get_llm_provider
 logger = logging.getLogger(__name__)
 
 
-@register_analyzer(
-    name="EstateAnalyzer", depends_on=["TextExtractor", "OCRExtractor"], version="1.2"
-)
+@register_analyzer(name="EstateAnalyzer", depends_on=["TextExtractor"], version="1.3")
 class EstateAnalyzerPlugin(AnalyzerBase):
     """
     Analyzes extracted text to find estate, legal, or financial relevance.
@@ -23,11 +21,8 @@ class EstateAnalyzerPlugin(AnalyzerBase):
 
         # 1. Fetch text from upstream Extractors Context
         text_data = context.get("TextExtractor", {})
-        ocr_data = context.get("OCRExtractor", {})
 
         extracted_text = text_data.get("text", "")
-        if not extracted_text:
-            extracted_text = ocr_data.get("text", "")
 
         if not extracted_text:
             return {

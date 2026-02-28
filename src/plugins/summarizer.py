@@ -31,9 +31,7 @@ def get_llm_provider():
     return provider
 
 
-@register_analyzer(
-    name="Summarizer", depends_on=["TextExtractor", "OCRExtractor"], version="1.1"
-)
+@register_analyzer(name="Summarizer", depends_on=["TextExtractor"], version="1.2")
 class SummarizerPlugin(AnalyzerBase):
     """
     Summarizes the extracted text from a document using a local LLM.
@@ -46,11 +44,8 @@ class SummarizerPlugin(AnalyzerBase):
 
         # 1. Fetch text from upstream Extractors Context
         text_data = context.get("TextExtractor", {})
-        ocr_data = context.get("OCRExtractor", {})
 
         extracted_text = text_data.get("text", "")
-        if not extracted_text:  # Fallback to OCR if text extraction failed/skipped
-            extracted_text = ocr_data.get("text", "")
 
         if not extracted_text:
             logger.debug(f"No text extracted for {file_path}. Skipping summarization.")
