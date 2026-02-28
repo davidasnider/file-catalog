@@ -50,7 +50,11 @@ st.markdown(
 async def fetch_all_data():
     """Fetch all documents and tasks asynchronously to avoid N+1 queries."""
     async with async_session_maker() as session:
-        docs = (await session.execute(select(Document))).scalars().all()
+        docs = (
+            (await session.execute(select(Document).order_by(Document.id.desc())))
+            .scalars()
+            .all()
+        )
         tasks = (await session.execute(select(AnalysisTask))).scalars().all()
         return docs, tasks
 
@@ -165,7 +169,7 @@ def main():
             # Interactive Dataframe
             event = st.dataframe(
                 df[["Document Status", "Tasks", "File", "Type", "Path"]],
-                width="stretch",
+                use_container_width=True,
                 hide_index=True,
                 on_select="rerun",
                 selection_mode="single-row",
