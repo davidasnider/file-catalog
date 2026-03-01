@@ -15,6 +15,20 @@ class DuplicateDetectorPlugin(AnalyzerBase):
     duplicate detection or grouping if needed.
     """
 
+    def should_run(
+        self, file_path: str, mime_type: str, context: Dict[str, Any]
+    ) -> bool:
+        """
+        Skip very large files to avoid excessive I/O and CPU usage.
+        Threshold: 100MB
+        """
+        import os
+
+        try:
+            return os.path.getsize(file_path) < 100 * 1024 * 1024
+        except Exception:
+            return True
+
     async def analyze(
         self, file_path: str, mime_type: str, context: Dict[str, Any]
     ) -> Dict[str, Any]:
