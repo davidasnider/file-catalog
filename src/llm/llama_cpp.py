@@ -190,15 +190,19 @@ class LlamaCppProvider(LLMProvider):
             "temperature": kwargs.get("temperature", 0.7),
         }
 
-        def _run_sync():
-            with open(image_path, "rb") as image_file:
-                encoded_string = base64.b64encode(image_file.read()).decode("utf-8")
+            from PIL import Image
+            import io
 
-            mime_type, _ = mimetypes.guess_type(image_path)
-            if not mime_type:
-                mime_type = "image/jpeg"  # Fallback
+            with Image.open(image_path) as img:
+                # Convert to RGB if necessary (e.g. RGBA/PNG)
+                if img.mode != "RGB":
+                    img = img.convert("RGB")
+                
+                buffered = io.BytesIO()
+                img.save(buffered, format="JPEG")
+                encoded_string = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-            image_url = f"data:{mime_type};base64,{encoded_string}"
+            image_url = f"data:image/jpeg;base64,{encoded_string}"
 
             response = self.llm.create_chat_completion(
                 messages=[
