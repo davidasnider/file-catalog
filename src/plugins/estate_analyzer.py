@@ -3,16 +3,27 @@ import logging
 from typing import Dict, Any
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
-from src.plugins.summarizer import get_llm_provider
+from src.llm.llama_cpp import get_llm_provider
 
 logger = logging.getLogger(__name__)
 
 
-@register_analyzer(name="EstateAnalyzer", depends_on=["TextExtractor"], version="1.3")
+@register_analyzer(
+    name="EstateAnalyzer", depends_on=["TextExtractor", "Router"], version="1.4"
+)
 class EstateAnalyzerPlugin(AnalyzerBase):
     """
     Analyzes extracted text to find estate, legal, or financial relevance.
+    Crucially, this now relies on the Router to conditionally execute only for Legal/Estate documents.
     """
+
+    def should_run(
+        self, file_path: str, mime_type: str, context: Dict[str, Any]
+    ) -> bool:
+        router_data = context.get("Router", {})
+        category = router_data.get("category", "")
+        # Only explicitly run the heavy Estate modeling if the Router flagged it
+        return category == "Legal/Estate"
 
     async def analyze(
         self, file_path: str, mime_type: str, context: Dict[str, Any]

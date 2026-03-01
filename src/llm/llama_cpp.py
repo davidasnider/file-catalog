@@ -4,6 +4,8 @@ import asyncio
 import logging
 from contextlib import redirect_stdout, redirect_stderr
 from typing import AsyncGenerator
+from collections import OrderedDict
+import psutil
 from concurrent.futures import ThreadPoolExecutor
 from src.llm.provider import LLMProvider
 
@@ -23,6 +25,14 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+KNOWN_MODELS = {
+    "Llama-3-8B": (
+        "QuantFactory/Meta-Llama-3-8B-Instruct-GGUF",
+        "Meta-Llama-3-8B-Instruct.Q4_K_M.gguf",
+    ),
+    "Phi-4-mini": ("unsloth/phi-4-mini-GGUF", "phi-4-mini-Q4_K_M.gguf"),
+}
+
 
 class LlamaCppProvider(LLMProvider):
     """
@@ -31,7 +41,15 @@ class LlamaCppProvider(LLMProvider):
 
     @classmethod
     def download_model(cls, model_path: str):
-        if not HAS_HF_HUB or "Llama-3-8B" not in model_path:
+        repo_id = None
+        filename = None
+
+        for key, info in KNOWN_MODELS.items():
+            if key in model_path:
+                repo_id, filename = info
+                break
+
+        if not HAS_HF_HUB or not repo_id:
             raise FileNotFoundError(
                 f"Model file not found at {model_path} and auto-download not supported for this path."
             )
@@ -40,9 +58,6 @@ class LlamaCppProvider(LLMProvider):
             f"Model file not found at {model_path}. Attempting to download..."
         )
         try:
-            repo_id = "QuantFactory/Meta-Llama-3-8B-Instruct-GGUF"
-            filename = "Meta-Llama-3-8B-Instruct.Q4_K_M.gguf"
-
             Path(model_path).parent.mkdir(parents=True, exist_ok=True)
             downloaded_path = hf_hub_download(
                 repo_id=repo_id,
@@ -69,8 +84,6 @@ class LlamaCppProvider(LLMProvider):
             self.download_model(model_path)
 
         logger.info(f"Initializing Llama with model: {model_path}")
-        # Note: In a true async app, this initialization might block the event loop heavily.
-        # It's best loaded in an executor or at startup.
 
         # Llama cpp output falls back to C-level print streams, suppress them to keep CLI clean
         with open(os.devnull, "w") as fnull:
@@ -78,7 +91,7 @@ class LlamaCppProvider(LLMProvider):
                 self.llm = Llama(
                     model_path=model_path,
                     n_ctx=n_ctx,
-                    n_gpu_layers=n_gpu_layers,  # -1 for all layers to GPU (if applicable)
+                    n_gpu_layers=n_gpu_layers,
                     verbose=False,
                 )
 
@@ -89,6 +102,9 @@ class LlamaCppProvider(LLMProvider):
         """Cleanup resources and shutdown the executor."""
         if hasattr(self, "executor"):
             self.executor.shutdown(wait=True)
+        # Clear out the llama reference to free memory immediately
+        if hasattr(self, "llm"):
+            del self.llm
 
     # For async contexts to ensure cleanup
     def __del__(self):
@@ -109,36 +125,79 @@ class LlamaCppProvider(LLMProvider):
             gen_kwargs["response_format"] = kwargs["response_format"]
 
         def _run_sync():
-            # If using response_format, we MUST use the chat completion API
-            if "response_format" in gen_kwargs:
-                # Remove echo since it's unsupported in chat completion
-                chat_kwargs = dict(gen_kwargs)
-                if "echo" in chat_kwargs:
-                    del chat_kwargs["echo"]
+            # Always use chat completion since we are using Instruct-tuned models
+            chat_kwargs = dict(gen_kwargs)
+            if "echo" in chat_kwargs:
+                del chat_kwargs["echo"]
 
-                response = self.llm.create_chat_completion(
-                    messages=[
-                        {"role": "system", "content": "You are a helpful assistant."},
-                        {"role": "user", "content": prompt},
-                    ],
-                    **chat_kwargs,
-                )
-                return response["choices"][0]["message"]["content"].strip()
-            else:
-                response = self.llm(prompt, **gen_kwargs)
-                return response["choices"][0]["text"].strip()
+            response = self.llm.create_chat_completion(
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": prompt},
+                ],
+                **chat_kwargs,
+            )
+            return response["choices"][0]["message"]["content"].strip()
 
         return await loop.run_in_executor(self.executor, _run_sync)
 
     async def generate_stream(self, prompt: str, **kwargs) -> AsyncGenerator[str, None]:
-        # Steaming async iterator over thread executor requires custom queueing or wrapper,
-        # simplified for MVP
         raise NotImplementedError(
             "Streaming not yet implemented for async LlamaCppProvider"
         )
 
     async def process_image(self, image_path: str, prompt: str, **kwargs) -> str:
-        # Requires Llama-cpp compiled with vision support and mmproj model
         raise NotImplementedError(
             "Image processing not implemented for LlamaCppProvider"
         )
+
+
+class ModelManager:
+    _cache: OrderedDict[str, LLMProvider] = OrderedDict()
+
+    @classmethod
+    def get_provider(cls, model_path: str, n_ctx: int = 4096) -> LLMProvider:
+        if not HAS_LLAMA_CPP:
+            return "MISSING_LIBRARY"
+
+        if model_path in cls._cache:
+            provider = cls._cache[model_path]
+            # If the cached model has a smaller context than requested, we must reload it
+            if provider.llm.context_params.n_ctx < n_ctx:
+                logger.info(
+                    f"Reloading {model_path} with larger context window ({n_ctx})"
+                )
+                provider.close()
+                del cls._cache[model_path]
+            else:
+                # Move to end (most recently used)
+                provider = cls._cache.pop(model_path)
+                cls._cache[model_path] = provider
+                return provider
+
+        # Check memory before loading
+        cls._ensure_memory()
+
+        try:
+            provider = LlamaCppProvider(model_path=model_path, n_ctx=n_ctx)
+            cls._cache[model_path] = provider
+            return provider
+        except FileNotFoundError:
+            return "MISSING_MODEL"
+        except ImportError:
+            return "MISSING_LIBRARY"
+
+    @classmethod
+    def _ensure_memory(cls):
+        # Evict least recently used models if memory is < 2GB available
+        while cls._cache and psutil.virtual_memory().available < 2 * 1024**3:
+            model_path, provider = cls._cache.popitem(last=False)
+            logger.warning(
+                f"Evicting model {model_path} to free up memory (available RAM: {psutil.virtual_memory().available / 1024**3:.2f}GB)"
+            )
+            provider.close()
+
+
+def get_llm_provider(model_path="models/Llama-3-8B.gguf", n_ctx=4096):
+    """Global utility for retrieving model instances"""
+    return ModelManager.get_provider(model_path, n_ctx=n_ctx)
