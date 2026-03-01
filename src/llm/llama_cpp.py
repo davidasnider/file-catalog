@@ -181,7 +181,6 @@ class LlamaCppProvider(LLMProvider):
     async def process_image(self, image_path: str, prompt: str, **kwargs) -> str:
         """Run LLaVA image processing in a thread pool executor."""
         import base64
-        import mimetypes
 
         loop = asyncio.get_running_loop()
 
@@ -198,7 +197,7 @@ class LlamaCppProvider(LLMProvider):
                 # Convert to RGB if necessary (e.g. RGBA/PNG)
                 if img.mode != "RGB":
                     img = img.convert("RGB")
-                
+
                 buffered = io.BytesIO()
                 img.save(buffered, format="JPEG")
                 encoded_string = base64.b64encode(buffered.getvalue()).decode("utf-8")
