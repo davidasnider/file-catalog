@@ -1,4 +1,5 @@
 import pytest
+import os
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -110,3 +111,30 @@ async def test_ingest_directory_unchanged_files_skips_reset(db_session, temp_dir
 
     # It should STILL be completed, because the hash matched, so we didn't reset it
     assert updated_doc.status == DocumentStatus.COMPLETED
+
+
+@pytest.mark.asyncio
+async def test_ingest_directory_excludes_noise_files(db_session, temp_dir):
+    # Add some noise files to the temp directory
+    js_file = temp_dir / "script.js"
+    js_file.write_text("console.log('hello');")
+
+    py_file = temp_dir / "module.py"
+    py_file.write_text("print('hello')")
+
+    css_file = temp_dir / "styles.css"
+    css_file.write_text("body { color: red; }")
+
+    # Ingest directory
+    processed_ids = await ingest_directory(str(temp_dir), db_session)
+
+    # Should only process the original 2 .txt files, as .js, .py, and .css are in IGNORED_EXTENSIONS
+    assert len(processed_ids) == 2
+
+    result = await db_session.execute(select(Document))
+    docs = result.scalars().all()
+    assert len(docs) == 2
+
+    for doc in docs:
+        _, ext = os.path.splitext(doc.path)
+        assert ext == ".txt"

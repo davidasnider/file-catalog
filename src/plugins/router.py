@@ -113,7 +113,8 @@ class RouterPlugin(AnalyzerBase):
             if mime_type in code_mimes or mime_type.startswith("text/x-"):
                 return "Code"
 
-            if file_path.endswith((".py", ".js", ".html", ".css", ".json", ".sh")):
-                return "Code"
+        # 2. Extension Fallback
+        if file_path.endswith((".py", ".js", ".html", ".css", ".json", ".sh")):
+            return "Code"
 
         return None

@@ -181,6 +181,7 @@ class LlamaCppProvider(LLMProvider):
     async def process_image(self, image_path: str, prompt: str, **kwargs) -> str:
         """Run LLaVA image processing in a thread pool executor."""
         import base64
+        import mimetypes
 
         loop = asyncio.get_running_loop()
 
@@ -193,7 +194,11 @@ class LlamaCppProvider(LLMProvider):
             with open(image_path, "rb") as image_file:
                 encoded_string = base64.b64encode(image_file.read()).decode("utf-8")
 
-            image_url = f"data:image/jpeg;base64,{encoded_string}"
+            mime_type, _ = mimetypes.guess_type(image_path)
+            if not mime_type:
+                mime_type = "image/jpeg"  # Fallback
+
+            image_url = f"data:{mime_type};base64,{encoded_string}"
 
             response = self.llm.create_chat_completion(
                 messages=[
@@ -256,7 +261,8 @@ class ModelManager:
             return "MISSING_LIBRARY"
         except Exception as e:
             logger.error(f"Unexpected error in get_provider: {e}")
-            return str(e)
+            # Always return a sentinel string that the caller recognizes as an error
+            return "MISSING_MODEL"
 
     @classmethod
     def _ensure_memory(cls):

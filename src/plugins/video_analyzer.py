@@ -37,7 +37,7 @@ class VideoAnalyzerPlugin(AnalyzerBase):
     def extract_keyframe(self, file_path: str) -> str:
         """Extracts a single frame from the middle of the video and saves it to a temp file."""
         if not HAS_CV2:
-            raise ImportError("opencv-python-headless is not installed.")
+            raise ImportError("opencv-python is not installed.")
 
         vidcap = cv2.VideoCapture(file_path)
         if not vidcap or not vidcap.isOpened():
@@ -57,10 +57,14 @@ class VideoAnalyzerPlugin(AnalyzerBase):
         if not success:
             raise Exception("Could not read frame from video.")
 
-        # Save to temp file
-        temp_file = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
-        cv2.imwrite(temp_file.name, image)
-        return temp_file.name
+        # Save to temp file using mkstemp to avoid handle leaks
+        fd, temp_path = tempfile.mkstemp(suffix=".jpg")
+        os.close(fd)
+        if not cv2.imwrite(temp_path, image):
+            raise Exception(
+                f"Failed to write extracted frame to temporary file: {temp_path}"
+            )
+        return temp_path
 
     async def analyze(
         self, file_path: str, mime_type: str, context: Dict[str, Any]

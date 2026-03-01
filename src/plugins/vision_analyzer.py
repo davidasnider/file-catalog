@@ -81,10 +81,10 @@ class VisionAnalyzerPlugin(AnalyzerBase):
                 logger.error(
                     f"Failed to parse Vision LLM JSON response for {file_path}. Raw: {response_text}"
                 )
-                # Fallback if the model failed to output strict JSON
+                # Be conservative: treat unparseable responses as not safe for work
                 return {
                     "description": response_text,
-                    "is_sfw": True,  # Assume safe if we can't parse it
+                    "is_sfw": False,  # Conservative default
                     "source": "vision_analyzer",
                     "parse_error": True,
                 }
