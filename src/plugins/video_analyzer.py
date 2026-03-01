@@ -37,7 +37,7 @@ class VideoAnalyzerPlugin(AnalyzerBase):
     def extract_keyframe(self, file_path: str) -> str:
         """Extracts a single frame from the middle of the video and saves it to a temp file."""
         if not HAS_CV2:
-            raise ImportError("opencv-python is not installed.")
+            raise ImportError("opencv-python-headless is not installed.")
 
         vidcap = cv2.VideoCapture(file_path)
         if not vidcap or not vidcap.isOpened():
