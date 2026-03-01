@@ -9,13 +9,12 @@ logger = logging.getLogger(__name__)
 
 SPREADSHEET_MIMES = {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",  # .xlsx
-    "application/vnd.ms-excel",  # .xls
     "text/csv",
     "application/csv",
     "application/vnd.oasis.opendocument.spreadsheet",  # .ods
 }
 
-SPREADSHEET_EXTENSIONS = {".xlsx", ".xls", ".csv", ".ods"}
+SPREADSHEET_EXTENSIONS = {".xlsx", ".csv", ".ods"}
 
 MAX_SAMPLE_ROWS = 5
 
@@ -72,8 +71,10 @@ class SpreadsheetAnalyzerPlugin(AnalyzerBase):
             for name, df in all_sheets.items():
                 sheets_data.append(self._summarize_dataframe(df, str(name)))
         else:
-            # .xlsx / .xls
-            all_sheets = pd.read_excel(file_path, sheet_name=None, nrows=10000)
+            # .xlsx
+            all_sheets = pd.read_excel(
+                file_path, engine="openpyxl", sheet_name=None, nrows=10000
+            )
             for name, df in all_sheets.items():
                 sheets_data.append(self._summarize_dataframe(df, str(name)))
 
@@ -89,10 +90,19 @@ class SpreadsheetAnalyzerPlugin(AnalyzerBase):
         if not numeric_df.empty:
             desc = numeric_df.describe()
             for col in desc.columns:
-                numeric_stats[str(col)] = {
-                    k: round(v, 4) if isinstance(v, float) else v
-                    for k, v in desc[col].to_dict().items()
-                }
+                stats: Dict[str, Any] = {}
+                for k, v in desc[col].to_dict().items():
+                    # Convert NumPy scalar types (e.g., np.float64, np.int64)
+                    # to native Python types for JSON serialization
+                    if hasattr(v, "item"):
+                        try:
+                            v = v.item()
+                        except Exception:
+                            pass
+                    if isinstance(v, float):
+                        v = round(v, 4)
+                    stats[k] = v
+                numeric_stats[str(col)] = stats
 
         # Sample rows (first N rows as list of dicts)
         sample_rows = (

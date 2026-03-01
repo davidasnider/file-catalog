@@ -10,10 +10,9 @@ logger = logging.getLogger(__name__)
 @register_analyzer(name="DuplicateDetector", depends_on=[], version="1.0")
 class DuplicateDetectorPlugin(AnalyzerBase):
     """
-    Detects duplicate files by computing SHA-256 hashes and comparing
-    them against previously seen hashes within the same processing batch.
-    The scanner already stores file_hash on each Document, so this plugin
-    re-computes the hash and stores duplicate group info in its result.
+    Computes the SHA-256 hash of a file and returns it as part of the
+    analysis result. Other components can use this hash to perform
+    duplicate detection or grouping if needed.
     """
 
     async def analyze(

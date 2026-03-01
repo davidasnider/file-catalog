@@ -1,9 +1,15 @@
 import logging
 from typing import Dict, Any
 
+from langdetect import detect, detect_langs, LangDetectException
+from langdetect import DetectorFactory
+
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
 
 logger = logging.getLogger(__name__)
+
+# Set seed for deterministic language detection results
+DetectorFactory.seed = 0
 
 # ISO 639-1 code to language name mapping for common languages
 LANGUAGE_NAMES = {
@@ -84,8 +90,6 @@ class LanguageDetectorPlugin(AnalyzerBase):
         self, file_path: str, mime_type: str, context: Dict[str, Any]
     ) -> Dict[str, Any]:
         logger.info(f"Detecting language for {file_path}")
-
-        from langdetect import detect, detect_langs, LangDetectException
 
         extracted_text = context.get("TextExtractor", {}).get("text", "")
 

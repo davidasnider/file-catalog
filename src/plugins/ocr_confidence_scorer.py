@@ -15,14 +15,14 @@ SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/bmp", "image/tiff"}
 REVIEW_THRESHOLD = 60.0
 
 
-@register_analyzer(
-    name="OCRConfidenceScorer", depends_on=["TextExtractor"], version="1.0"
-)
+@register_analyzer(name="OCRConfidenceScorer", depends_on=[], version="1.1")
 class OCRConfidenceScorerPlugin(AnalyzerBase):
     """
     Scores OCR quality for image-based documents using pytesseract's
     word-level confidence data. Flags low-confidence extractions for
     manual review.
+
+    Runs independently of TextExtractor to avoid duplicate OCR passes.
     """
 
     def should_run(
