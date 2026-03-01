@@ -23,11 +23,11 @@
 - [ ] Upgrade vision model — replace LLaVA 1.5-7B with a more capable multimodal model (e.g., LLaVA-NeXT, Moondream, or a Gemini vision endpoint).
 
 ## New Plugins
-- [ ] **Duplicate Detector Plugin** — use file hashes and/or semantic similarity to surface duplicate or near-duplicate files across the archive.
-- [ ] **Language Detector Plugin** — detect the primary language of each document and store it as metadata (useful for multilingual archives).
-- [ ] **Spreadsheet Analyzer Plugin** — extract and summarize data from `.xlsx`, `.csv`, and `.ods` files (tables, column headers, key stats).
-- [ ] **Email Parser Plugin** — parse `.eml` and `.mbox` files to extract sender, recipients, subject, body, and attachments.
-- [ ] **OCR Confidence Scorer** — for image-based documents, score the OCR quality and flag low-confidence extractions for manual review.
+- [x] **Duplicate Detector Plugin** — use file hashes and/or semantic similarity to surface duplicate or near-duplicate files across the archive.
+- [x] **Language Detector Plugin** — detect the primary language of each document and store it as metadata (useful for multilingual archives).
+- [x] **Spreadsheet Analyzer Plugin** — extract and summarize data from `.xlsx`, `.csv`, and `.ods` files (tables, column headers, key stats).
+- [x] **Email Parser Plugin** — parse `.eml` and `.mbox` files to extract sender, recipients, subject, body, and attachments.
+- [x] **OCR Confidence Scorer** — for image-based documents, score the OCR quality and flag low-confidence extractions for manual review.
 
 ## Dashboard & UI Improvements
 - [ ] Add a document detail view with a file preview pane (PDF viewer, image viewer, text viewer) integrated into the Streamlit dashboard.
