@@ -24,6 +24,25 @@ class AnalyzerBase(ABC):
         """
         return True
 
+    def _extract_json_from_response(self, response: str) -> str:
+        """
+        Normalize LLM responses that may contain fenced JSON code blocks.
+        """
+        clean_str = response.strip()
+
+        if "```json" in clean_str:
+            start = clean_str.find("```json") + len("```json")
+            end = clean_str.find("```", start)
+            if end != -1:
+                clean_str = clean_str[start:end].strip()
+        elif "```" in clean_str:
+            start = clean_str.find("```") + len("```")
+            end = clean_str.find("```", start)
+            if end != -1:
+                clean_str = clean_str[start:end].strip()
+
+        return clean_str
+
     @abstractmethod
     async def analyze(
         self, file_path: str, mime_type: str, context: Dict[str, Any]

@@ -36,7 +36,7 @@ class SummarizerPlugin(AnalyzerBase):
             extracted_text = extracted_text[:max_chars] + "... [TRUNCATED]"
 
         # 2. Get LLM Instance
-        llm = get_llm_provider(model_path=MODEL_PATH, n_ctx=4096)
+        llm = get_llm_provider()
         if not llm:
             return {
                 "summary": "",

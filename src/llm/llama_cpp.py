@@ -162,7 +162,7 @@ class ModelManager:
     _cache: OrderedDict[str, LLMProvider] = OrderedDict()
 
     @classmethod
-    def get_provider(cls, model_path: str, n_ctx: int = 4096) -> LLMProvider:
+    def get_provider(cls, model_path: str, n_ctx: int = 4096) -> LLMProvider | str:
         if not HAS_LLAMA_CPP:
             return "MISSING_LIBRARY"
 
@@ -197,13 +197,15 @@ class ModelManager:
     def _ensure_memory(cls):
         if not HAS_PSUTIL:
             return
-        # Evict least recently used models if memory is < 2GB available
+        # Evict least recently used models from the cache if memory is < 2GB available.
+        # We intentionally do not call provider.close() here to avoid closing a model
+        # that might currently be in use by another coroutine.
         while cls._cache and psutil.virtual_memory().available < 2 * 1024**3:
             model_path, provider = cls._cache.popitem(last=False)
             logger.warning(
-                f"Evicting model {model_path} to free up memory (available RAM: {psutil.virtual_memory().available / 1024**3:.2f}GB)"
+                f"Evicting model {model_path} from cache due to low memory "
+                f"(available RAM: {psutil.virtual_memory().available / 1024**3:.2f}GB)"
             )
-            provider.close()
 
 
 def get_llm_provider(model_path="models/Llama-3-8B.gguf", n_ctx=4096):
