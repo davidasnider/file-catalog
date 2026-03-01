@@ -80,9 +80,15 @@ class PIIHarvesterPlugin(AnalyzerBase):
 
             clean_str = response.strip()
             if "```json" in clean_str:
-                clean_str = clean_str.split("```json")[-1].split("```")[0].strip()
+                start = clean_str.find("```json") + len("```json")
+                end = clean_str.find("```", start)
+                if end != -1:
+                    clean_str = clean_str[start:end].strip()
             elif "```" in clean_str:
-                clean_str = clean_str.split("```")[-1].split("```")[0].strip()
+                start = clean_str.find("```") + len("```")
+                end = clean_str.find("```", start)
+                if end != -1:
+                    clean_str = clean_str[start:end].strip()
 
             parsed = json.loads(clean_str)
             return {"pii": parsed, "skipped": False, "method": "llm_json_expert"}

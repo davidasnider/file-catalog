@@ -5,9 +5,15 @@ import logging
 from contextlib import redirect_stdout, redirect_stderr
 from typing import AsyncGenerator
 from collections import OrderedDict
-import psutil
 from concurrent.futures import ThreadPoolExecutor
 from src.llm.provider import LLMProvider
+
+try:
+    import psutil
+
+    HAS_PSUTIL = True
+except ImportError:
+    HAS_PSUTIL = False
 
 try:
     from llama_cpp import Llama
@@ -189,6 +195,8 @@ class ModelManager:
 
     @classmethod
     def _ensure_memory(cls):
+        if not HAS_PSUTIL:
+            return
         # Evict least recently used models if memory is < 2GB available
         while cls._cache and psutil.virtual_memory().available < 2 * 1024**3:
             model_path, provider = cls._cache.popitem(last=False)
