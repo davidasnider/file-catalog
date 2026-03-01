@@ -120,4 +120,4 @@ class DeepSummarizerPlugin(AnalyzerBase):
             }
         except Exception as e:
             logger.error(f"Error during Reduce phase for {file_path}: {e}")
-            raise Exception(f"Reduce phase execution failed: {str(e)}")
+            raise RuntimeError(f"Reduce phase execution failed: {e}") from e

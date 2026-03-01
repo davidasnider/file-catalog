@@ -67,7 +67,13 @@ class TaskEngine:
                 task = await session.get(AnalysisTask, task_id)
                 task.status = TaskStatus.COMPLETED
                 result = {"skipped": True, "reason": "Condition not met by should_run"}
-                task.result_data = json.dumps(result)
+                try:
+                    task.result_data = json.dumps(result)
+                except TypeError:
+                    logger.warning(
+                        f"Could not serialize skip result for {task_name}, storing empty dict."
+                    )
+                    task.result_data = "{}"
                 await session.commit()
                 return True, "", result
 

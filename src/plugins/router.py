@@ -83,11 +83,7 @@ class RouterPlugin(AnalyzerBase):
                 },
             )
 
-            clean_str = response.strip()
-            if "```json" in clean_str:
-                clean_str = clean_str.split("```json")[-1].split("```")[0].strip()
-            elif "```" in clean_str:
-                clean_str = clean_str.split("```")[-1].split("```")[0].strip()
+            clean_str = self._extract_json_from_response(response)
 
             parsed = json.loads(clean_str)
             return {"category": parsed.get("category", "GenericText"), "method": "llm"}
@@ -95,7 +91,7 @@ class RouterPlugin(AnalyzerBase):
             logger.error(f"Failed to use LLM for routing {file_path}: {e}")
             return {"category": "GenericText", "method": "error_fallback"}
 
-    def _apply_heuristics(self, mime_type: str, file_path: str) -> str:
+    def _apply_heuristics(self, mime_type: str, file_path: str) -> str | None:
         if mime_type:
             if mime_type.startswith("image/"):
                 return "Image"

@@ -240,3 +240,47 @@ async def test_process_document_version_bump_rerun(db_session, reset_registry):
     assert tasks[0].status == TaskStatus.COMPLETED
     assert tasks[0].plugin_version == "2.0"
     assert json.loads(tasks[0].result_data) == {"v": "2"}
+
+
+@pytest.mark.asyncio
+async def test_process_document_should_run_skipping(db_session, reset_registry):
+    import json
+
+    # Setup DB
+    doc = Document(path="/dummy_skip.txt", mime_type="text/plain")
+    db_session.add(doc)
+    await db_session.commit()
+    await db_session.refresh(doc)
+    doc_id = doc.id
+
+    async_session = sessionmaker(
+        db_session.bind, class_=AsyncSession, expire_on_commit=False
+    )
+    engine = TaskEngine(async_session_maker=async_session, max_concurrent_tasks=2)
+
+    # Register SkipPlugin
+    @register_analyzer(name="SkipPlugin", version="1.0")
+    class SkipPlugin(AnalyzerBase):
+        def should_run(
+            self, file_path: str, mime_type: str, context: Dict[str, Any]
+        ) -> bool:
+            return False
+
+        async def analyze(
+            self, file_path: str, mime_type: str, context: Dict[str, Any]
+        ) -> Dict[str, Any]:
+            return {"should_not_reach_here": True}
+
+    await engine.process_document(doc_id)
+
+    from sqlmodel import select
+
+    result = await db_session.execute(
+        select(AnalysisTask).where(AnalysisTask.document_id == doc_id)
+    )
+    task = result.scalars().first()
+    assert task is not None
+    assert task.status == TaskStatus.COMPLETED
+    result_data = json.loads(task.result_data)
+    assert result_data.get("skipped") is True
+    assert "reason" in result_data
