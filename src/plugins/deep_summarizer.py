@@ -70,7 +70,7 @@ class DeepSummarizerPlugin(AnalyzerBase):
             prompt = f"""
             You are analyzing a portion of a massive document. Read the following text chunk and summarize the main points, facts, and events within it. Do not miss any critical details.
 
-            TEXT CHUNK {i+1}/{len(chunks)}:
+            TEXT CHUNK {i + 1}/{len(chunks)}:
             {chunk}
 
             SUMMARY:
@@ -80,7 +80,7 @@ class DeepSummarizerPlugin(AnalyzerBase):
                 response = await llm.generate(prompt, max_tokens=400, temperature=0.2)
                 chunk_summaries.append(response.strip())
             except Exception as e:
-                logger.error(f"Error summarizing chunk {i+1} for {file_path}: {e}")
+                logger.error(f"Error summarizing chunk {i + 1} for {file_path}: {e}")
                 # We can continue to reduce the chunks we successfully mapped
                 continue
 
@@ -93,7 +93,7 @@ class DeepSummarizerPlugin(AnalyzerBase):
 
         # 3. Reduce Phase: Combine chunk summaries
         combined_summaries = "\n\n".join(
-            [f"Part {j+1}: {s}" for j, s in enumerate(chunk_summaries)]
+            [f"Part {j + 1}: {s}" for j, s in enumerate(chunk_summaries)]
         )
 
         # If the combined summaries are still too large, we might need a recursive Map-Reduce.

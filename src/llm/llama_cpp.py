@@ -37,6 +37,8 @@ KNOWN_MODELS = {
         "Meta-Llama-3-8B-Instruct.Q4_K_M.gguf",
     ),
     "Phi-4-mini": ("unsloth/phi-4-mini-GGUF", "phi-4-mini-Q4_K_M.gguf"),
+    "Llava-1.5-7b": ("mys/ggml_llava-v1.5-7b", "ggml-model-q4_k.gguf"),
+    "Llava-1.5-7b-mmproj": ("mys/ggml_llava-v1.5-7b", "mmproj-model-f16.gguf"),
 }
 
 
@@ -50,10 +52,16 @@ class LlamaCppProvider(LLMProvider):
         repo_id = None
         filename = None
 
+        # Search for model info in KNOWN_MODELS (case-insensitive)
+        model_name_lower = os.path.basename(model_path).lower()
         for key, info in KNOWN_MODELS.items():
-            if key in model_path:
+            if key.lower() in model_name_lower:
                 repo_id, filename = info
                 break
+
+        # Special handling for mmproj files if not found by name
+        if not repo_id and "mmproj" in model_name_lower:
+            repo_id, filename = KNOWN_MODELS["Llava-1.5-7b-mmproj"]
 
         if not HAS_HF_HUB or not repo_id:
             raise FileNotFoundError(
@@ -91,6 +99,23 @@ class LlamaCppProvider(LLMProvider):
 
         logger.info(f"Initializing Llama with model: {model_path}")
 
+        # Detect if we are loading a vision model, we need the mmproj handler
+        chat_handler = None
+        if "llava" in model_path.lower():
+            try:
+                from llama_cpp.llama_chat_format import Llava15ChatHandler
+
+                # Assumes mmproj is in the same directory
+                mmproj_path = os.path.join(
+                    Path(model_path).parent, KNOWN_MODELS["Llava-1.5-7b-mmproj"][1]
+                )
+                if not os.path.exists(mmproj_path):
+                    self.download_model(mmproj_path)
+                logger.info(f"Loading Llava Chat Handler with mmproj: {mmproj_path}")
+                chat_handler = Llava15ChatHandler(clip_model_path=mmproj_path)
+            except ImportError:
+                logger.warning("Llava15ChatHandler not found, vision may fail.")
+
         # Llama cpp output falls back to C-level print streams, suppress them to keep CLI clean
         with open(os.devnull, "w") as fnull:
             with redirect_stdout(fnull), redirect_stderr(fnull):
@@ -98,6 +123,7 @@ class LlamaCppProvider(LLMProvider):
                     model_path=model_path,
                     n_ctx=n_ctx,
                     n_gpu_layers=n_gpu_layers,
+                    chat_handler=chat_handler,
                     verbose=False,
                 )
 
@@ -153,9 +179,51 @@ class LlamaCppProvider(LLMProvider):
         )
 
     async def process_image(self, image_path: str, prompt: str, **kwargs) -> str:
-        raise NotImplementedError(
-            "Image processing not implemented for LlamaCppProvider"
-        )
+        """Run LLaVA image processing in a thread pool executor."""
+        import base64
+        import mimetypes
+
+        loop = asyncio.get_running_loop()
+
+        gen_kwargs = {
+            "max_tokens": kwargs.get("max_tokens", 512),
+            "temperature": kwargs.get("temperature", 0.7),
+        }
+
+        def _run_sync():
+            from PIL import Image
+            import io
+
+            with Image.open(image_path) as img:
+                # Convert to RGB if necessary (e.g. RGBA/PNG)
+                if img.mode != "RGB":
+                    img = img.convert("RGB")
+                
+                buffered = io.BytesIO()
+                img.save(buffered, format="JPEG")
+                encoded_string = base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+            image_url = f"data:image/jpeg;base64,{encoded_string}"
+
+            response = self.llm.create_chat_completion(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that accurately describes images.",
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "image_url", "image_url": {"url": image_url}},
+                            {"type": "text", "text": prompt},
+                        ],
+                    },
+                ],
+                **gen_kwargs,
+            )
+            return response["choices"][0]["message"]["content"].strip()
+
+        return await loop.run_in_executor(self.executor, _run_sync)
 
 
 class ModelManager:
@@ -164,8 +232,10 @@ class ModelManager:
     @classmethod
     def get_provider(cls, model_path: str, n_ctx: int = 4096) -> LLMProvider | str:
         if not HAS_LLAMA_CPP:
+            logger.error("LLAMA_CPP not found")
             return "MISSING_LIBRARY"
 
+        logger.info(f"ModelManager.get_provider called for: {model_path}")
         if model_path in cls._cache:
             provider = cls._cache[model_path]
             # If the cached model has a smaller context than requested, we must reload it
@@ -188,10 +258,16 @@ class ModelManager:
             provider = LlamaCppProvider(model_path=model_path, n_ctx=n_ctx)
             cls._cache[model_path] = provider
             return provider
-        except FileNotFoundError:
+        except FileNotFoundError as e:
+            logger.error(f"FileNotFoundError in get_provider: {e}")
             return "MISSING_MODEL"
-        except ImportError:
+        except ImportError as e:
+            logger.error(f"ImportError in get_provider: {e}")
             return "MISSING_LIBRARY"
+        except Exception as e:
+            logger.error(f"Unexpected error in get_provider: {e}")
+            # Always return a sentinel string that the caller recognizes as an error
+            return "MISSING_MODEL"
 
     @classmethod
     def _ensure_memory(cls):

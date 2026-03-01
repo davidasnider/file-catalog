@@ -4,7 +4,6 @@ import hashlib
 import logging
 import os
 from pathlib import Path
-
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -23,6 +22,20 @@ from src.db.models import Document, DocumentStatus, AnalysisTask
 from src.core.task_engine import TaskEngine
 from src.core.file_type import detect_file_type
 from src.core.plugin_registry import load_plugins
+
+# Add global constants for noise files
+IGNORED_EXTENSIONS = {
+    ".css",
+    ".js",
+    ".py",
+    ".pyc",
+    ".html_part",
+    ".sh",
+    ".ts",
+    ".map",
+    ".jsx",
+    ".tsx",
+}
 
 # Ensure plugins are loaded dynamically from the plugin registry
 plugin_dir = os.path.join(os.path.dirname(__file__), "plugins")
@@ -71,6 +84,12 @@ async def ingest_directory(
         for filename in files:
             if filename.startswith("."):
                 continue
+
+            # Ignore structural or developer noise files based on extension
+            _, ext = os.path.splitext(filename)
+            if ext.lower() in IGNORED_EXTENSIONS:
+                continue
+
             files_to_process.append(str((Path(root) / filename).resolve()))
 
     if limit is not None:
