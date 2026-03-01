@@ -190,6 +190,7 @@ class LlamaCppProvider(LLMProvider):
             "temperature": kwargs.get("temperature", 0.7),
         }
 
+        def _run_sync():
             from PIL import Image
             import io
 
