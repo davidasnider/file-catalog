@@ -15,6 +15,15 @@ class AnalyzerBase(ABC):
     def __init__(self, **kwargs: Any):
         self.config = kwargs
 
+    def should_run(
+        self, file_path: str, mime_type: str, context: Dict[str, Any]
+    ) -> bool:
+        """
+        Determines whether this analyzer should execute for the given file and context.
+        Can be overridden by plugins to implement conditional execution.
+        """
+        return True
+
     @abstractmethod
     async def analyze(
         self, file_path: str, mime_type: str, context: Dict[str, Any]

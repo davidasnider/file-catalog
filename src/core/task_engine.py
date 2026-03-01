@@ -61,8 +61,17 @@ class TaskEngine:
             task.error_message = None
             await session.commit()
 
-            # Instantiate and run
+            # Instantiate and check conditionally
             analyzer = plugin_class()
+            if not analyzer.should_run(document_path, mime_type, context):
+                task = await session.get(AnalysisTask, task_id)
+                task.status = TaskStatus.COMPLETED
+                result = {"skipped": True, "reason": "Condition not met by should_run"}
+                task.result_data = json.dumps(result)
+                await session.commit()
+                return True, "", result
+
+            # Run the plugin
             result = await analyzer.analyze(document_path, mime_type, context)
 
             # Successful completion

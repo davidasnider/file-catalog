@@ -29,6 +29,12 @@ class TextExtractorPlugin(AnalyzerBase):
             if mime_type == "text/plain":
                 with open(file_path, "r", encoding="utf-8", errors="replace") as f:
                     extracted_text = f.read()
+            elif mime_type == "text/html":
+                from bs4 import BeautifulSoup
+
+                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                    soup = BeautifulSoup(f, "html.parser")
+                    extracted_text = soup.get_text(separator="\n", strip=True)
             elif mime_type == "application/pdf":
                 with pdfplumber.open(file_path) as pdf:
                     pages_text = []
