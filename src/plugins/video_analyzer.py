@@ -40,8 +40,10 @@ class VideoAnalyzerPlugin(AnalyzerBase):
             raise ImportError("opencv-python-headless is not installed.")
 
         vidcap = cv2.VideoCapture(file_path)
-        if not vidcap.isOpened():
-            raise Exception("Failed to open video file for frame extraction.")
+        if not vidcap or not vidcap.isOpened():
+            raise Exception(
+                f"Failed to open video file for frame extraction: {file_path}"
+            )
 
         total_frames = int(vidcap.get(cv2.CAP_PROP_FRAME_COUNT))
         if total_frames <= 0:

@@ -10,15 +10,17 @@ logger = logging.getLogger(__name__)
 # Fallback on "base" model for speed on standard hardware
 MODEL_SIZE = "base"
 model = None
+model_lock = asyncio.Lock()
 
 
-def get_whisper_model():
+async def get_whisper_model():
     global model
-    if model is None:
-        logger.info(f"Loading faster-whisper model ({MODEL_SIZE})...")
-        # auto chooses GPU or CPU
-        model = WhisperModel(MODEL_SIZE, device="auto", compute_type="default")
-    return model
+    async with model_lock:
+        if model is None:
+            logger.info(f"Loading faster-whisper model ({MODEL_SIZE})...")
+            # auto chooses GPU or CPU
+            model = WhisperModel(MODEL_SIZE, device="auto", compute_type="default")
+        return model
 
 
 @register_analyzer(name="audio_transcriber", depends_on=[], version="1.0")
@@ -31,7 +33,8 @@ class AudioTranscriberPlugin(AnalyzerBase):
         self, file_path: str, mime_type: str, context: Dict[str, Any]
     ) -> bool:
         # Avoid running if we somehow already have text (though we shouldn't unless cached)
-        if "text" in context.get("text_extractor", {}):
+        # Fix: Using "TextExtractor" to match the registered name in src/plugins/text_extractor.py
+        if "text" in context.get("TextExtractor", {}):
             return False
 
         return mime_type.startswith("audio/") or mime_type.startswith("video/")
@@ -44,10 +47,11 @@ class AudioTranscriberPlugin(AnalyzerBase):
         try:
             # We run the transcription in a thread pool since Whisper is CPU/GPU bound and blocking
             loop = asyncio.get_running_loop()
+            # Get model before entering executor as it is async
+            whisper = await get_whisper_model()
 
             def transcribe():
                 try:
-                    whisper = get_whisper_model()
                     segments, info = whisper.transcribe(file_path, beam_size=5)
                     # Ensure generator is exhausted to get all text
                     transcript = " ".join([segment.text for segment in segments])
