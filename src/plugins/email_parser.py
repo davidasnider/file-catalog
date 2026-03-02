@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import email
 import email.policy
 import logging
@@ -34,9 +36,7 @@ class EmailParserPlugin(AnalyzerBase):
         logger.info(f"Parsing email file {file_path}")
 
         try:
-            lower_path = file_path.lower()
-
-            if lower_path.endswith(".mbox"):
+            if self._is_mbox(file_path, mime_type):
                 emails = self._parse_mbox(file_path)
             else:
                 emails = [self._parse_eml(file_path)]
@@ -57,17 +57,27 @@ class EmailParserPlugin(AnalyzerBase):
             msg = email.message_from_binary_file(f, policy=email.policy.default)
         return self._extract_email_data(msg)
 
+    @staticmethod
+    def _is_mbox(file_path: str, mime_type: str) -> bool:
+        """Determine if the file should be parsed as mbox format."""
+        if mime_type == "application/mbox":
+            return True
+        return file_path.lower().endswith(".mbox")
+
     def _parse_mbox(self, file_path: str) -> list[Dict[str, Any]]:
         """Parse an .mbox file and return a list of email dicts."""
         mbox = mailbox.mbox(file_path)
         emails = []
-        for i, msg in enumerate(mbox):
-            if i >= MAX_EMAILS_FROM_MBOX:
-                logger.info(
-                    f"Reached max email limit ({MAX_EMAILS_FROM_MBOX}) for {file_path}"
-                )
-                break
-            emails.append(self._extract_email_data(msg))
+        try:
+            for i, msg in enumerate(mbox):
+                if i >= MAX_EMAILS_FROM_MBOX:
+                    logger.info(
+                        f"Reached max email limit ({MAX_EMAILS_FROM_MBOX}) for {file_path}"
+                    )
+                    break
+                emails.append(self._extract_email_data(msg))
+        finally:
+            mbox.close()
         return emails
 
     def _extract_email_data(self, msg: email.message.Message) -> Dict[str, Any]:

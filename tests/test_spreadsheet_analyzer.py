@@ -53,6 +53,44 @@ async def test_spreadsheet_analyzer_xlsx(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_spreadsheet_analyzer_ods(tmp_path):
+    import pandas as pd
+    from unittest.mock import patch
+
+    plugin = SpreadsheetAnalyzerPlugin()
+
+    ods_file = tmp_path / "test.ods"
+    ods_file.write_text("fake ods content")
+
+    # Create a dummy DataFrame to return from mock
+    df = pd.DataFrame(
+        {
+            "Name": ["Alice", "Bob"],
+            "City": ["NYC", "LA"],
+            "Value": [100, 200],
+        }
+    )
+
+    with patch("pandas.read_excel", return_value={"Sheet1": df}) as mock_read_excel:
+        result = await plugin.analyze(
+            str(ods_file),
+            "application/vnd.oasis.opendocument.spreadsheet",
+            {},
+        )
+
+        mock_read_excel.assert_called_once()
+        _, kwargs = mock_read_excel.call_args
+        assert kwargs.get("engine") == "odf"
+
+        assert result["total_sheets"] == 1
+        sheet = result["sheets"][0]
+        assert sheet["sheet_name"] == "Sheet1"
+        assert sheet["total_rows"] == 2
+        assert "Name" in sheet["column_names"]
+        assert "Value" in sheet["numeric_stats"]
+
+
+@pytest.mark.asyncio
 async def test_spreadsheet_analyzer_should_run():
     plugin = SpreadsheetAnalyzerPlugin()
 
