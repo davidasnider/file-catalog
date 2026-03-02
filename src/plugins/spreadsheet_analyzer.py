@@ -17,6 +17,7 @@ SPREADSHEET_MIMES = {
 SPREADSHEET_EXTENSIONS = {".xlsx", ".csv", ".ods"}
 
 MAX_SAMPLE_ROWS = 5
+MAX_SPREADSHEET_ROWS = 10000
 
 
 @register_analyzer(name="SpreadsheetAnalyzer", depends_on=[], version="1.0")
@@ -59,21 +60,24 @@ class SpreadsheetAnalyzerPlugin(AnalyzerBase):
         sheets_data = []
 
         if lower_path.endswith(".csv") or mime_type in ("text/csv", "application/csv"):
-            df = pd.read_csv(file_path, nrows=10000)
+            df = pd.read_csv(file_path, nrows=MAX_SPREADSHEET_ROWS)
             sheets_data.append(self._summarize_dataframe(df, "Sheet1"))
         elif (
             lower_path.endswith(".ods")
             or mime_type == "application/vnd.oasis.opendocument.spreadsheet"
         ):
             all_sheets = pd.read_excel(
-                file_path, engine="odf", sheet_name=None, nrows=10000
+                file_path, engine="odf", sheet_name=None, nrows=MAX_SPREADSHEET_ROWS
             )
             for name, df in all_sheets.items():
                 sheets_data.append(self._summarize_dataframe(df, str(name)))
         else:
             # .xlsx
             all_sheets = pd.read_excel(
-                file_path, engine="openpyxl", sheet_name=None, nrows=10000
+                file_path,
+                engine="openpyxl",
+                sheet_name=None,
+                nrows=MAX_SPREADSHEET_ROWS,
             )
             for name, df in all_sheets.items():
                 sheets_data.append(self._summarize_dataframe(df, str(name)))
