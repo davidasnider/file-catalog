@@ -140,7 +140,8 @@ async def run_benchmark(root_dir: Path):
             provider.close()
         elif hasattr(provider, "model"):
             del provider.model
-            del provider.tokenizer
+            if hasattr(provider, "tokenizer"):
+                del provider.tokenizer
 
         import gc
 

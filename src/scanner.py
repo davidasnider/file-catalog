@@ -372,13 +372,13 @@ def main():
     )
     parser.add_argument(
         "--use-cloud-fallback",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=config.use_cloud_fallback,
         help="Allow falling back to cloud providers (e.g. Gemini) if local models fail.",
     )
     parser.add_argument(
         "--use-document-ai",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=config.use_document_ai,
         help="Use Google Cloud Document AI for text extraction in PDFs/Images instead of local tools.",
     )

@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import weakref
 from typing import AsyncGenerator
 
 from src.llm.provider import LLMProvider
@@ -7,7 +8,8 @@ from src.llm.provider import LLMProvider
 logger = logging.getLogger(__name__)
 
 # Module-level dictionary to store locks per event loop.
-_mlx_gpu_locks = {}
+# Using WeakKeyDictionary prevents leaking locks when loops are destroyed.
+_mlx_gpu_locks = weakref.WeakKeyDictionary()
 
 
 def get_mlx_gpu_lock():
@@ -30,7 +32,7 @@ except ImportError:
     HAS_MLX = False
 
 try:
-    import mlx_vlm as _mlx_vlm_check  # noqa: F401
+    from mlx_vlm import load as vlm_load, generate as vlm_generate
 
     HAS_MLX_VLM = True
 except ImportError:
@@ -39,11 +41,16 @@ except ImportError:
 
 class MLXProvider(LLMProvider):
     """
-    LLM Provider using Apple's MLX (mlx-lm) for native Silicon acceleration.
+    LLM Provider using MLX-LM for Apple Silicon acceleration.
     """
 
-    def __init__(self, model_path: str, **kwargs):
-        self.is_vision = kwargs.get("is_vision", False)
+    def __init__(self, model_path: str, is_vision: bool = False, **kwargs):
+        self.model_path = model_path
+        self.is_vision = is_vision
+        self.model = None
+        self.tokenizer = None
+        self.processor = None
+        self.use_chat_template = True
 
         if self.is_vision:
             if not HAS_MLX_VLM:
@@ -53,8 +60,6 @@ class MLXProvider(LLMProvider):
 
             logger.info(f"Initializing MLXProvider (Vision) with model: {model_path}")
             try:
-                from mlx_vlm import load as vlm_load
-
                 self.model, self.processor = vlm_load(model_path)
 
                 # Patch processor for older LLaVA 1.5 models where transformers'
@@ -101,7 +106,7 @@ class MLXProvider(LLMProvider):
                 raise
 
     async def generate(self, prompt: str, **kwargs) -> str:
-        """Run MLX generation asynchronously to avoid blocking the event loop."""
+        """Run MLX generation asynchronously."""
         if self.is_vision:
             raise NotImplementedError("Use process_image for vision tasks.")
 
@@ -109,19 +114,18 @@ class MLXProvider(LLMProvider):
 
         max_tokens = kwargs.get("max_tokens", 1024)
 
-        def _run_sync():
-            # Format prompt if chat template exists
-            if self.use_chat_template:
-                messages = [
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": prompt},
-                ]
-                formatted_prompt = self.tokenizer.apply_chat_template(
-                    messages, tokenize=False, add_generation_prompt=True
-                )
-            else:
-                formatted_prompt = prompt
+        if self.use_chat_template:
+            messages = [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": prompt},
+            ]
+            formatted_prompt = self.tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
+        else:
+            formatted_prompt = prompt
 
+        def _run_sync():
             sampler = make_sampler(temp=kwargs.get("temperature", 0.0))
             logits_processors = make_logits_processors(
                 repetition_penalty=kwargs.get("repetition_penalty", 1.2)
@@ -142,7 +146,7 @@ class MLXProvider(LLMProvider):
             return await loop.run_in_executor(None, _run_sync)
 
     async def generate_stream(self, prompt: str, **kwargs) -> AsyncGenerator[str, None]:
-        """Stream MLX generation asynchronously."""
+        """Stream the generated response."""
         if self.is_vision:
             raise NotImplementedError("Use process_image for vision tasks.")
 
@@ -195,7 +199,6 @@ class MLXProvider(LLMProvider):
         max_tokens = kwargs.get("max_tokens", 512)
 
         def _run_sync():
-            from mlx_vlm import generate as vlm_generate
             # MLX-VLM's generate wrapper automatically applies the processor chat template
             # and handles the image passing.
 

@@ -57,15 +57,9 @@ class VisionAnalyzerPlugin(AnalyzerBase):
                 if not res_data:
                     raise ValueError("Parsed JSON response is empty or invalid.")
 
-                score = res_data.get("adult_content_score", 0)
-                # If the score is missing or not a number, default to safe unless description looks bad
-                try:
-                    score = float(score)
-                except (ValueError, TypeError):
-                    score = 0
-
                 description = res_data.get("description", "").strip()
                 score = res_data.get("adult_content_score", 0)
+                # If the score is missing or not a number, default to safe unless description looks bad
                 try:
                     score = float(score)
                 except (ValueError, TypeError):

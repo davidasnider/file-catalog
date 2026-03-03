@@ -6,6 +6,16 @@ def get_all_extracted_text(context: Dict[str, Any]) -> str:
     Aggregates text extracted from all available analyzers in the context.
     This ensures that summaries and routing can use audio transcripts,
     video visual descriptions, and image descriptions in addition to standard text.
+
+    The function aggregates content in the following order when present:
+
+    1. ``TextExtractor["text"]`` (standard document / OCR text)
+    2. ``DocumentAIExtractor["text"]`` (Document AI text)
+    3. ``audio_transcriber["text"]`` labeled as ``[Audio Transcript]``
+    4. ``vision_analyzer["description"]`` labeled as ``[Visual Description]``
+    5. ``video_analyzer["visual_description"]`` labeled as ``[Video Visual Description]``
+
+    Empty or missing fields are ignored. Sections are separated by a blank line.
     """
     aggregated_parts = []
 

@@ -80,6 +80,8 @@ class SummarizerPlugin(AnalyzerBase):
                         error_msg = f"Required LLM library for provider '{provider}' is not installed"
                     else:
                         error_msg = "Required LLM library is not installed"
+            elif llm == "PROVIDER_INIT_FAILED":
+                error_msg = f"Failed to initialize LLM provider '{provider}'"
 
             return {
                 "summary": "",

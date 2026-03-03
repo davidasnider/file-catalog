@@ -98,6 +98,8 @@ class RouterPlugin(AnalyzerBase):
             from src.core.text_utils import repair_and_load_json
 
             parsed = repair_and_load_json(response)
+            if not parsed:
+                raise ValueError("LLM response could not be parsed as JSON.")
             return {"category": parsed.get("category", "GenericText"), "method": "llm"}
         except Exception as e:
             logger.error(f"Failed to use LLM for routing {file_path}: {e}")

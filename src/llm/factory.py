@@ -36,7 +36,7 @@ def get_llm_provider(is_vision: bool = False, **kwargs) -> LLMProvider | str:
             return "MISSING_LIBRARY"
         except Exception as e:
             logger.error(f"Failed to instantiate GeminiProvider fallback: {e}")
-            return "MISSING_MODEL"
+            return "PROVIDER_INIT_FAILED"
 
     return provider
 

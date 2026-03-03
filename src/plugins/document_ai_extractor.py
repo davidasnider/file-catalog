@@ -56,10 +56,31 @@ class DocumentAIExtractorPlugin(AnalyzerBase):
 
         project_id = config.google_cloud_project
         # Document AI uses multi-region locations ("us", "eu"), not Vertex AI
-        # regions like "us-central1". Normalize input or default to "us".
-        location = config.document_ai_location or "us"
-        if "-" in location:
-            location = location.split("-")[0]
+        # regions like "us-central1". Prefer a dedicated setting if available,
+        # then fall back to a general Google Cloud location or env, and default to "us".
+        raw_location = (
+            getattr(config, "document_ai_location", None)
+            or getattr(config, "google_cloud_location", None)
+            or os.getenv("DOCUMENT_AI_LOCATION")
+            or "us"
+        )
+
+        # Normalise common regional locations (e.g. "us-central1" -> "us").
+        location = raw_location.lower()
+        if location.startswith("us-"):
+            location = "us"
+        elif location.startswith("eu-"):
+            location = "eu"
+
+        # If, after normalisation, the location is not a known multi-region,
+        # log a warning and fall back to "us" to avoid misconfigured endpoints.
+        if location not in ("us", "eu"):
+            logger.warning(
+                "Invalid or unsupported Document AI location '%s'; "
+                "falling back to 'us'.",
+                raw_location,
+            )
+            location = "us"
 
         if not project_id:
             logger.error("google_cloud_project is not configured for Document AI.")
@@ -117,4 +138,8 @@ class DocumentAIExtractorPlugin(AnalyzerBase):
             logger.error(
                 f"Failed to extract text using Document AI for {file_path}: {e}"
             )
-            raise RuntimeError("Document AI extraction failed") from e
+            return {
+                "text": "",
+                "extracted": False,
+                "error": f"Document AI extraction failed: {e}",
+            }
