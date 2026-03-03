@@ -52,4 +52,4 @@ def test_get_llm_provider_no_fallback(mock_config):
             result = get_llm_provider(is_vision=False)
             # Should NOT fall back to Gemini
             mock_gemini.assert_not_called()
-            assert result == "MLX fail"
+            assert result == "PROVIDER_INIT_FAILED"

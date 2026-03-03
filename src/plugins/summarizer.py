@@ -50,17 +50,17 @@ class SummarizerPlugin(AnalyzerBase):
                 "skipped": True,
                 "error": "LLM Provider uninitialized",
             }
-        elif llm == "MISSING_MODEL":
+        elif isinstance(llm, str):
+            error_msg = llm
+            if llm == "MISSING_MODEL":
+                error_msg = f"Llama model not found at {config.llm_model_path}"
+            elif llm == "MISSING_LIBRARY":
+                error_msg = "llama-cpp-python is not installed"
+
             return {
                 "summary": "",
                 "skipped": True,
-                "error": f"Llama model not found at {config.llm_model_path}",
-            }
-        elif llm == "MISSING_LIBRARY":
-            return {
-                "summary": "",
-                "skipped": True,
-                "error": "llama-cpp-python is not installed",
+                "error": error_msg,
             }
 
         prompt = f"""

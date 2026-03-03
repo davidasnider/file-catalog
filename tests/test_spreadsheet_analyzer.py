@@ -138,7 +138,6 @@ async def test_spreadsheet_analyzer_empty_csv(tmp_path):
 async def test_spreadsheet_analyzer_json_serialization(tmp_path):
     import json
     import pandas as pd
-    from src.plugins.spreadsheet_analyzer import SpreadsheetAnalyzerPlugin
 
     plugin = SpreadsheetAnalyzerPlugin()
     csv_file = tmp_path / "serializable.csv"

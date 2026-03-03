@@ -6,11 +6,20 @@ from src.llm.provider import LLMProvider
 
 logger = logging.getLogger(__name__)
 
-# Module-level lock to serialize all MLX GPU operations.
-# Metal cannot handle concurrent command buffer encoders from different
-# async tasks dispatched to the thread pool, causing:
-#   "A command encoder is already encoding to this command buffer"
-_mlx_gpu_lock = asyncio.Lock()
+# Module-level dictionary to store locks per event loop.
+_mlx_gpu_locks = {}
+
+
+def get_mlx_gpu_lock():
+    """
+    Returns an asyncio.Lock for the current running event loop.
+    Lazily creates the lock if it doesn't exist to avoid 'bound to a different event loop' errors.
+    """
+    loop = asyncio.get_running_loop()
+    if loop not in _mlx_gpu_locks:
+        _mlx_gpu_locks[loop] = asyncio.Lock()
+    return _mlx_gpu_locks[loop]
+
 
 try:
     from mlx_lm import load, generate, stream_generate
@@ -121,7 +130,7 @@ class MLXProvider(LLMProvider):
             )
             return response.strip()
 
-        async with _mlx_gpu_lock:
+        async with get_mlx_gpu_lock():
             return await loop.run_in_executor(None, _run_sync)
 
     async def generate_stream(self, prompt: str, **kwargs) -> AsyncGenerator[str, None]:
@@ -144,12 +153,15 @@ class MLXProvider(LLMProvider):
         else:
             formatted_prompt = prompt
 
-        # stream_generate in mlx_lm returns an iterator of tokens
-        iterator = stream_generate(
-            self.model, self.tokenizer, prompt=formatted_prompt, max_tokens=max_tokens
-        )
+        async with get_mlx_gpu_lock():
+            # stream_generate in mlx_lm returns an iterator of tokens
+            iterator = stream_generate(
+                self.model,
+                self.tokenizer,
+                prompt=formatted_prompt,
+                max_tokens=max_tokens,
+            )
 
-        async with _mlx_gpu_lock:
             while True:
                 try:
                     # get next chunk in threadpool to avoid event loop block
@@ -211,5 +223,5 @@ class MLXProvider(LLMProvider):
                 logger.error(f"MLX VLM execution failed: {e}")
                 raise
 
-        async with _mlx_gpu_lock:
+        async with get_mlx_gpu_lock():
             return await loop.run_in_executor(None, _run_sync)

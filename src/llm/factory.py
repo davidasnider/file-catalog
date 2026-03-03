@@ -53,7 +53,7 @@ def _instantiate_provider(
             return "MISSING_LIBRARY"
         except Exception as e:
             logger.error(f"Failed to instantiate GeminiProvider: {e}")
-            return str(e)
+            return "PROVIDER_INIT_FAILED"
     elif provider_type == "mlx":
         try:
             from src.llm.mlx_provider import MLXProvider
@@ -63,7 +63,7 @@ def _instantiate_provider(
             return "MISSING_LIBRARY"
         except Exception as e:
             logger.error(f"Failed to instantiate MLXProvider: {e}")
-            return str(e)
+            return "PROVIDER_INIT_FAILED"
     else:
         logger.error(f"Unknown provider type: {provider_type}")
         return "UNKNOWN_PROVIDER"
