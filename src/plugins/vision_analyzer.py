@@ -45,24 +45,28 @@ class VisionAnalyzerPlugin(AnalyzerBase):
                 temperature=0.2,  # low temp for JSON stability
             )
 
-            # Strip out markdown formatting if the model wrapped it
-            if response_text.startswith("```json"):
-                response_text = response_text[7:]
-            if response_text.endswith("```"):
-                response_text = response_text[:-3]
-
-            response_text = response_text.strip()
-
             try:
-                # Handle cases where the LLM might escape underscores (e.g., is\_sfw)
-                cleaned_response = response_text.replace("\\_", "_").strip()
-                # Find start and end of JSON if LLM included other text
-                start = cleaned_response.find("{")
-                end = cleaned_response.rfind("}") + 1
-                if start != -1 and end > start:
-                    cleaned_response = cleaned_response[start:end]
+                # Robust JSON extraction using regex and finding boundaries
+                import re
 
-                res_data = json.loads(cleaned_response)
+                # 1. Preliminary cleanup: remove common markdown escapes
+                cleaned = response_text.replace("\\_", "_").replace("\\*", "*").strip()
+
+                # 2. Try to find JSON block using regex or bracket counting
+                # This regex looks for anything between { and } including nested braces
+                match = re.search(r"(\{.*\})", cleaned, re.DOTALL)
+                if match:
+                    cleaned_json = match.group(1)
+                else:
+                    # Fallback to finding first/last brace if regex failed
+                    start = cleaned.find("{")
+                    end = cleaned.rfind("}") + 1
+                    if start != -1 and end > start:
+                        cleaned_json = cleaned[start:end]
+                    else:
+                        cleaned_json = cleaned
+
+                res_data = json.loads(cleaned_json)
                 return {
                     "description": res_data.get(
                         "description", "No description provided."
