@@ -282,3 +282,421 @@
 2026-03-03 12:05:47,964 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
 2026-03-03 12:05:47,964 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
 2026-03-03 12:05:48,180 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:06:01,235 - src.core.task_engine - INFO - Running new task Summarizer (v1.2) for 9
+2026-03-03 12:06:01,236 - plugins.summarizer - INFO - Summarizing document /Users/david/code/rfb/Gas Mileage_Mini_2015.txt
+2026-03-03 12:06:01,236 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:06:01,236 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:06:01,450 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:06:17,416 - src.core.task_engine - INFO - Running new task DeepSummarizer (v1.0) for 9
+2026-03-03 12:06:17,417 - src.core.task_engine - INFO - Running new task DuplicateDetector (v1.0) for 9
+2026-03-03 12:06:17,418 - plugins.duplicate_detector - INFO - Running duplicate detection for /Users/david/code/rfb/Gas Mileage_Mini_2015.txt
+2026-03-03 12:06:17,419 - src.core.task_engine - INFO - Running new task EmailParser (v1.0) for 9
+2026-03-03 12:06:17,460 - src.core.task_engine - INFO - Running new task EstateAnalyzer (v1.4) for 9
+2026-03-03 12:06:17,462 - src.core.task_engine - INFO - Running new task LanguageDetector (v1.0) for 9
+2026-03-03 12:06:17,484 - plugins.language_detector - INFO - Detecting language for /Users/david/code/rfb/Gas Mileage_Mini_2015.txt
+2026-03-03 12:06:17,494 - src.core.task_engine - INFO - Running new task MetadataExtractor (v1.0) for 9
+2026-03-03 12:06:17,495 - plugins.metadata - INFO - Extracting metadata for /Users/david/code/rfb/Gas Mileage_Mini_2015.txt
+2026-03-03 12:06:17,495 - src.core.task_engine - INFO - Running new task OCRConfidenceScorer (v1.1) for 9
+2026-03-03 12:06:17,497 - src.core.task_engine - INFO - Running new task PIIHarvester (v1.0) for 9
+2026-03-03 12:06:17,498 - plugins.pii_harvester - INFO - Harvesting PII/Secrets for /Users/david/code/rfb/Gas Mileage_Mini_2015.txt
+2026-03-03 12:06:17,498 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:06:17,498 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:06:17,692 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:06:31,553 - src.core.task_engine - INFO - Running new task SpreadsheetAnalyzer (v1.0) for 9
+2026-03-03 12:06:31,619 - src.core.task_engine - INFO - Running new task TextExtractor (v1.2) for 10
+2026-03-03 12:06:31,620 - plugins.text_extractor - INFO - Extracting text for /Users/david/code/rfb/CenturyLink pic.jpg
+2026-03-03 12:06:31,620 - plugins.text_extractor - INFO - Running OCR on /Users/david/code/rfb/CenturyLink pic.jpg
+2026-03-03 12:06:31,966 - src.core.task_engine - INFO - Running new task DocumentAIExtractor (v1.0) for 10
+2026-03-03 12:06:31,968 - src.core.task_engine - INFO - Running new task audio_transcriber (v1.0) for 10
+2026-03-03 12:06:31,970 - src.core.task_engine - INFO - Running new task vision_analyzer (v1.0) for 10
+2026-03-03 12:06:31,970 - plugins.vision_analyzer - INFO - Running Vision Analysis on /Users/david/code/rfb/CenturyLink pic.jpg
+2026-03-03 12:06:31,970 - src.llm.factory - INFO - LLM Factory: is_vision=True, provider=mlx, model=mlx-community/Qwen3-VL-8B-Instruct-4bit
+2026-03-03 12:06:31,970 - src.llm.mlx_provider - INFO - Initializing MLXProvider (Vision) with model: mlx-community/Qwen3-VL-8B-Instruct-4bit
+2026-03-03 12:06:32,166 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Qwen3-VL-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:06:34,489 - src.llm.mlx_provider - INFO - Patched processor.patch_size = 16 from vision config
+2026-03-03 12:06:34,489 - src.llm.mlx_provider - INFO - Patched processor.vision_feature_select_strategy = 'default'
+2026-03-03 12:06:45,073 - plugins.vision_analyzer - INFO - Vision analysis result for /Users/david/code/rfb/CenturyLink pic.jpg: is_sfw=True (score=0.0), description='The image displays a label from an Actiontec CenturyLink WiFi router (Model C1000A). It contains tec...'
+2026-03-03 12:06:45,077 - src.core.task_engine - INFO - Running new task video_analyzer (v1.0) for 10
+2026-03-03 12:06:45,079 - src.core.task_engine - INFO - Running new task Router (v1.0) for 10
+2026-03-03 12:06:45,080 - plugins.router - INFO - Routing document /Users/david/code/rfb/CenturyLink pic.jpg
+2026-03-03 12:06:45,080 - src.core.task_engine - INFO - Running new task Summarizer (v1.2) for 10
+2026-03-03 12:06:45,142 - plugins.summarizer - INFO - Summarizing document /Users/david/code/rfb/CenturyLink pic.jpg
+2026-03-03 12:06:45,142 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:06:45,142 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:06:45,341 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:06:58,185 - src.core.task_engine - INFO - Running new task DeepSummarizer (v1.0) for 10
+2026-03-03 12:06:58,187 - src.core.task_engine - INFO - Running new task DuplicateDetector (v1.0) for 10
+2026-03-03 12:06:58,188 - plugins.duplicate_detector - INFO - Running duplicate detection for /Users/david/code/rfb/CenturyLink pic.jpg
+2026-03-03 12:06:58,188 - src.core.task_engine - INFO - Running new task EmailParser (v1.0) for 10
+2026-03-03 12:06:58,230 - src.core.task_engine - INFO - Running new task EstateAnalyzer (v1.4) for 10
+2026-03-03 12:06:58,232 - src.core.task_engine - INFO - Running new task LanguageDetector (v1.0) for 10
+2026-03-03 12:06:58,233 - plugins.language_detector - INFO - Detecting language for /Users/david/code/rfb/CenturyLink pic.jpg
+2026-03-03 12:06:58,237 - src.core.task_engine - INFO - Running new task MetadataExtractor (v1.0) for 10
+2026-03-03 12:06:58,238 - plugins.metadata - INFO - Extracting metadata for /Users/david/code/rfb/CenturyLink pic.jpg
+2026-03-03 12:06:58,238 - src.core.task_engine - INFO - Running new task OCRConfidenceScorer (v1.1) for 10
+2026-03-03 12:06:58,239 - plugins.ocr_confidence_scorer - INFO - Scoring OCR confidence for /Users/david/code/rfb/CenturyLink pic.jpg
+2026-03-03 12:06:58,586 - src.core.task_engine - INFO - Running new task PIIHarvester (v1.0) for 10
+2026-03-03 12:06:58,587 - src.core.task_engine - INFO - Running new task SpreadsheetAnalyzer (v1.0) for 10
+2026-03-03 12:06:58,590 - src.core.task_engine - INFO - Running new task TextExtractor (v1.2) for 11
+2026-03-03 12:06:58,591 - plugins.text_extractor - INFO - Extracting text for /Users/david/code/rfb/Desktop 23-Sep'21.jpg
+2026-03-03 12:06:58,591 - plugins.text_extractor - INFO - Running OCR on /Users/david/code/rfb/Desktop 23-Sep'21.jpg
+2026-03-03 12:07:00,435 - src.core.task_engine - INFO - Running new task DocumentAIExtractor (v1.0) for 11
+2026-03-03 12:07:00,437 - src.core.task_engine - INFO - Running new task audio_transcriber (v1.0) for 11
+2026-03-03 12:07:00,438 - src.core.task_engine - INFO - Running new task vision_analyzer (v1.0) for 11
+2026-03-03 12:07:00,439 - plugins.vision_analyzer - INFO - Running Vision Analysis on /Users/david/code/rfb/Desktop 23-Sep'21.jpg
+2026-03-03 12:07:00,439 - src.llm.factory - INFO - LLM Factory: is_vision=True, provider=mlx, model=mlx-community/Qwen3-VL-8B-Instruct-4bit
+2026-03-03 12:07:00,439 - src.llm.mlx_provider - INFO - Initializing MLXProvider (Vision) with model: mlx-community/Qwen3-VL-8B-Instruct-4bit
+2026-03-03 12:07:00,635 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Qwen3-VL-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:07:03,270 - src.llm.mlx_provider - INFO - Patched processor.patch_size = 16 from vision config
+2026-03-03 12:07:03,281 - src.llm.mlx_provider - INFO - Patched processor.vision_feature_select_strategy = 'default'
+2026-03-03 12:07:17,877 - plugins.vision_analyzer - INFO - Vision analysis result for /Users/david/code/rfb/Desktop 23-Sep'21.jpg: is_sfw=True (score=0.0), description='A cluttered Windows desktop screen filled with numerous icons, including folders labeled with person...'
+2026-03-03 12:07:17,901 - src.core.task_engine - INFO - Running new task video_analyzer (v1.0) for 11
+2026-03-03 12:07:17,903 - src.core.task_engine - INFO - Running new task Router (v1.0) for 11
+2026-03-03 12:07:17,904 - plugins.router - INFO - Routing document /Users/david/code/rfb/Desktop 23-Sep'21.jpg
+2026-03-03 12:07:17,904 - src.core.task_engine - INFO - Running new task Summarizer (v1.2) for 11
+2026-03-03 12:07:17,944 - plugins.summarizer - INFO - Summarizing document /Users/david/code/rfb/Desktop 23-Sep'21.jpg
+2026-03-03 12:07:17,944 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:07:17,944 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:07:18,140 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:07:38,062 - src.core.task_engine - INFO - Running new task DeepSummarizer (v1.0) for 11
+2026-03-03 12:07:38,064 - src.core.task_engine - INFO - Running new task DuplicateDetector (v1.0) for 11
+2026-03-03 12:07:38,065 - plugins.duplicate_detector - INFO - Running duplicate detection for /Users/david/code/rfb/Desktop 23-Sep'21.jpg
+2026-03-03 12:07:38,066 - src.core.task_engine - INFO - Running new task EmailParser (v1.0) for 11
+2026-03-03 12:07:38,107 - src.core.task_engine - INFO - Running new task EstateAnalyzer (v1.4) for 11
+2026-03-03 12:07:38,109 - src.core.task_engine - INFO - Running new task LanguageDetector (v1.0) for 11
+2026-03-03 12:07:38,110 - plugins.language_detector - INFO - Detecting language for /Users/david/code/rfb/Desktop 23-Sep'21.jpg
+2026-03-03 12:07:38,118 - src.core.task_engine - INFO - Running new task MetadataExtractor (v1.0) for 11
+2026-03-03 12:07:38,119 - plugins.metadata - INFO - Extracting metadata for /Users/david/code/rfb/Desktop 23-Sep'21.jpg
+2026-03-03 12:07:38,119 - src.core.task_engine - INFO - Running new task OCRConfidenceScorer (v1.1) for 11
+2026-03-03 12:07:38,120 - plugins.ocr_confidence_scorer - INFO - Scoring OCR confidence for /Users/david/code/rfb/Desktop 23-Sep'21.jpg
+2026-03-03 12:07:39,995 - src.core.task_engine - INFO - Running new task PIIHarvester (v1.0) for 11
+2026-03-03 12:07:39,997 - src.core.task_engine - INFO - Running new task SpreadsheetAnalyzer (v1.0) for 11
+2026-03-03 12:07:40,000 - src.core.task_engine - INFO - Running new task TextExtractor (v1.2) for 12
+2026-03-03 12:07:40,001 - plugins.text_extractor - INFO - Extracting text for /Users/david/code/rfb/AT&T Phone.txt
+2026-03-03 12:07:40,001 - src.core.task_engine - INFO - Running new task DocumentAIExtractor (v1.0) for 12
+2026-03-03 12:07:40,002 - src.core.task_engine - INFO - Running new task audio_transcriber (v1.0) for 12
+2026-03-03 12:07:40,003 - src.core.task_engine - INFO - Running new task vision_analyzer (v1.0) for 12
+2026-03-03 12:07:40,005 - src.core.task_engine - INFO - Running new task video_analyzer (v1.0) for 12
+2026-03-03 12:07:40,006 - src.core.task_engine - INFO - Running new task Router (v1.0) for 12
+2026-03-03 12:07:40,007 - plugins.router - INFO - Routing document /Users/david/code/rfb/AT&T Phone.txt
+2026-03-03 12:07:40,007 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:07:40,007 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:07:40,289 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:07:52,505 - src.core.task_engine - INFO - Running new task Summarizer (v1.2) for 12
+2026-03-03 12:07:52,566 - plugins.summarizer - INFO - Summarizing document /Users/david/code/rfb/AT&T Phone.txt
+2026-03-03 12:07:52,566 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:07:52,566 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:07:52,768 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:08:08,620 - src.core.task_engine - INFO - Running new task DuplicateDetector (v1.0) for 7
+2026-03-03 12:08:08,664 - plugins.duplicate_detector - INFO - Running duplicate detection for /Users/david/code/rfb/Warranty.pdf
+2026-03-03 12:08:08,665 - src.core.task_engine - INFO - Running new task EmailParser (v1.0) for 7
+2026-03-03 12:08:08,666 - src.core.task_engine - INFO - Running new task EstateAnalyzer (v1.4) for 7
+2026-03-03 12:08:08,667 - plugins.estate_analyzer - INFO - Checking estate relevance for /Users/david/code/rfb/Warranty.pdf
+2026-03-03 12:08:08,667 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:08,667 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:08,859 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:08:10,448 - src.core.task_engine - INFO - Running new task DeepSummarizer (v1.0) for 12
+2026-03-03 12:08:10,450 - src.core.task_engine - INFO - Running new task DuplicateDetector (v1.0) for 12
+2026-03-03 12:08:10,493 - plugins.duplicate_detector - INFO - Running duplicate detection for /Users/david/code/rfb/AT&T Phone.txt
+2026-03-03 12:08:10,494 - src.core.task_engine - INFO - Running new task EmailParser (v1.0) for 12
+2026-03-03 12:08:10,495 - src.core.task_engine - INFO - Running new task EstateAnalyzer (v1.4) for 12
+2026-03-03 12:08:10,496 - plugins.estate_analyzer - INFO - Checking estate relevance for /Users/david/code/rfb/AT&T Phone.txt
+2026-03-03 12:08:10,496 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:10,496 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:10,609 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:08:15,410 - src.core.task_engine - INFO - Running new task LanguageDetector (v1.0) for 7
+2026-03-03 12:08:15,460 - plugins.language_detector - INFO - Detecting language for /Users/david/code/rfb/Warranty.pdf
+2026-03-03 12:08:15,501 - src.core.task_engine - INFO - Running new task MetadataExtractor (v1.0) for 7
+2026-03-03 12:08:15,502 - plugins.metadata - INFO - Extracting metadata for /Users/david/code/rfb/Warranty.pdf
+2026-03-03 12:08:15,502 - src.core.task_engine - INFO - Running new task OCRConfidenceScorer (v1.1) for 7
+2026-03-03 12:08:15,504 - src.core.task_engine - INFO - Running new task PIIHarvester (v1.0) for 7
+2026-03-03 12:08:15,505 - plugins.pii_harvester - INFO - Harvesting PII/Secrets for /Users/david/code/rfb/Warranty.pdf
+2026-03-03 12:08:15,505 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:15,505 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:15,629 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:08:16,690 - src.core.task_engine - INFO - Running new task LanguageDetector (v1.0) for 12
+2026-03-03 12:08:16,691 - plugins.language_detector - INFO - Detecting language for /Users/david/code/rfb/AT&T Phone.txt
+2026-03-03 12:08:16,770 - src.core.task_engine - INFO - Running new task MetadataExtractor (v1.0) for 12
+2026-03-03 12:08:16,771 - plugins.metadata - INFO - Extracting metadata for /Users/david/code/rfb/AT&T Phone.txt
+2026-03-03 12:08:16,772 - src.core.task_engine - INFO - Running new task OCRConfidenceScorer (v1.1) for 12
+2026-03-03 12:08:16,773 - src.core.task_engine - INFO - Running new task PIIHarvester (v1.0) for 12
+2026-03-03 12:08:16,774 - plugins.pii_harvester - INFO - Harvesting PII/Secrets for /Users/david/code/rfb/AT&T Phone.txt
+2026-03-03 12:08:16,774 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:16,774 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:16,898 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:08:24,075 - src.core.task_engine - INFO - Running new task SpreadsheetAnalyzer (v1.0) for 7
+2026-03-03 12:08:24,138 - src.core.task_engine - INFO - Running new task TextExtractor (v1.2) for 13
+2026-03-03 12:08:24,139 - plugins.text_extractor - INFO - Extracting text for /Users/david/code/rfb/Dr. Sonia J. Rowley.docx
+2026-03-03 12:08:24,142 - src.core.task_engine - INFO - Running new task DocumentAIExtractor (v1.0) for 13
+2026-03-03 12:08:24,144 - src.core.task_engine - INFO - Running new task audio_transcriber (v1.0) for 13
+2026-03-03 12:08:24,145 - src.core.task_engine - INFO - Running new task vision_analyzer (v1.0) for 13
+2026-03-03 12:08:24,146 - src.core.task_engine - INFO - Running new task video_analyzer (v1.0) for 13
+2026-03-03 12:08:24,147 - src.core.task_engine - INFO - Running new task Router (v1.0) for 13
+2026-03-03 12:08:24,148 - plugins.router - INFO - Routing document /Users/david/code/rfb/Dr. Sonia J. Rowley.docx
+2026-03-03 12:08:24,148 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:24,148 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:24,386 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:08:25,734 - src.core.task_engine - INFO - Running new task SpreadsheetAnalyzer (v1.0) for 12
+2026-03-03 12:08:25,808 - src.core.task_engine - INFO - Running new task TextExtractor (v1.2) for 14
+2026-03-03 12:08:25,809 - plugins.text_extractor - INFO - Extracting text for /Users/david/code/rfb/Desktop 6-Sep-'20.jpg
+2026-03-03 12:08:25,810 - plugins.text_extractor - INFO - Running OCR on /Users/david/code/rfb/Desktop 6-Sep-'20.jpg
+2026-03-03 12:08:27,243 - src.core.task_engine - INFO - Running new task DocumentAIExtractor (v1.0) for 14
+2026-03-03 12:08:27,245 - src.core.task_engine - INFO - Running new task Summarizer (v1.2) for 13
+2026-03-03 12:08:27,245 - src.core.task_engine - INFO - Running new task audio_transcriber (v1.0) for 14
+2026-03-03 12:08:27,247 - src.core.task_engine - INFO - Running new task vision_analyzer (v1.0) for 14
+2026-03-03 12:08:27,248 - plugins.vision_analyzer - INFO - Running Vision Analysis on /Users/david/code/rfb/Desktop 6-Sep-'20.jpg
+2026-03-03 12:08:27,248 - src.llm.factory - INFO - LLM Factory: is_vision=True, provider=mlx, model=mlx-community/Qwen3-VL-8B-Instruct-4bit
+2026-03-03 12:08:27,248 - src.llm.mlx_provider - INFO - Initializing MLXProvider (Vision) with model: mlx-community/Qwen3-VL-8B-Instruct-4bit
+2026-03-03 12:08:27,362 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Qwen3-VL-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:08:28,454 - src.llm.mlx_provider - INFO - Patched processor.patch_size = 16 from vision config
+2026-03-03 12:08:28,460 - src.llm.mlx_provider - INFO - Patched processor.vision_feature_select_strategy = 'default'
+2026-03-03 12:08:28,465 - plugins.summarizer - INFO - Summarizing document /Users/david/code/rfb/Dr. Sonia J. Rowley.docx
+2026-03-03 12:08:28,465 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:28,465 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:28,589 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:08:35,503 - plugins.vision_analyzer - INFO - Vision analysis result for /Users/david/code/rfb/Desktop 6-Sep-'20.jpg: is_sfw=True (score=0.0), description='A screenshot of a Windows desktop with an overwhelming number of files and folders, many labeled in ...'
+2026-03-03 12:08:35,508 - src.core.task_engine - INFO - Running new task video_analyzer (v1.0) for 14
+2026-03-03 12:08:35,549 - src.core.task_engine - INFO - Running new task Router (v1.0) for 14
+2026-03-03 12:08:35,550 - plugins.router - INFO - Routing document /Users/david/code/rfb/Desktop 6-Sep-'20.jpg
+2026-03-03 12:08:35,550 - src.core.task_engine - INFO - Running new task Summarizer (v1.2) for 14
+2026-03-03 12:08:35,551 - plugins.summarizer - INFO - Summarizing document /Users/david/code/rfb/Desktop 6-Sep-'20.jpg
+2026-03-03 12:08:35,551 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:35,551 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:35,761 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:08:38,179 - src.core.task_engine - INFO - Running new task DeepSummarizer (v1.0) for 13
+2026-03-03 12:08:38,240 - src.core.task_engine - INFO - Running new task DuplicateDetector (v1.0) for 13
+2026-03-03 12:08:38,241 - plugins.duplicate_detector - INFO - Running duplicate detection for /Users/david/code/rfb/Dr. Sonia J. Rowley.docx
+2026-03-03 12:08:38,242 - src.core.task_engine - INFO - Running new task EmailParser (v1.0) for 13
+2026-03-03 12:08:38,243 - src.core.task_engine - INFO - Running new task EstateAnalyzer (v1.4) for 13
+2026-03-03 12:08:38,244 - src.core.task_engine - INFO - Running new task LanguageDetector (v1.0) for 13
+2026-03-03 12:08:38,245 - plugins.language_detector - INFO - Detecting language for /Users/david/code/rfb/Dr. Sonia J. Rowley.docx
+2026-03-03 12:08:38,252 - src.core.task_engine - INFO - Running new task MetadataExtractor (v1.0) for 13
+2026-03-03 12:08:38,253 - plugins.metadata - INFO - Extracting metadata for /Users/david/code/rfb/Dr. Sonia J. Rowley.docx
+2026-03-03 12:08:38,254 - src.core.task_engine - INFO - Running new task OCRConfidenceScorer (v1.1) for 13
+2026-03-03 12:08:38,255 - src.core.task_engine - INFO - Running new task PIIHarvester (v1.0) for 13
+2026-03-03 12:08:38,256 - plugins.pii_harvester - INFO - Harvesting PII/Secrets for /Users/david/code/rfb/Dr. Sonia J. Rowley.docx
+2026-03-03 12:08:38,256 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:38,256 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:38,379 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:08:40,103 - src.core.task_engine - INFO - Running new task DeepSummarizer (v1.0) for 14
+2026-03-03 12:08:40,150 - src.core.task_engine - INFO - Running new task DuplicateDetector (v1.0) for 14
+2026-03-03 12:08:40,151 - plugins.duplicate_detector - INFO - Running duplicate detection for /Users/david/code/rfb/Desktop 6-Sep-'20.jpg
+2026-03-03 12:08:40,152 - src.core.task_engine - INFO - Running new task EmailParser (v1.0) for 14
+2026-03-03 12:08:40,153 - src.core.task_engine - INFO - Running new task EstateAnalyzer (v1.4) for 14
+2026-03-03 12:08:40,155 - src.core.task_engine - INFO - Running new task LanguageDetector (v1.0) for 14
+2026-03-03 12:08:40,156 - plugins.language_detector - INFO - Detecting language for /Users/david/code/rfb/Desktop 6-Sep-'20.jpg
+2026-03-03 12:08:40,162 - src.core.task_engine - INFO - Running new task MetadataExtractor (v1.0) for 14
+2026-03-03 12:08:40,163 - plugins.metadata - INFO - Extracting metadata for /Users/david/code/rfb/Desktop 6-Sep-'20.jpg
+2026-03-03 12:08:40,163 - src.core.task_engine - INFO - Running new task OCRConfidenceScorer (v1.1) for 14
+2026-03-03 12:08:40,164 - plugins.ocr_confidence_scorer - INFO - Scoring OCR confidence for /Users/david/code/rfb/Desktop 6-Sep-'20.jpg
+2026-03-03 12:08:41,622 - src.core.task_engine - INFO - Running new task PIIHarvester (v1.0) for 14
+2026-03-03 12:08:41,624 - src.core.task_engine - INFO - Running new task SpreadsheetAnalyzer (v1.0) for 14
+2026-03-03 12:08:41,628 - src.core.task_engine - INFO - Running new task TextExtractor (v1.2) for 15
+2026-03-03 12:08:41,630 - plugins.text_extractor - INFO - Extracting text for /Users/david/code/rfb/80 Trips Sun .docx
+2026-03-03 12:08:41,632 - src.core.task_engine - INFO - Running new task DocumentAIExtractor (v1.0) for 15
+2026-03-03 12:08:41,634 - src.core.task_engine - INFO - Running new task audio_transcriber (v1.0) for 15
+2026-03-03 12:08:41,636 - src.core.task_engine - INFO - Running new task vision_analyzer (v1.0) for 15
+2026-03-03 12:08:41,637 - src.core.task_engine - INFO - Running new task video_analyzer (v1.0) for 15
+2026-03-03 12:08:41,638 - src.core.task_engine - INFO - Running new task Router (v1.0) for 15
+2026-03-03 12:08:41,639 - plugins.router - INFO - Routing document /Users/david/code/rfb/80 Trips Sun .docx
+2026-03-03 12:08:41,639 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:41,639 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:41,837 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:08:42,596 - src.core.task_engine - INFO - Running new task SpreadsheetAnalyzer (v1.0) for 13
+2026-03-03 12:08:42,651 - src.core.task_engine - INFO - Running new task TextExtractor (v1.2) for 16
+2026-03-03 12:08:42,652 - plugins.text_extractor - INFO - Extracting text for /Users/david/code/rfb/Clip Board.txt
+2026-03-03 12:08:42,653 - src.core.task_engine - INFO - Running new task DocumentAIExtractor (v1.0) for 16
+2026-03-03 12:08:42,654 - src.core.task_engine - INFO - Running new task audio_transcriber (v1.0) for 16
+2026-03-03 12:08:42,656 - src.core.task_engine - INFO - Running new task vision_analyzer (v1.0) for 16
+2026-03-03 12:08:42,657 - src.core.task_engine - INFO - Running new task video_analyzer (v1.0) for 16
+2026-03-03 12:08:42,658 - src.core.task_engine - INFO - Running new task Router (v1.0) for 16
+2026-03-03 12:08:42,659 - plugins.router - INFO - Routing document /Users/david/code/rfb/Clip Board.txt
+2026-03-03 12:08:42,659 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:42,659 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:42,777 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:08:43,685 - src.core.task_engine - INFO - Running new task Summarizer (v1.2) for 15
+2026-03-03 12:08:43,745 - plugins.summarizer - INFO - Summarizing document /Users/david/code/rfb/80 Trips Sun .docx
+2026-03-03 12:08:43,745 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:43,745 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:43,867 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:08:44,608 - src.core.task_engine - INFO - Running new task Summarizer (v1.2) for 16
+2026-03-03 12:08:44,609 - plugins.summarizer - INFO - Summarizing document /Users/david/code/rfb/Clip Board.txt
+2026-03-03 12:08:44,609 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:44,626 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:44,757 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:08:47,176 - src.core.task_engine - INFO - Running new task DeepSummarizer (v1.0) for 15
+2026-03-03 12:08:47,219 - src.core.task_engine - INFO - Running new task DuplicateDetector (v1.0) for 15
+2026-03-03 12:08:47,220 - plugins.duplicate_detector - INFO - Running duplicate detection for /Users/david/code/rfb/80 Trips Sun .docx
+2026-03-03 12:08:47,221 - src.core.task_engine - INFO - Running new task EmailParser (v1.0) for 15
+2026-03-03 12:08:47,222 - src.core.task_engine - INFO - Running new task EstateAnalyzer (v1.4) for 15
+2026-03-03 12:08:47,223 - src.core.task_engine - INFO - Running new task LanguageDetector (v1.0) for 15
+2026-03-03 12:08:47,224 - plugins.language_detector - INFO - Detecting language for /Users/david/code/rfb/80 Trips Sun .docx
+2026-03-03 12:08:47,234 - src.core.task_engine - INFO - Running new task MetadataExtractor (v1.0) for 15
+2026-03-03 12:08:47,235 - plugins.metadata - INFO - Extracting metadata for /Users/david/code/rfb/80 Trips Sun .docx
+2026-03-03 12:08:47,235 - src.core.task_engine - INFO - Running new task OCRConfidenceScorer (v1.1) for 15
+2026-03-03 12:08:47,239 - src.core.task_engine - INFO - Running new task PIIHarvester (v1.0) for 15
+2026-03-03 12:08:47,240 - plugins.pii_harvester - INFO - Harvesting PII/Secrets for /Users/david/code/rfb/80 Trips Sun .docx
+2026-03-03 12:08:47,240 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:47,240 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:47,363 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:08:48,942 - src.core.task_engine - INFO - Running new task DeepSummarizer (v1.0) for 16
+2026-03-03 12:08:48,984 - src.core.task_engine - INFO - Running new task DuplicateDetector (v1.0) for 16
+2026-03-03 12:08:48,985 - plugins.duplicate_detector - INFO - Running duplicate detection for /Users/david/code/rfb/Clip Board.txt
+2026-03-03 12:08:48,986 - src.core.task_engine - INFO - Running new task EmailParser (v1.0) for 16
+2026-03-03 12:08:48,988 - src.core.task_engine - INFO - Running new task EstateAnalyzer (v1.4) for 16
+2026-03-03 12:08:48,988 - plugins.estate_analyzer - INFO - Checking estate relevance for /Users/david/code/rfb/Clip Board.txt
+2026-03-03 12:08:48,989 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:48,989 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:49,113 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:08:51,646 - src.core.task_engine - INFO - Running new task SpreadsheetAnalyzer (v1.0) for 15
+2026-03-03 12:08:51,699 - src.core.task_engine - INFO - Running new task TextExtractor (v1.2) for 17
+2026-03-03 12:08:51,700 - plugins.text_extractor - INFO - Extracting text for /Users/david/code/rfb/NY Times Mini-Crossword.txt
+2026-03-03 12:08:51,700 - src.core.task_engine - INFO - Running new task DocumentAIExtractor (v1.0) for 17
+2026-03-03 12:08:51,702 - src.core.task_engine - INFO - Running new task audio_transcriber (v1.0) for 17
+2026-03-03 12:08:51,703 - src.core.task_engine - INFO - Running new task vision_analyzer (v1.0) for 17
+2026-03-03 12:08:51,704 - src.core.task_engine - INFO - Running new task video_analyzer (v1.0) for 17
+2026-03-03 12:08:51,706 - src.core.task_engine - INFO - Running new task Router (v1.0) for 17
+2026-03-03 12:08:51,707 - plugins.router - INFO - Routing document /Users/david/code/rfb/NY Times Mini-Crossword.txt
+2026-03-03 12:08:51,707 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:51,707 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:51,845 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:08:52,936 - src.core.task_engine - INFO - Running new task LanguageDetector (v1.0) for 16
+2026-03-03 12:08:52,984 - plugins.language_detector - INFO - Detecting language for /Users/david/code/rfb/Clip Board.txt
+2026-03-03 12:08:52,988 - src.core.task_engine - INFO - Running new task MetadataExtractor (v1.0) for 16
+2026-03-03 12:08:52,989 - plugins.metadata - INFO - Extracting metadata for /Users/david/code/rfb/Clip Board.txt
+2026-03-03 12:08:52,989 - src.core.task_engine - INFO - Running new task OCRConfidenceScorer (v1.1) for 16
+2026-03-03 12:08:52,991 - src.core.task_engine - INFO - Running new task PIIHarvester (v1.0) for 16
+2026-03-03 12:08:52,992 - plugins.pii_harvester - INFO - Harvesting PII/Secrets for /Users/david/code/rfb/Clip Board.txt
+2026-03-03 12:08:52,992 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:52,992 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:53,108 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:08:54,616 - src.core.task_engine - INFO - Running new task Summarizer (v1.2) for 17
+2026-03-03 12:08:54,657 - plugins.summarizer - INFO - Summarizing document /Users/david/code/rfb/NY Times Mini-Crossword.txt
+2026-03-03 12:08:54,657 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:54,657 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:54,783 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:08:57,361 - src.core.task_engine - INFO - Running new task SpreadsheetAnalyzer (v1.0) for 16
+2026-03-03 12:08:57,424 - src.core.task_engine - INFO - Running new task TextExtractor (v1.2) for 18
+2026-03-03 12:08:57,425 - plugins.text_extractor - INFO - Extracting text for /Users/david/code/rfb/Money rfb.mny
+2026-03-03 12:08:57,425 - src.core.task_engine - INFO - Running new task DocumentAIExtractor (v1.0) for 18
+2026-03-03 12:08:57,426 - src.core.task_engine - INFO - Running new task audio_transcriber (v1.0) for 18
+2026-03-03 12:08:57,428 - src.core.task_engine - INFO - Running new task vision_analyzer (v1.0) for 18
+2026-03-03 12:08:57,429 - src.core.task_engine - INFO - Running new task video_analyzer (v1.0) for 18
+2026-03-03 12:08:57,430 - src.core.task_engine - INFO - Running new task Router (v1.0) for 18
+2026-03-03 12:08:57,431 - plugins.router - INFO - Routing document /Users/david/code/rfb/Money rfb.mny
+2026-03-03 12:08:57,431 - src.core.task_engine - INFO - Running new task Summarizer (v1.2) for 18
+2026-03-03 12:08:57,432 - plugins.summarizer - INFO - Summarizing document /Users/david/code/rfb/Money rfb.mny
+2026-03-03 12:08:57,433 - src.core.task_engine - INFO - Running new task DeepSummarizer (v1.0) for 18
+2026-03-03 12:08:57,434 - src.core.task_engine - INFO - Running new task DuplicateDetector (v1.0) for 18
+2026-03-03 12:08:57,435 - plugins.duplicate_detector - INFO - Running duplicate detection for /Users/david/code/rfb/Money rfb.mny
+2026-03-03 12:08:57,438 - src.core.task_engine - INFO - Running new task EmailParser (v1.0) for 18
+2026-03-03 12:08:57,440 - src.core.task_engine - INFO - Running new task EstateAnalyzer (v1.4) for 18
+2026-03-03 12:08:57,441 - src.core.task_engine - INFO - Running new task LanguageDetector (v1.0) for 18
+2026-03-03 12:08:57,442 - src.core.task_engine - INFO - Running new task MetadataExtractor (v1.0) for 18
+2026-03-03 12:08:57,443 - plugins.metadata - INFO - Extracting metadata for /Users/david/code/rfb/Money rfb.mny
+2026-03-03 12:08:57,443 - src.core.task_engine - INFO - Running new task OCRConfidenceScorer (v1.1) for 18
+2026-03-03 12:08:57,444 - src.core.task_engine - INFO - Running new task PIIHarvester (v1.0) for 18
+2026-03-03 12:08:57,445 - src.core.task_engine - INFO - Running new task SpreadsheetAnalyzer (v1.0) for 18
+2026-03-03 12:08:57,448 - src.core.task_engine - INFO - Running new task TextExtractor (v1.2) for 19
+2026-03-03 12:08:57,449 - plugins.text_extractor - INFO - Extracting text for /Users/david/code/rfb/Appointments  - Copy.txt
+2026-03-03 12:08:57,449 - src.core.task_engine - INFO - Running new task DocumentAIExtractor (v1.0) for 19
+2026-03-03 12:08:57,451 - src.core.task_engine - INFO - Running new task audio_transcriber (v1.0) for 19
+2026-03-03 12:08:57,452 - src.core.task_engine - INFO - Running new task vision_analyzer (v1.0) for 19
+2026-03-03 12:08:57,453 - src.core.task_engine - INFO - Running new task video_analyzer (v1.0) for 19
+2026-03-03 12:08:57,454 - src.core.task_engine - INFO - Running new task Router (v1.0) for 19
+2026-03-03 12:08:57,455 - plugins.router - INFO - Routing document /Users/david/code/rfb/Appointments  - Copy.txt
+2026-03-03 12:08:57,455 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:57,455 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:57,590 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:08:59,593 - src.core.task_engine - INFO - Running new task DeepSummarizer (v1.0) for 17
+2026-03-03 12:08:59,657 - src.core.task_engine - INFO - Running new task DuplicateDetector (v1.0) for 17
+2026-03-03 12:08:59,658 - plugins.duplicate_detector - INFO - Running duplicate detection for /Users/david/code/rfb/NY Times Mini-Crossword.txt
+2026-03-03 12:08:59,659 - src.core.task_engine - INFO - Running new task EmailParser (v1.0) for 17
+2026-03-03 12:08:59,660 - src.core.task_engine - INFO - Running new task EstateAnalyzer (v1.4) for 17
+2026-03-03 12:08:59,661 - src.core.task_engine - INFO - Running new task LanguageDetector (v1.0) for 17
+2026-03-03 12:08:59,662 - plugins.language_detector - INFO - Detecting language for /Users/david/code/rfb/NY Times Mini-Crossword.txt
+2026-03-03 12:08:59,666 - src.core.task_engine - INFO - Running new task MetadataExtractor (v1.0) for 17
+2026-03-03 12:08:59,668 - plugins.metadata - INFO - Extracting metadata for /Users/david/code/rfb/NY Times Mini-Crossword.txt
+2026-03-03 12:08:59,668 - src.core.task_engine - INFO - Running new task OCRConfidenceScorer (v1.1) for 17
+2026-03-03 12:08:59,669 - src.core.task_engine - INFO - Running new task PIIHarvester (v1.0) for 17
+2026-03-03 12:08:59,670 - plugins.pii_harvester - INFO - Harvesting PII/Secrets for /Users/david/code/rfb/NY Times Mini-Crossword.txt
+2026-03-03 12:08:59,670 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:59,670 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:08:59,793 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:09:00,735 - src.core.task_engine - INFO - Running new task Summarizer (v1.2) for 19
+2026-03-03 12:09:00,786 - plugins.summarizer - INFO - Summarizing document /Users/david/code/rfb/Appointments  - Copy.txt
+2026-03-03 12:09:00,786 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:09:00,786 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:09:00,913 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:09:02,611 - src.core.task_engine - INFO - Running new task SpreadsheetAnalyzer (v1.0) for 17
+2026-03-03 12:09:02,654 - src.core.task_engine - INFO - Running new task TextExtractor (v1.2) for 20
+2026-03-03 12:09:02,655 - plugins.text_extractor - INFO - Extracting text for /Users/david/code/rfb/Anniversaries .txt
+2026-03-03 12:09:02,655 - src.core.task_engine - INFO - Running new task DocumentAIExtractor (v1.0) for 20
+2026-03-03 12:09:02,657 - src.core.task_engine - INFO - Running new task audio_transcriber (v1.0) for 20
+2026-03-03 12:09:02,658 - src.core.task_engine - INFO - Running new task vision_analyzer (v1.0) for 20
+2026-03-03 12:09:02,659 - src.core.task_engine - INFO - Running new task video_analyzer (v1.0) for 20
+2026-03-03 12:09:02,660 - src.core.task_engine - INFO - Running new task Router (v1.0) for 20
+2026-03-03 12:09:02,661 - plugins.router - INFO - Routing document /Users/david/code/rfb/Anniversaries .txt
+2026-03-03 12:09:02,661 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:09:02,661 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:09:02,769 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:09:04,537 - src.core.task_engine - INFO - Running new task DeepSummarizer (v1.0) for 19
+2026-03-03 12:09:04,582 - src.core.task_engine - INFO - Running new task DuplicateDetector (v1.0) for 19
+2026-03-03 12:09:04,584 - plugins.duplicate_detector - INFO - Running duplicate detection for /Users/david/code/rfb/Appointments  - Copy.txt
+2026-03-03 12:09:04,584 - src.core.task_engine - INFO - Running new task EmailParser (v1.0) for 19
+2026-03-03 12:09:04,586 - src.core.task_engine - INFO - Running new task EstateAnalyzer (v1.4) for 19
+2026-03-03 12:09:04,587 - plugins.estate_analyzer - INFO - Checking estate relevance for /Users/david/code/rfb/Appointments  - Copy.txt
+2026-03-03 12:09:04,587 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:09:04,587 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:09:04,725 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:09:05,819 - src.core.task_engine - INFO - Running new task Summarizer (v1.2) for 20
+2026-03-03 12:09:05,865 - plugins.summarizer - INFO - Summarizing document /Users/david/code/rfb/Anniversaries .txt
+2026-03-03 12:09:05,865 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:09:05,865 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:09:05,990 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:09:07,241 - src.core.task_engine - INFO - Running new task LanguageDetector (v1.0) for 19
+2026-03-03 12:09:07,303 - plugins.language_detector - INFO - Detecting language for /Users/david/code/rfb/Appointments  - Copy.txt
+2026-03-03 12:09:07,308 - src.core.task_engine - INFO - Running new task MetadataExtractor (v1.0) for 19
+2026-03-03 12:09:07,309 - plugins.metadata - INFO - Extracting metadata for /Users/david/code/rfb/Appointments  - Copy.txt
+2026-03-03 12:09:07,309 - src.core.task_engine - INFO - Running new task OCRConfidenceScorer (v1.1) for 19
+2026-03-03 12:09:07,311 - src.core.task_engine - INFO - Running new task PIIHarvester (v1.0) for 19
+2026-03-03 12:09:07,311 - plugins.pii_harvester - INFO - Harvesting PII/Secrets for /Users/david/code/rfb/Appointments  - Copy.txt
+2026-03-03 12:09:07,311 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:09:07,312 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:09:07,441 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:09:09,479 - src.core.task_engine - INFO - Running new task DeepSummarizer (v1.0) for 20
+2026-03-03 12:09:09,521 - src.core.task_engine - INFO - Running new task DuplicateDetector (v1.0) for 20
+2026-03-03 12:09:09,522 - plugins.duplicate_detector - INFO - Running duplicate detection for /Users/david/code/rfb/Anniversaries .txt
+2026-03-03 12:09:09,522 - src.core.task_engine - INFO - Running new task EmailParser (v1.0) for 20
+2026-03-03 12:09:09,524 - src.core.task_engine - INFO - Running new task EstateAnalyzer (v1.4) for 20
+2026-03-03 12:09:09,525 - plugins.estate_analyzer - INFO - Checking estate relevance for /Users/david/code/rfb/Anniversaries .txt
+2026-03-03 12:09:09,525 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:09:09,525 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:09:09,648 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:09:11,315 - src.core.task_engine - INFO - Running new task SpreadsheetAnalyzer (v1.0) for 19
+2026-03-03 12:09:11,361 - src.core.task_engine - INFO - Running new task TextExtractor (v1.2) for 21
+2026-03-03 12:09:11,362 - plugins.text_extractor - INFO - Extracting text for /Users/david/code/rfb/RFB Med List.docx
+2026-03-03 12:09:11,367 - src.core.task_engine - INFO - Running new task DocumentAIExtractor (v1.0) for 21
+2026-03-03 12:09:11,368 - src.core.task_engine - INFO - Running new task audio_transcriber (v1.0) for 21
+2026-03-03 12:09:11,369 - src.core.task_engine - INFO - Running new task vision_analyzer (v1.0) for 21
+2026-03-03 12:09:11,371 - src.core.task_engine - INFO - Running new task video_analyzer (v1.0) for 21
+2026-03-03 12:09:11,372 - src.core.task_engine - INFO - Running new task Router (v1.0) for 21
+2026-03-03 12:09:11,373 - plugins.router - INFO - Routing document /Users/david/code/rfb/RFB Med List.docx
+2026-03-03 12:09:11,373 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:09:11,373 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:09:11,515 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:09:12,932 - src.core.task_engine - INFO - Running new task LanguageDetector (v1.0) for 20
+2026-03-03 12:09:12,992 - plugins.language_detector - INFO - Detecting language for /Users/david/code/rfb/Anniversaries .txt
+2026-03-03 12:09:12,997 - src.core.task_engine - INFO - Running new task MetadataExtractor (v1.0) for 20
+2026-03-03 12:09:12,998 - plugins.metadata - INFO - Extracting metadata for /Users/david/code/rfb/Anniversaries .txt
+2026-03-03 12:09:12,999 - src.core.task_engine - INFO - Running new task OCRConfidenceScorer (v1.1) for 20
+2026-03-03 12:09:13,000 - src.core.task_engine - INFO - Running new task PIIHarvester (v1.0) for 20
+2026-03-03 12:09:13,001 - plugins.pii_harvester - INFO - Harvesting PII/Secrets for /Users/david/code/rfb/Anniversaries .txt
+2026-03-03 12:09:13,001 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:09:13,001 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:09:13,117 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"
+2026-03-03 12:09:14,419 - src.core.task_engine - INFO - Running new task Summarizer (v1.2) for 21
+2026-03-03 12:09:14,478 - plugins.summarizer - INFO - Summarizing document /Users/david/code/rfb/RFB Med List.docx
+2026-03-03 12:09:14,478 - src.llm.factory - INFO - LLM Factory: is_vision=False, provider=mlx, model=mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:09:14,478 - src.llm.mlx_provider - INFO - Initializing MLXProvider with model: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
+2026-03-03 12:09:14,596 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/mlx-community/Meta-Llama-3.1-8B-Instruct-4bit/revision/main "HTTP/1.1 200 OK"

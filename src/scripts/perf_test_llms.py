@@ -1,13 +1,11 @@
 import argparse
 import asyncio
 import os
-import sys
 import time
 import psutil
 from pathlib import Path
 
-# Add project root to path
-sys.path.append(str(Path(__file__).parent.parent.parent))
+# To run this script, use: python -m src.scripts.perf_test_llms
 
 from src.core.config import config
 from src.llm.factory import get_llm_provider

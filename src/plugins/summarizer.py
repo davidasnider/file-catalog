@@ -51,11 +51,35 @@ class SummarizerPlugin(AnalyzerBase):
                 "error": "LLM Provider uninitialized",
             }
         elif isinstance(llm, str):
+            provider = getattr(config, "llm_provider", None)
+            model_path = getattr(config, "llm_model_path", None)
             error_msg = llm
+
             if llm == "MISSING_MODEL":
-                error_msg = f"Model not found at {config.llm_model_path}"
+                if provider in ("llama", "llama_cpp"):
+                    if model_path:
+                        error_msg = f"Llama model not found at {model_path}"
+                    else:
+                        error_msg = "Llama model not found"
+                else:
+                    if model_path and provider:
+                        error_msg = (
+                            f"Model not found for provider '{provider}' at {model_path}"
+                        )
+                    elif provider:
+                        error_msg = f"Model not found for provider '{provider}'"
+                    elif model_path:
+                        error_msg = f"Model not found at {model_path}"
+                    else:
+                        error_msg = "Model not found for configured LLM provider"
             elif llm == "MISSING_LIBRARY":
-                error_msg = "llama-cpp-python is not installed"
+                if provider in ("llama", "llama_cpp"):
+                    error_msg = "llama-cpp-python is not installed"
+                else:
+                    if provider:
+                        error_msg = f"Required LLM library for provider '{provider}' is not installed"
+                    else:
+                        error_msg = "Required LLM library is not installed"
 
             return {
                 "summary": "",

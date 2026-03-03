@@ -54,6 +54,8 @@ class VisionAnalyzerPlugin(AnalyzerBase):
                 from src.core.text_utils import repair_and_load_json
 
                 res_data = repair_and_load_json(response_text)
+                if not res_data:
+                    raise ValueError("Parsed JSON response is empty or invalid.")
 
                 score = res_data.get("adult_content_score", 0)
                 # If the score is missing or not a number, default to safe unless description looks bad
@@ -94,8 +96,14 @@ class VisionAnalyzerPlugin(AnalyzerBase):
             except Exception as e:
                 import traceback
 
+                preview = response_text[:500] + (
+                    "...[truncated]" if len(response_text) > 500 else ""
+                )
                 logger.error(
-                    f"Failed to parse Vision LLM JSON response for {file_path}. Error: {str(e)}\nTraceback: {traceback.format_exc()}\nRaw text: {response_text}"
+                    f"Failed to parse Vision LLM JSON response for {file_path}. Error: {str(e)}\nTraceback: {traceback.format_exc()}\nSee debug logs for a truncated preview of the raw text."
+                )
+                logger.debug(
+                    f"Raw Vision LLM response preview for {file_path}:\n{preview}"
                 )
                 # Be conservative: treat unparseable responses as not safe for work
                 # Avoid returning the raw response_text to prevent polluting downstream text summarizers

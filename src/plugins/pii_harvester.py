@@ -88,6 +88,13 @@ class PIIHarvesterPlugin(AnalyzerBase):
             from src.core.text_utils import repair_and_load_json
 
             parsed = repair_and_load_json(response)
+            if not parsed:
+                parsed = {"names": [], "emails": [], "addresses": [], "secrets": []}
+            else:
+                parsed.setdefault("names", [])
+                parsed.setdefault("emails", [])
+                parsed.setdefault("addresses", [])
+                parsed.setdefault("secrets", [])
             return {"pii": parsed, "skipped": False, "method": "llm_json_expert"}
         except Exception as e:
             logger.error(f"Failed to harvest PII for {file_path}: {e}")
