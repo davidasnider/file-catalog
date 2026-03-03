@@ -3,6 +3,7 @@ from typing import Dict, Any
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
 from src.llm.factory import get_llm_provider
+from src.core.config import config
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,7 @@ class EstateAnalyzerPlugin(AnalyzerBase):
             return {
                 "is_estate_document": False,
                 "skipped": True,
-                "error": "Llama model not found at models/Llama-3-8B.gguf",
+                "error": f"Model not found at {config.llm_model_path}",
             }
         elif llm == "MISSING_LIBRARY":
             return {

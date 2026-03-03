@@ -23,6 +23,7 @@ def get_mlx_gpu_lock():
 
 try:
     from mlx_lm import load, generate, stream_generate
+    from mlx_lm.sample_utils import make_sampler, make_logits_processors
 
     HAS_MLX = True
 except ImportError:
@@ -121,11 +122,18 @@ class MLXProvider(LLMProvider):
             else:
                 formatted_prompt = prompt
 
+            sampler = make_sampler(temp=kwargs.get("temperature", 0.0))
+            logits_processors = make_logits_processors(
+                repetition_penalty=kwargs.get("repetition_penalty", 1.2)
+            )
+
             response = generate(
                 self.model,
                 self.tokenizer,
                 prompt=formatted_prompt,
                 max_tokens=max_tokens,
+                sampler=sampler,
+                logits_processors=logits_processors,
                 verbose=False,
             )
             return response.strip()
@@ -154,12 +162,19 @@ class MLXProvider(LLMProvider):
             formatted_prompt = prompt
 
         async with get_mlx_gpu_lock():
+            sampler = make_sampler(temp=kwargs.get("temperature", 0.0))
+            logits_processors = make_logits_processors(
+                repetition_penalty=kwargs.get("repetition_penalty", 1.2)
+            )
+
             # stream_generate in mlx_lm returns an iterator of tokens
             iterator = stream_generate(
                 self.model,
                 self.tokenizer,
                 prompt=formatted_prompt,
                 max_tokens=max_tokens,
+                sampler=sampler,
+                logits_processors=logits_processors,
             )
 
             while True:
@@ -187,15 +202,13 @@ class MLXProvider(LLMProvider):
             # Different processors might have different requirements for the prompt
             # but mlx_vlm generate attempts to format it
             try:
-                # Based on mlx_vlm docs, we can format chat prompts or just pass the text and image
-                # The generate wrapper often accepts standard prompts
                 if hasattr(self.processor, "apply_chat_template"):
                     messages = [
                         {
                             "role": "user",
                             "content": [
-                                {"type": "text", "text": prompt},
                                 {"type": "image"},
+                                {"type": "text", "text": prompt},
                             ],
                         }
                     ]
@@ -211,6 +224,8 @@ class MLXProvider(LLMProvider):
                     prompt=formatted_prompt,
                     image=image_path,
                     max_tokens=max_tokens,
+                    temperature=kwargs.get("temperature", 0.0),
+                    repetition_penalty=kwargs.get("repetition_penalty", 1.2),
                     verbose=False,
                 )
 

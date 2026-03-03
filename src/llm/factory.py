@@ -13,6 +13,10 @@ def get_llm_provider(is_vision: bool = False, **kwargs) -> LLMProvider | str:
     provider_type = config.vision_provider if is_vision else config.llm_provider
     model_path = config.vision_model_path if is_vision else config.llm_model_path
 
+    logger.info(
+        f"LLM Factory: is_vision={is_vision}, provider={provider_type}, model={model_path}"
+    )
+
     kwargs["is_vision"] = is_vision
     provider = _instantiate_provider(provider_type, model_path, **kwargs)
 

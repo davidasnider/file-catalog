@@ -71,4 +71,26 @@ def repair_and_load_json(text: str) -> Dict[str, Any]:
             return data
         return {}
     except Exception:
-        return {}
+        # 5. LAST RESORT HEURISTIC for severely truncated LLM JSON
+        # e.g. {"description": "A woman standing... [TRUNCATED]
+        data = {}
+        # Try to extract anything that looks like "description": "..."
+        desc_match = re.search(
+            r'"description":\s*"(.*?)(?:"|$)', cleaned, re.IGNORECASE | re.DOTALL
+        )
+        if desc_match:
+            data["description"] = desc_match.group(1).strip()
+
+        # Try to extract score: "score": 5
+        score_match = re.search(
+            r'"(?:adult_content_)?score":\s*(\d+(?:\.\d+)?)', cleaned, re.IGNORECASE
+        )
+        if score_match:
+            data["adult_content_score"] = float(score_match.group(1))
+
+        # Try to extract is_sfw: "is_sfw": true
+        sfw_match = re.search(r'"is_sfw":\s*(true|false)', cleaned, re.IGNORECASE)
+        if sfw_match:
+            data["is_sfw"] = sfw_match.group(1).lower() == "true"
+
+        return data

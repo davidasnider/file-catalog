@@ -70,10 +70,10 @@ async def run_benchmark(root_dir: Path):
 
     results = []
 
-    # Configure Providers to Test
+    # Configure Providers to Test (Defaults to current config)
     providers_to_test = [
-        {"name": "llama_cpp", "model_path": "models/Llama-3-8B.gguf"},
-        {"name": "mlx", "model_path": "mlx-community/Meta-Llama-3-8B-Instruct-4bit"},
+        {"name": config.llm_provider, "model_path": config.llm_model_path},
+        {"name": config.vision_provider, "model_path": config.vision_model_path},
     ]
 
     for p in providers_to_test:

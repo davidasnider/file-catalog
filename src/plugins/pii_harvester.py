@@ -6,7 +6,7 @@ from src.llm.factory import get_llm_provider
 
 logger = logging.getLogger(__name__)
 
-# Using Llama-3-8B for general extraction (can swap to Qwen later for specialized speed)
+# Using the configured LLM for general extraction
 
 
 @register_analyzer(

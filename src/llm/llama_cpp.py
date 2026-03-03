@@ -32,6 +32,18 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 KNOWN_MODELS = {
+    "Qwen-3.5-27B": (
+        "bartowski/Qwen3.5-27B-Instruct-GGUF",
+        "Qwen3.5-27B-Instruct-Q4_K_M.gguf",
+    ),
+    "Qwen-3-VL-32B": (
+        "bartowski/Qwen3-VL-32B-Instruct-GGUF",
+        "Qwen3-VL-32B-Instruct-Q4_K_M.gguf",
+    ),
+    "Gemma-3-4B": (
+        "bartowski/gemma-3-4b-it-GGUF",
+        "gemma-3-4b-it-Q4_K_M.gguf",
+    ),
     "Llama-3-8B": (
         "QuantFactory/Meta-Llama-3-8B-Instruct-GGUF",
         "Meta-Llama-3-8B-Instruct.Q4_K_M.gguf",

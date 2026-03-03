@@ -46,13 +46,13 @@ class GeminiProvider(LLMProvider):
 
         self.client = genai.Client(**client_kwargs)
 
-        # Map model name based on whether it is a vision task or a text task
+        # Map model name to appropriate provider aliases
         if is_vision:
-            # Vertex AI currently exposes Gemini 3.1 multimodal via a specific preview alias
-            self.model_name = "gemini-3.1-flash-image-preview"
+            # Qwen 3 VL
+            self.model_name = "qwen3-vl-32b"
         else:
-            # Standard text and chat
-            self.model_name = "gemini-3-flash-preview"
+            # Llama 3.1
+            self.model_name = "llama-3.1-8b"
 
         logger.info(f"Initializing GeminiProvider with model: {self.model_name}")
 

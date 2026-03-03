@@ -7,7 +7,7 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 ### 1. Multi-Model Orchestration & Memory Management
 - **Native Python LLM Management**: Directly manages models using `llama-cpp-python` without external proxy bloat.
 - **LRU Cache & RAM Monitoring**: Actively monitors system RAM (via `psutil`). Models are cached "hot" in unified memory for maximum speed between tasks, and gracefully evicted using an LRU strategy only when memory drops below 2GB.
-- **Dynamic Model Fetching**: Automatically downloads and manages localized GGUF models directly from HuggingFace (e.g., `Llama-3-8B-Instruct`, `Phi-4-mini`) upon first request.
+- **Dynamic Model Fetching**: Automatically downloads and manages localized GGUF models directly from HuggingFace (e.g., `Llama-3.1-8B-Instruct`, `Phi-4-mini`) upon first request.
 
 ### 2. Intelligent Document Routing
 - **Hybrid Router Paradigm**: The pipeline utilizes a dedicated `RouterPlugin` to act as a traffic controller before touching heavy, specialized reasoning models.

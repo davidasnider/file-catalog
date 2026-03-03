@@ -53,7 +53,7 @@ class SummarizerPlugin(AnalyzerBase):
         elif isinstance(llm, str):
             error_msg = llm
             if llm == "MISSING_MODEL":
-                error_msg = f"Llama model not found at {config.llm_model_path}"
+                error_msg = f"Model not found at {config.llm_model_path}"
             elif llm == "MISSING_LIBRARY":
                 error_msg = "llama-cpp-python is not installed"
 
