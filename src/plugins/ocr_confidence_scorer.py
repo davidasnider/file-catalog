@@ -22,7 +22,7 @@ class OCRConfidenceScorerPlugin(AnalyzerBase):
     word-level confidence data. Flags low-confidence extractions for
     manual review.
 
-    Runs independently of TextExtractor to avoid duplicate OCR passes.
+    This plugin performs an independent Tesseract pass to extract confidence scores.
     """
 
     def should_run(

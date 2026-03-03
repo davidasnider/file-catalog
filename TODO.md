@@ -17,10 +17,10 @@
 - [ ] Add a tag/label system so users can manually or automatically tag files and filter by them in the dashboard.
 
 ## LLM Provider Expansion
-- [ ] Implement a `GeminiProvider` or `OpenAIProvider` as a cloud fallback in the `LLMProvider` interface (as outlined in the PRD).
-- [ ] Add an `MLXProvider` for native Apple Silicon acceleration.
+- [x] Implement a `GeminiProvider` or `OpenAIProvider` as a cloud fallback in the `LLMProvider` interface (as outlined in the PRD).
+- [x] Add an `MLXProvider` for native Apple Silicon acceleration.
 - [ ] Make the model selection configurable per-plugin via a config file or environment variables instead of hardcoded paths.
-- [ ] Upgrade vision model — replace LLaVA 1.5-7B with a more capable multimodal model (e.g., LLaVA-NeXT, Moondream, or a Gemini vision endpoint).
+- [x] Upgrade vision model — replace LLaVA 1.5-7B with a more capable multimodal model (Qwen 3 VL).
 
 ## New Plugins
 - [x] **Duplicate Detector Plugin** — use file hashes and/or semantic similarity to surface duplicate or near-duplicate files across the archive.

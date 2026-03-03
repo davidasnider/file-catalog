@@ -132,3 +132,23 @@ async def test_spreadsheet_analyzer_empty_csv(tmp_path):
     sheet = result["sheets"][0]
     assert sheet["total_rows"] == 0
     assert sheet["column_names"] == ["col_a", "col_b"]
+
+
+@pytest.mark.asyncio
+async def test_spreadsheet_analyzer_json_serialization(tmp_path):
+    import json
+    import pandas as pd
+
+    plugin = SpreadsheetAnalyzerPlugin()
+    csv_file = tmp_path / "serializable.csv"
+
+    # Create DataFrame with types that typically cause serialization issues (e.g., numpy scalar types)
+    df = pd.DataFrame({"integer_col": [1, 2, 3], "float_col": [1.1, 2.2, 3.3]})
+    df.to_csv(csv_file, index=False)
+
+    result = await plugin.analyze(str(csv_file), "text/csv", {})
+
+    # If the serialization fails, json.dumps will raise a TypeError
+    serialized_result = json.dumps(result)
+    assert isinstance(serialized_result, str)
+    assert "integer_col" in serialized_result

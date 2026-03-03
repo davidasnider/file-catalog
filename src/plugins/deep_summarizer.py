@@ -6,8 +6,7 @@ from src.llm.factory import get_llm_provider
 
 logger = logging.getLogger(__name__)
 
-# Reusing the Llama-3-8B model for Map-Reduce summarization
-MODEL_PATH = "models/Llama-3-8B.gguf"
+# Reusing the configured LLM model for Map-Reduce summarization
 
 
 @register_analyzer(

@@ -50,17 +50,43 @@ class SummarizerPlugin(AnalyzerBase):
                 "skipped": True,
                 "error": "LLM Provider uninitialized",
             }
-        elif llm == "MISSING_MODEL":
+        elif isinstance(llm, str):
+            provider = getattr(config, "llm_provider", None)
+            model_path = getattr(config, "llm_model_path", None)
+            error_msg = llm
+
+            if llm == "MISSING_MODEL":
+                if provider in ("llama", "llama_cpp"):
+                    if model_path:
+                        error_msg = f"Llama model not found at {model_path}"
+                    else:
+                        error_msg = "Llama model not found"
+                else:
+                    if model_path and provider:
+                        error_msg = (
+                            f"Model not found for provider '{provider}' at {model_path}"
+                        )
+                    elif provider:
+                        error_msg = f"Model not found for provider '{provider}'"
+                    elif model_path:
+                        error_msg = f"Model not found at {model_path}"
+                    else:
+                        error_msg = "Model not found for configured LLM provider"
+            elif llm == "MISSING_LIBRARY":
+                if provider in ("llama", "llama_cpp"):
+                    error_msg = "llama-cpp-python is not installed"
+                else:
+                    if provider:
+                        error_msg = f"Required LLM library for provider '{provider}' is not installed"
+                    else:
+                        error_msg = "Required LLM library is not installed"
+            elif llm == "PROVIDER_INIT_FAILED":
+                error_msg = f"Failed to initialize LLM provider '{provider}'"
+
             return {
                 "summary": "",
                 "skipped": True,
-                "error": f"Llama model not found at {config.llm_model_path}",
-            }
-        elif llm == "MISSING_LIBRARY":
-            return {
-                "summary": "",
-                "skipped": True,
-                "error": "llama-cpp-python is not installed",
+                "error": error_msg,
             }
 
         prompt = f"""
@@ -74,7 +100,7 @@ Text:
 
         try:
             summary_response = await llm.generate(
-                prompt, max_tokens=1024, temperature=0.3
+                prompt, max_tokens=150, temperature=0.3
             )
             return {
                 "summary": summary_response.strip(),

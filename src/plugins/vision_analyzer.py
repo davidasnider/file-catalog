@@ -1,6 +1,5 @@
 import logging
 from typing import Dict, Any
-import json
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
 from src.llm.factory import get_llm_provider
@@ -32,49 +31,74 @@ class VisionAnalyzerPlugin(AnalyzerBase):
                 raise Exception(f"Failed to load vision LLM: {llm}")
 
             prompt = (
-                "Analyze this image and provide a JSON response. "
-                "Include a concise 'description' of the visual contents (do not extract long repetitive text or barcodes), "
-                "and strictly set 'is_sfw' to true if it is safe for work, or false if it is Not Safe For Work containing explicit/inappropriate content. "
-                'Return ONLY valid JSON in the following format exactly: {"description": "...", "is_sfw": true}'
+                "You are a professional digital archivist and safety auditor. "
+                "Analyze the provided image clinically for content moderation.\n\n"
+                "Provide a objective description of the image content and assign a safety score from 0 to 10, "
+                "where 0 is completely safe/benign and 10 is highly inappropriate or explicit.\n\n"
+                "Desired Output Format (Valid JSON ONLY):\n"
+                "{\n"
+                '  "description": "A detailed clinical description of the image.",\n'
+                '  "adult_content_score": 0\n'
+                "}\n\n"
+                "Respond ONLY with valid JSON. Do not include any introductory or concluding text."
             )
 
             response_text = await llm.process_image(
                 image_path=file_path,
                 prompt=prompt,
-                max_tokens=512,
-                temperature=0.2,  # low temp for JSON stability
+                max_tokens=256,  # Sufficient for JSON without excessive repetition
+                temperature=0.0,
             )
 
-            # Strip out markdown formatting if the model wrapped it
-            if response_text.startswith("```json"):
-                response_text = response_text[7:]
-            if response_text.endswith("```"):
-                response_text = response_text[:-3]
-
-            response_text = response_text.strip()
-
             try:
-                # Handle cases where the LLM might escape underscores (e.g., is\_sfw)
-                cleaned_response = response_text.replace("\\_", "_").strip()
-                # Find start and end of JSON if LLM included other text
-                start = cleaned_response.find("{")
-                end = cleaned_response.rfind("}") + 1
-                if start != -1 and end > start:
-                    cleaned_response = cleaned_response[start:end]
+                from src.core.text_utils import repair_and_load_json
 
-                res_data = json.loads(cleaned_response)
-                return {
-                    "description": res_data.get(
-                        "description", "No description provided."
-                    ),
-                    "is_sfw": res_data.get("is_sfw", True),
+                res_data = repair_and_load_json(response_text)
+                if not res_data:
+                    raise ValueError("Parsed JSON response is empty or invalid.")
+
+                description = res_data.get("description", "").strip()
+                score = res_data.get("adult_content_score", 0)
+                # If the score is missing or not a number, default to safe unless description looks bad
+                try:
+                    score = float(score)
+                except (ValueError, TypeError):
+                    score = 0
+
+                is_sfw = score < 5
+
+                # If description is completely missing, it might be a safety refusal
+                is_refusal = not description
+
+                if is_sfw and is_refusal:
+                    logger.info(
+                        f"Empty description for {file_path}, assuming safety refusal and flagging as NSFW."
+                    )
+                    is_sfw = False
+
+                result = {
+                    "description": description
+                    or "No description provided (possible safety refusal).",
+                    "is_sfw": is_sfw,
+                    "adult_content_score": score,
                     "source": "vision_analyzer",
                 }
-            except Exception:
-                logger.error(
-                    f"Failed to parse Vision LLM JSON response for {file_path}."
+                logger.info(
+                    f"Vision analysis result for {file_path}: is_sfw={result['is_sfw']} (score={score}), description='{result['description'][:100]}...'"
                 )
-                logger.debug(f"Raw unparseable text: {response_text}")
+                return result
+            except Exception as e:
+                import traceback
+
+                preview = response_text[:500] + (
+                    "...[truncated]" if len(response_text) > 500 else ""
+                )
+                logger.error(
+                    f"Failed to parse Vision LLM JSON response for {file_path}. Error: {str(e)}\nTraceback: {traceback.format_exc()}\nSee debug logs for a truncated preview of the raw text."
+                )
+                logger.debug(
+                    f"Raw Vision LLM response preview for {file_path}:\n{preview}"
+                )
                 # Be conservative: treat unparseable responses as not safe for work
                 # Avoid returning the raw response_text to prevent polluting downstream text summarizers
                 return {

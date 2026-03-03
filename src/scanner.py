@@ -22,6 +22,7 @@ from src.db.models import Document, DocumentStatus, AnalysisTask
 from src.core.task_engine import TaskEngine
 from src.core.file_type import detect_file_type
 from src.core.plugin_registry import load_plugins
+from src.core.config import config
 
 # Add global constants for noise files
 IGNORED_EXTENSIONS = {
@@ -41,11 +42,11 @@ IGNORED_EXTENSIONS = {
 plugin_dir = os.path.join(os.path.dirname(__file__), "plugins")
 load_plugins(plugin_dir)
 
-# Set logger levels for src packages to WARNING so standard INFO logs don't clutter the rich UI
-logging.getLogger("src").setLevel(logging.WARNING)
+# Set logger levels for src packages
+logging.getLogger("src").setLevel(logging.INFO)
 
 logging.basicConfig(
-    level=logging.WARNING,
+    level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.FileHandler("scanner.log", encoding="utf-8"),
@@ -99,9 +100,12 @@ async def ingest_directory(
             files_to_process.append(str((Path(root) / filename).resolve()))
 
     if progress and task_id is not None:
-        progress.update(
-            task_id, total=limit if limit is not None else len(files_to_process)
+        total_files = (
+            len(files_to_process)
+            if limit is None
+            else min(limit, len(files_to_process))
         )
+        progress.update(task_id, total=total_files)
 
     for file_path in files_to_process:
         try:
@@ -186,15 +190,22 @@ async def run_scanner(
 
     # 0. Pre-flight checks: Ensure LLM models are downloaded before hijacking the console with Rich Progress
     try:
-        from src.llm.llama_cpp import LlamaCppProvider, HAS_HF_HUB
-        from src.plugins.summarizer import MODEL_PATH
+        from src.core.config import config
 
-        if HAS_HF_HUB and not os.path.exists(MODEL_PATH):
-            console.print(
-                "[yellow]⬇️  Downloading Local LLM (Llama-3-8B). This may take a few minutes...[/yellow]"
-            )
-            LlamaCppProvider.download_model(MODEL_PATH)
-            console.print("[green]✅ Download complete![/green]\n")
+        if config.llm_provider == "llama_cpp":
+            from src.llm.llama_cpp import LlamaCppProvider, HAS_HF_HUB
+
+            if HAS_HF_HUB and not os.path.exists(config.llm_model_path):
+                console.print(
+                    f"[yellow]⬇️  Downloading Local LLM ({config.llm_display_name}). This may take a few minutes...[/yellow]"
+                )
+                try:
+                    LlamaCppProvider.download_model(config.llm_model_path)
+                    console.print("[green]✅ Download complete![/green]\n")
+                except FileNotFoundError:
+                    console.print(
+                        f"[yellow]⚠️  Could not auto-download model at {config.llm_model_path}. Skipping.[/yellow]\n"
+                    )
     except ImportError:
         pass
 
@@ -278,7 +289,7 @@ async def run_scanner(
                             try:
                                 data = json.loads(t.result_data)
                                 err = data.get("error", "")
-                                if "Llama model not found" in err:
+                                if "model not found" in err.lower():
                                     missing_models.add(err)
                                 elif "llama-cpp-python is not installed" in err:
                                     missing_libraries.add(err)
@@ -348,37 +359,39 @@ def main():
     parser.add_argument(
         "--llm-provider",
         type=str,
-        default="llama_cpp",
+        default=config.llm_provider,
         choices=["llama_cpp", "mlx", "gemini"],
         help="Provider for text generation models.",
     )
     parser.add_argument(
         "--vision-provider",
         type=str,
-        default="llama_cpp",
+        default=config.vision_provider,
         choices=["llama_cpp", "mlx", "gemini"],
         help="Provider for vision models.",
     )
     parser.add_argument(
         "--use-cloud-fallback",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=config.use_cloud_fallback,
         help="Allow falling back to cloud providers (e.g. Gemini) if local models fail.",
     )
     parser.add_argument(
         "--use-document-ai",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=config.use_document_ai,
         help="Use Google Cloud Document AI for text extraction in PDFs/Images instead of local tools.",
     )
     parser.add_argument(
         "--llm-model-path",
         type=str,
-        default="models/Llama-3-8B.gguf",
+        default=config.llm_model_path,
         help="Path or name of the text LLM model.",
     )
     parser.add_argument(
         "--vision-model-path",
         type=str,
-        default="models/Llava-1.5-7b-ggml-model-q4_k.gguf",
+        default=config.vision_model_path,
         help="Path or name of the vision LLM model.",
     )
     parser.add_argument(

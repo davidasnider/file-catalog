@@ -1,9 +1,9 @@
-import json
 import logging
 from typing import Dict, Any
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
 from src.llm.factory import get_llm_provider
+from src.core.config import config
 
 logger = logging.getLogger(__name__)
 
@@ -56,17 +56,43 @@ class EstateAnalyzerPlugin(AnalyzerBase):
                 "skipped": True,
                 "error": "LLM Provider uninitialized",
             }
-        elif llm == "MISSING_MODEL":
+        elif isinstance(llm, str):
+            provider = getattr(config, "llm_provider", None)
+            model_path = getattr(config, "llm_model_path", None)
+            error_msg = llm
+
+            if llm == "MISSING_MODEL":
+                if provider in ("llama", "llama_cpp"):
+                    if model_path:
+                        error_msg = f"Llama model not found at {model_path}"
+                    else:
+                        error_msg = "Llama model not found"
+                else:
+                    if model_path and provider:
+                        error_msg = (
+                            f"Model not found for provider '{provider}' at {model_path}"
+                        )
+                    elif provider:
+                        error_msg = f"Model not found for provider '{provider}'"
+                    elif model_path:
+                        error_msg = f"Model not found at {model_path}"
+                    else:
+                        error_msg = "Model not found for configured LLM provider"
+            elif llm == "MISSING_LIBRARY":
+                if provider in ("llama", "llama_cpp"):
+                    error_msg = "llama-cpp-python is not installed"
+                else:
+                    if provider:
+                        error_msg = f"Required LLM library for provider '{provider}' is not installed"
+                    else:
+                        error_msg = "Required LLM library is not installed"
+            elif llm == "PROVIDER_INIT_FAILED":
+                error_msg = f"Failed to initialize LLM provider '{provider}'"
+
             return {
                 "is_estate_document": False,
                 "skipped": True,
-                "error": "Llama model not found at models/Llama-3-8B.gguf",
-            }
-        elif llm == "MISSING_LIBRARY":
-            return {
-                "is_estate_document": False,
-                "skipped": True,
-                "error": "llama-cpp-python is not installed",
+                "error": error_msg,
             }
 
         prompt = f"""
@@ -75,7 +101,13 @@ Read the text below and determine if this file is critical for an estate plan, f
 
 Respond ONLY with valid JSON with exactly two fields:
 "is_estate_document": true or false
-"reasonging": "A 1 sentence explanation of why it is or isn't relevant."
+"reasoning": "A 1 sentence explanation of why it is or isn't relevant."
+
+Desired Output Format (Valid JSON ONLY):
+{{
+  "is_estate_document": true,
+  "reasoning": "This document appears to be a Last Will and Testament."
+}}
 
 Text:
 {extracted_text}
@@ -86,7 +118,7 @@ Text:
             llm_response = await llm.generate(
                 prompt,
                 max_tokens=150,
-                temperature=0.1,
+                temperature=0.0,
                 response_format={
                     "type": "json_object",
                     "schema": {
@@ -100,24 +132,17 @@ Text:
                 },
             )
 
-            # Very basic cleanup of output for MVP parsing
-            clean_str = llm_response.strip()
-            if "```json" in clean_str:
-                clean_str = clean_str.split("```json")[-1].split("```")[0].strip()
-            elif "```" in clean_str:
-                clean_str = clean_str.split("```")[-1].split("```")[0].strip()
+            from src.core.text_utils import repair_and_load_json
 
-            try:
-                parsed_json = json.loads(clean_str)
-            except json.JSONDecodeError:
-                # Fallback if the LLM completely fails at JSON
+            parsed_json = repair_and_load_json(llm_response)
+            if not parsed_json:
+                # Fallback if parsing failed completely
                 logger.warning(
-                    f"Failed to parse JSON from LLM for estate check: {clean_str}"
+                    f"Failed to parse JSON from LLM for estate check: {llm_response}"
                 )
                 parsed_json = {
                     "is_estate_document": False,
                     "reasoning": "Failed to parse LLM response.",
-                    "raw_response": clean_str,
                 }
 
             parsed_json["skipped"] = False
