@@ -66,7 +66,47 @@ class VisionAnalyzerPlugin(AnalyzerBase):
                     else:
                         cleaned_json = cleaned
 
-                res_data = json.loads(cleaned_json)
+                try:
+                    res_data = json.loads(cleaned_json)
+                except json.JSONDecodeError:
+                    # HEURISTIC PARSING for "Lazy JSON" or truncated responses
+                    # e.g. {"description": A fish... (no quotes, no end brace)
+                    logger.warning(
+                        f"JSON decode failed for {file_path}, attempting heuristic extraction."
+                    )
+                    res_data = {}
+
+                    # Extract description: look for "description": followed by text until end or "is_sfw"
+                    # Handles both quoted and unquoted values
+                    desc_match = re.search(
+                        r'"description":\s*"?([^"]*)"?,?', cleaned_json, re.IGNORECASE
+                    )
+                    if not desc_match:
+                        # try even more liberal matching if quotes are missing entirely
+                        desc_match = re.search(
+                            r'"description":\s*(.*?)(?:,\s*"is_sfw"|\s*\})',
+                            cleaned_json,
+                            re.IGNORECASE | re.DOTALL,
+                        )
+
+                    if desc_match:
+                        res_data["description"] = desc_match.group(1).strip()
+                    else:
+                        # Final fallback: use the whole string if it looks like a description
+                        if len(cleaned_json) > 10:
+                            res_data["description"] = (
+                                cleaned_json.replace('{"description":', "")
+                                .replace("}", "")
+                                .strip()
+                            )
+
+                    # Extract is_sfw: look for true/false
+                    sfw_match = re.search(
+                        r'"is_sfw":\s*(true|false)', cleaned_json, re.IGNORECASE
+                    )
+                    if sfw_match:
+                        res_data["is_sfw"] = sfw_match.group(1).lower() == "true"
+
                 return {
                     "description": res_data.get(
                         "description", "No description provided."
