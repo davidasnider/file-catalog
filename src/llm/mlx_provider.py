@@ -6,6 +6,12 @@ from src.llm.provider import LLMProvider
 
 logger = logging.getLogger(__name__)
 
+# Module-level lock to serialize all MLX GPU operations.
+# Metal cannot handle concurrent command buffer encoders from different
+# async tasks dispatched to the thread pool, causing:
+#   "A command encoder is already encoding to this command buffer"
+_mlx_gpu_lock = asyncio.Lock()
+
 try:
     from mlx_lm import load, generate, stream_generate
 
@@ -91,7 +97,8 @@ class MLXProvider(LLMProvider):
             )
             return response.strip()
 
-        return await loop.run_in_executor(None, _run_sync)
+        async with _mlx_gpu_lock:
+            return await loop.run_in_executor(None, _run_sync)
 
     async def generate_stream(self, prompt: str, **kwargs) -> AsyncGenerator[str, None]:
         """Stream MLX generation asynchronously."""
@@ -118,13 +125,14 @@ class MLXProvider(LLMProvider):
             self.model, self.tokenizer, prompt=formatted_prompt, max_tokens=max_tokens
         )
 
-        while True:
-            try:
-                # get next chunk in threadpool to avoid event loop block
-                chunk = await loop.run_in_executor(None, next, iterator)
-                yield chunk
-            except StopIteration:
-                break
+        async with _mlx_gpu_lock:
+            while True:
+                try:
+                    # get next chunk in threadpool to avoid event loop block
+                    chunk = await loop.run_in_executor(None, next, iterator)
+                    yield chunk
+                except StopIteration:
+                    break
 
     async def process_image(self, image_path: str, prompt: str, **kwargs) -> str:
         """Run multimodal (vision) analysis asynchronously using MLX."""
@@ -179,4 +187,5 @@ class MLXProvider(LLMProvider):
                 logger.error(f"MLX VLM execution failed: {e}")
                 raise
 
-        return await loop.run_in_executor(None, _run_sync)
+        async with _mlx_gpu_lock:
+            return await loop.run_in_executor(None, _run_sync)
