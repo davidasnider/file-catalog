@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     vision_provider: str = "mlx"
     use_cloud_fallback: bool = False
     use_document_ai: bool = False
-    llm_model_path: str = "mlx-community/Meta-Llama-3.1-8B-Instruct-4bit"
+    llm_model_path: str = "mlx-community/gemma-3-4b-it-4bit"
     vision_model_path: str = "mlx-community/gemma-3n-4b-it-4bit"
 
     # API Keys & Cloud Config
