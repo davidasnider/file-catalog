@@ -1,4 +1,3 @@
-import json
 import logging
 from typing import Dict, Any
 
@@ -62,7 +61,10 @@ class RouterPlugin(AnalyzerBase):
         - Technical (e.g. Engineering spec, Server Log, scientific paper)
         - GenericText (Standard prose, correspondence, or unclassifiable)
 
-        Output valid JSON with one key 'category' containing the exact category name.
+        Desired Output Format (Valid JSON ONLY):
+        {{
+          "category": "Legal/Estate"
+        }}
 
         Text:
         {sample_text}
@@ -93,9 +95,9 @@ class RouterPlugin(AnalyzerBase):
                 },
             )
 
-            clean_str = self._extract_json_from_response(response)
+            from src.core.text_utils import repair_and_load_json
 
-            parsed = json.loads(clean_str)
+            parsed = repair_and_load_json(response)
             return {"category": parsed.get("category", "GenericText"), "method": "llm"}
         except Exception as e:
             logger.error(f"Failed to use LLM for routing {file_path}: {e}")

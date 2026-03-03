@@ -1,4 +1,3 @@
-import json
 import logging
 from typing import Dict, Any
 
@@ -75,7 +74,13 @@ Read the text below and determine if this file is critical for an estate plan, f
 
 Respond ONLY with valid JSON with exactly two fields:
 "is_estate_document": true or false
-"reasonging": "A 1 sentence explanation of why it is or isn't relevant."
+"reasoning": "A 1 sentence explanation of why it is or isn't relevant."
+
+Desired Output Format (Valid JSON ONLY):
+{{
+  "is_estate_document": true,
+  "reasoning": "This document appears to be a Last Will and Testament."
+}}
 
 Text:
 {extracted_text}
@@ -86,7 +91,7 @@ Text:
             llm_response = await llm.generate(
                 prompt,
                 max_tokens=150,
-                temperature=0.1,
+                temperature=0.0,
                 response_format={
                     "type": "json_object",
                     "schema": {
@@ -100,24 +105,17 @@ Text:
                 },
             )
 
-            # Very basic cleanup of output for MVP parsing
-            clean_str = llm_response.strip()
-            if "```json" in clean_str:
-                clean_str = clean_str.split("```json")[-1].split("```")[0].strip()
-            elif "```" in clean_str:
-                clean_str = clean_str.split("```")[-1].split("```")[0].strip()
+            from src.core.text_utils import repair_and_load_json
 
-            try:
-                parsed_json = json.loads(clean_str)
-            except json.JSONDecodeError:
-                # Fallback if the LLM completely fails at JSON
+            parsed_json = repair_and_load_json(llm_response)
+            if not parsed_json:
+                # Fallback if parsing failed completely
                 logger.warning(
-                    f"Failed to parse JSON from LLM for estate check: {clean_str}"
+                    f"Failed to parse JSON from LLM for estate check: {llm_response}"
                 )
                 parsed_json = {
                     "is_estate_document": False,
                     "reasoning": "Failed to parse LLM response.",
-                    "raw_response": clean_str,
                 }
 
             parsed_json["skipped"] = False

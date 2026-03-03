@@ -1,4 +1,3 @@
-import json
 import logging
 from typing import Dict, Any
 
@@ -52,7 +51,15 @@ class PIIHarvesterPlugin(AnalyzerBase):
         prompt = f"""
         You are a forensic PII extractor. Read the following text and extract all PII, names, emails, addresses, financial accounts, or secrets.
         If none are found, return empty lists.
-        Output ONLY valid JSON.
+        Output valid JSON ONLY.
+
+        Desired Output Format (Valid JSON ONLY):
+        {{
+          "names": ["Name 1", "Name 2"],
+          "emails": ["email@example.com"],
+          "addresses": ["123 Main St"],
+          "secrets": ["API_KEY_123"]
+        }}
 
         Text:
         {sample_text}
@@ -78,9 +85,9 @@ class PIIHarvesterPlugin(AnalyzerBase):
                 },
             )
 
-            clean_str = self._extract_json_from_response(response)
+            from src.core.text_utils import repair_and_load_json
 
-            parsed = json.loads(clean_str)
+            parsed = repair_and_load_json(response)
             return {"pii": parsed, "skipped": False, "method": "llm_json_expert"}
         except Exception as e:
             logger.error(f"Failed to harvest PII for {file_path}: {e}")

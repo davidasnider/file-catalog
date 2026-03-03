@@ -1,6 +1,5 @@
 import logging
 from typing import Dict, Any
-import json
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
 from src.llm.factory import get_llm_provider
@@ -34,78 +33,26 @@ class VisionAnalyzerPlugin(AnalyzerBase):
             prompt = (
                 "Analyze this image and provide a JSON response. "
                 "Include a concise 'description' of the visual contents (do not extract long repetitive text or barcodes), "
-                "and strictly set 'is_sfw' to true if it is safe for work, or false if it is Not Safe For Work containing explicit/inappropriate content. "
-                'Return ONLY valid JSON in the following format exactly: {"description": "...", "is_sfw": true}'
+                "and strictly set 'is_sfw' to true if it is safe for work, or false if it is Not Safe For Work containing explicit/inappropriate content.\n\n"
+                "Desired Output Format (Valid JSON ONLY):\n"
+                "{\n"
+                '  "description": "A concise description of the image content.",\n'
+                '  "is_sfw": true\n'
+                "}\n\n"
+                "Return ONLY valid JSON. Do not include introductory text or follow-up explanations."
             )
 
             response_text = await llm.process_image(
                 image_path=file_path,
                 prompt=prompt,
                 max_tokens=512,
-                temperature=0.2,  # low temp for JSON stability
+                temperature=0.0,  # Zero temperature as recommended for structured JSON
             )
 
             try:
-                # Robust JSON extraction using regex and finding boundaries
-                import re
+                from src.core.text_utils import repair_and_load_json
 
-                # 1. Preliminary cleanup: remove common markdown escapes
-                cleaned = response_text.replace("\\_", "_").replace("\\*", "*").strip()
-
-                # 2. Try to find JSON block using regex or bracket counting
-                # This regex looks for anything between { and } including nested braces
-                match = re.search(r"(\{.*\})", cleaned, re.DOTALL)
-                if match:
-                    cleaned_json = match.group(1)
-                else:
-                    # Fallback to finding first/last brace if regex failed
-                    start = cleaned.find("{")
-                    end = cleaned.rfind("}") + 1
-                    if start != -1 and end > start:
-                        cleaned_json = cleaned[start:end]
-                    else:
-                        cleaned_json = cleaned
-
-                try:
-                    res_data = json.loads(cleaned_json)
-                except json.JSONDecodeError:
-                    # HEURISTIC PARSING for "Lazy JSON" or truncated responses
-                    # e.g. {"description": A fish... (no quotes, no end brace)
-                    logger.warning(
-                        f"JSON decode failed for {file_path}, attempting heuristic extraction."
-                    )
-                    res_data = {}
-
-                    # Extract description: look for "description": followed by text until end or "is_sfw"
-                    # Handles both quoted and unquoted values
-                    desc_match = re.search(
-                        r'"description":\s*"?([^"]*)"?,?', cleaned_json, re.IGNORECASE
-                    )
-                    if not desc_match:
-                        # try even more liberal matching if quotes are missing entirely
-                        desc_match = re.search(
-                            r'"description":\s*(.*?)(?:,\s*"is_sfw"|\s*\})',
-                            cleaned_json,
-                            re.IGNORECASE | re.DOTALL,
-                        )
-
-                    if desc_match:
-                        res_data["description"] = desc_match.group(1).strip()
-                    else:
-                        # Final fallback: use the whole string if it looks like a description
-                        if len(cleaned_json) > 10:
-                            res_data["description"] = (
-                                cleaned_json.replace('{"description":', "")
-                                .replace("}", "")
-                                .strip()
-                            )
-
-                    # Extract is_sfw: look for true/false
-                    sfw_match = re.search(
-                        r'"is_sfw":\s*(true|false)', cleaned_json, re.IGNORECASE
-                    )
-                    if sfw_match:
-                        res_data["is_sfw"] = sfw_match.group(1).lower() == "true"
+                res_data = repair_and_load_json(response_text)
 
                 return {
                     "description": res_data.get(
@@ -116,9 +63,8 @@ class VisionAnalyzerPlugin(AnalyzerBase):
                 }
             except Exception:
                 logger.error(
-                    f"Failed to parse Vision LLM JSON response for {file_path}."
+                    f"Failed to parse Vision LLM JSON response for {file_path}. Raw text: {response_text}"
                 )
-                logger.debug(f"Raw unparseable text: {response_text}")
                 # Be conservative: treat unparseable responses as not safe for work
                 # Avoid returning the raw response_text to prevent polluting downstream text summarizers
                 return {
