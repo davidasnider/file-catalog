@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     use_cloud_fallback: bool = False
     use_document_ai: bool = False
     llm_model_path: str = "mlx-community/Meta-Llama-3.1-8B-Instruct-4bit"
-    vision_model_path: str = "mlx-community/paligemma-3b-mix-448-4bit"
+    vision_model_path: str = "mlx-community/gemma-3n-4b-it-4bit"
 
     # API Keys & Cloud Config
     vertex_api_key: str | None = None
