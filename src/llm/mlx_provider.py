@@ -20,6 +20,8 @@ except ImportError:
     HAS_MLX = False
 
 try:
+    import mlx_vlm as _mlx_vlm_check  # noqa: F401
+
     HAS_MLX_VLM = True
 except ImportError:
     HAS_MLX_VLM = False

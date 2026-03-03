@@ -55,7 +55,9 @@ class DocumentAIExtractorPlugin(AnalyzerBase):
         logger.info(f"Extracting text via Google Document AI for {file_path}")
 
         project_id = config.google_cloud_project
-        location = config.google_cloud_location or "us"
+        # Document AI uses multi-region locations ("us", "eu"), not Vertex AI
+        # regions like "us-central1". Use a dedicated setting or default to "us".
+        location = getattr(config, "document_ai_location", None) or "us"
 
         if not project_id:
             logger.error("google_cloud_project is not configured for Document AI.")
@@ -113,4 +115,4 @@ class DocumentAIExtractorPlugin(AnalyzerBase):
             logger.error(
                 f"Failed to extract text using Document AI for {file_path}: {e}"
             )
-            raise Exception(f"Document AI extraction failed: {str(e)}")
+            raise RuntimeError("Document AI extraction failed") from e

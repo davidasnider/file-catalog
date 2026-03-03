@@ -99,7 +99,12 @@ async def ingest_directory(
             files_to_process.append(str((Path(root) / filename).resolve()))
 
     if progress and task_id is not None:
-        progress.update(task_id, total=len(files_to_process))
+        total_files = (
+            len(files_to_process)
+            if limit is None
+            else min(limit, len(files_to_process))
+        )
+        progress.update(task_id, total=total_files)
 
     for file_path in files_to_process:
         try:
@@ -184,15 +189,22 @@ async def run_scanner(
 
     # 0. Pre-flight checks: Ensure LLM models are downloaded before hijacking the console with Rich Progress
     try:
-        from src.llm.llama_cpp import LlamaCppProvider, HAS_HF_HUB
         from src.core.config import config
 
-        if HAS_HF_HUB and not os.path.exists(config.llm_model_path):
-            console.print(
-                "[yellow]⬇️  Downloading Local LLM (Llama-3-8B). This may take a few minutes...[/yellow]"
-            )
-            LlamaCppProvider.download_model(config.llm_model_path)
-            console.print("[green]✅ Download complete![/green]\n")
+        if config.llm_provider == "llama_cpp":
+            from src.llm.llama_cpp import LlamaCppProvider, HAS_HF_HUB
+
+            if HAS_HF_HUB and not os.path.exists(config.llm_model_path):
+                console.print(
+                    "[yellow]⬇️  Downloading Local LLM (Llama-3-8B). This may take a few minutes...[/yellow]"
+                )
+                try:
+                    LlamaCppProvider.download_model(config.llm_model_path)
+                    console.print("[green]✅ Download complete![/green]\n")
+                except FileNotFoundError:
+                    console.print(
+                        f"[yellow]⚠️  Could not auto-download model at {config.llm_model_path}. Skipping.[/yellow]\n"
+                    )
     except ImportError:
         pass
 

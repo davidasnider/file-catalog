@@ -48,7 +48,7 @@ def _instantiate_provider(
         try:
             from src.llm.gemini import GeminiProvider
 
-            return GeminiProvider()
+            return GeminiProvider(**kwargs)
         except ImportError:
             return "MISSING_LIBRARY"
     elif provider_type == "mlx":
