@@ -5,6 +5,7 @@ import pytesseract
 from PIL import Image
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
+from src.core.config import config
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,22 @@ class TextExtractorPlugin(AnalyzerBase):
     """
     Extracts raw text from common document types (PDFs, docs) and images (OCR).
     """
+
+    def should_run(
+        self, file_path: str, mime_type: str, context: Dict[str, Any]
+    ) -> bool:
+        if config.use_document_ai:
+            supported_docai_prefixes = {
+                "application/pdf",
+                "image/",
+                "application/vnd.openxmlformats-officedocument",
+            }
+            if any(mime_type.startswith(p) for p in supported_docai_prefixes):
+                logger.debug(
+                    f"Skipping TextExtractor for {file_path} because Document AI is enabled."
+                )
+                return False
+        return True
 
     async def analyze(
         self, file_path: str, mime_type: str, context: Dict[str, Any]

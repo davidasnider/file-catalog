@@ -5,19 +5,17 @@ import os
 import tempfile
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
-from src.llm.llama_cpp import get_llm_provider
+from src.llm.factory import get_llm_provider
 
-# Conditional import as opencv-python-headless might not be installed yet during tests
+# Conditional import as PyAV might not be installed yet during tests
 try:
-    import cv2
+    import av
 
-    HAS_CV2 = True
+    HAS_AV = True
 except ImportError:
-    HAS_CV2 = False
+    HAS_AV = False
 
 logger = logging.getLogger(__name__)
-
-VISION_MODEL_PATH = "models/Llava-1.5-7b-ggml-model-q4_k.gguf"
 
 
 @register_analyzer(
@@ -35,36 +33,34 @@ class VideoAnalyzerPlugin(AnalyzerBase):
         return mime_type.startswith("video/")
 
     def extract_keyframe(self, file_path: str) -> str:
-        """Extracts a single frame from the middle of the video and saves it to a temp file."""
-        if not HAS_CV2:
-            raise ImportError("opencv-python-headless is not installed.")
+        """Extracts a single frame from roughly the middle of the video using PyAV and saves it to a temp file."""
+        if not HAS_AV:
+            raise ImportError("PyAV (av library) is not installed.")
 
-        vidcap = cv2.VideoCapture(file_path)
-        if not vidcap or not vidcap.isOpened():
-            raise Exception(
-                f"Failed to open video file for frame extraction: {file_path}"
-            )
+        try:
+            container = av.open(file_path)
+            # Find the first video stream
+            video_stream = next(s for s in container.streams if s.type == "video")
 
-        total_frames = int(vidcap.get(cv2.CAP_PROP_FRAME_COUNT))
-        if total_frames <= 0:
-            raise Exception("Video has no frames.")
+            # Seek to roughly the middle of the video
+            if video_stream.duration is not None:
+                target_ts = int(video_stream.duration / 2)
+                container.seek(target_ts, stream=video_stream)
 
-        # Get a frame from roughly the middle to avoid blank title screens
-        vidcap.set(cv2.CAP_PROP_POS_FRAMES, total_frames // 2)
-        success, image = vidcap.read()
-        vidcap.release()
+            # Grab the first decoded frame after seeking
+            for frame in container.decode(video_stream):
+                img = frame.to_image()  # Converts to PIL Image
+                fd, temp_path = tempfile.mkstemp(suffix=".jpg")
+                os.close(fd)
+                img.save(temp_path, format="JPEG")
+                container.close()
+                return temp_path
 
-        if not success:
-            raise Exception("Could not read frame from video.")
+            container.close()
+            raise Exception("No video frames could be decoded.")
 
-        # Save to temp file using mkstemp to avoid handle leaks
-        fd, temp_path = tempfile.mkstemp(suffix=".jpg")
-        os.close(fd)
-        if not cv2.imwrite(temp_path, image):
-            raise Exception(
-                f"Failed to write extracted frame to temporary file: {temp_path}"
-            )
-        return temp_path
+        except Exception as e:
+            raise Exception(f"Failed to extract frame using PyAV: {str(e)}")
 
     async def analyze(
         self, file_path: str, mime_type: str, context: Dict[str, Any]
@@ -80,8 +76,7 @@ class VideoAnalyzerPlugin(AnalyzerBase):
             temp_img_path = self.extract_keyframe(file_path)
 
             # 3. Process the frame with Vision LLM
-            abs_model_path = os.path.join(os.getcwd(), VISION_MODEL_PATH)
-            llm = get_llm_provider(abs_model_path)
+            llm = get_llm_provider(is_vision=True)
 
             if isinstance(llm, str):
                 raise Exception(f"Failed to load vision LLM: {llm}")

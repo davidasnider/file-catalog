@@ -3,12 +3,23 @@ import logging
 from typing import Dict, Any
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
-from src.llm.llama_cpp import get_llm_provider
+from src.llm.factory import get_llm_provider
+from src.core.text_utils import get_all_extracted_text
 
 logger = logging.getLogger(__name__)
 
 
-@register_analyzer(name="Router", depends_on=["TextExtractor"], version="1.0")
+@register_analyzer(
+    name="Router",
+    depends_on=[
+        "TextExtractor",
+        "DocumentAIExtractor",
+        "audio_transcriber",
+        "vision_analyzer",
+        "video_analyzer",
+    ],
+    version="1.0",
+)
 class RouterPlugin(AnalyzerBase):
     """
     Classifies the document into a high-level taxonomy category using fast heuristics
@@ -26,8 +37,7 @@ class RouterPlugin(AnalyzerBase):
             return {"category": fast_category, "method": "heuristic"}
 
         # 2. LLM Fallback
-        text_data = context.get("TextExtractor", {})
-        extracted_text = text_data.get("text", "")
+        extracted_text = get_all_extracted_text(context)
 
         if not extracted_text:
             return {
@@ -39,7 +49,7 @@ class RouterPlugin(AnalyzerBase):
         max_chars = 3000
         sample_text = extracted_text[:max_chars]
 
-        llm = get_llm_provider()
+        llm = get_llm_provider(is_vision=False)
         if not llm or llm in ("MISSING_MODEL", "MISSING_LIBRARY"):
             logger.warning("LLM unavailable for routing, falling back to GenericText")
             return {"category": "GenericText", "method": "fallback_no_llm"}

@@ -45,7 +45,12 @@ load_plugins(plugin_dir)
 logging.getLogger("src").setLevel(logging.WARNING)
 
 logging.basicConfig(
-    level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.WARNING,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler("scanner.log", encoding="utf-8"),
+        logging.StreamHandler(),
+    ],
 )
 logger = logging.getLogger(__name__)
 
@@ -65,6 +70,7 @@ async def ingest_directory(
     progress: Progress = None,
     task_id=None,
     limit: int = None,
+    mime_type_filter: str = None,
 ) -> list[int]:
     """Walk directory, compute hashes, and insert/update documents."""
     base_path = Path(directory)
@@ -92,16 +98,23 @@ async def ingest_directory(
 
             files_to_process.append(str((Path(root) / filename).resolve()))
 
-    if limit is not None:
-        files_to_process = files_to_process[:limit]
-
     if progress and task_id is not None:
-        progress.update(task_id, total=len(files_to_process))
+        progress.update(
+            task_id, total=limit if limit is not None else len(files_to_process)
+        )
 
     for file_path in files_to_process:
         try:
-            file_hash = compute_file_hash(file_path)
             mime_type = detect_file_type(file_path)
+
+            if mime_type_filter and not (
+                mime_type and mime_type.startswith(mime_type_filter)
+            ):
+                if progress and task_id is not None:
+                    progress.advance(task_id)
+                continue
+
+            file_hash = compute_file_hash(file_path)
 
             # Check if document exists
             result = await session.execute(
@@ -141,11 +154,18 @@ async def ingest_directory(
         if progress and task_id is not None:
             progress.advance(task_id)
 
+        if limit is not None and len(processed_doc_ids) >= limit:
+            break
+
     return processed_doc_ids
 
 
 async def run_scanner(
-    directory: str, max_concurrent: int = 5, clean: bool = False, limit: int = None
+    directory: str,
+    max_concurrent: int = 5,
+    clean: bool = False,
+    limit: int = None,
+    mime_type_filter: str = None,
 ):
     """Main scanner logic."""
     if clean:
@@ -191,7 +211,7 @@ async def run_scanner(
         async with async_session_maker() as session:
             # 1. Ingest files
             ingested_ids = await ingest_directory(
-                directory, session, progress, ingest_task, limit
+                directory, session, progress, ingest_task, limit, mime_type_filter
             )
             progress.update(
                 ingest_task,
@@ -324,9 +344,63 @@ def main():
         default=None,
         help="Limit the number of files to process.",
     )
+    # New Arguments for LLM / Vision / Document AI
+    parser.add_argument(
+        "--llm-provider",
+        type=str,
+        default="llama_cpp",
+        choices=["llama_cpp", "mlx", "gemini"],
+        help="Provider for text generation models.",
+    )
+    parser.add_argument(
+        "--vision-provider",
+        type=str,
+        default="llama_cpp",
+        choices=["llama_cpp", "mlx", "gemini"],
+        help="Provider for vision models.",
+    )
+    parser.add_argument(
+        "--use-cloud-fallback",
+        action="store_true",
+        help="Allow falling back to cloud providers (e.g. Gemini) if local models fail.",
+    )
+    parser.add_argument(
+        "--use-document-ai",
+        action="store_true",
+        help="Use Google Cloud Document AI for text extraction in PDFs/Images instead of local tools.",
+    )
+    parser.add_argument(
+        "--llm-model-path",
+        type=str,
+        default="models/Llama-3-8B.gguf",
+        help="Path or name of the text LLM model.",
+    )
+    parser.add_argument(
+        "--vision-model-path",
+        type=str,
+        default="models/Llava-1.5-7b-ggml-model-q4_k.gguf",
+        help="Path or name of the vision LLM model.",
+    )
+    parser.add_argument(
+        "--mime-type",
+        type=str,
+        default=None,
+        help="Filter ingestion to only documents matching this MIME type (e.g. 'image/jpeg' or 'image/').",
+    )
+
     args = parser.parse_args()
 
-    asyncio.run(run_scanner(args.directory, args.concurrency, args.clean, args.limit))
+    # Update global config from CLI args before we run anything
+    from src.core.config import update_config_from_cli
+
+    # We remove mime_type from args before updating config because config doesn't have it
+    args_dict = vars(args).copy()
+    mime_type = args_dict.pop("mime_type", None)
+    update_config_from_cli(**args_dict)
+
+    asyncio.run(
+        run_scanner(args.directory, args.concurrency, args.clean, args.limit, mime_type)
+    )
 
 
 if __name__ == "__main__":

@@ -229,7 +229,9 @@ class ModelManager:
     _cache: OrderedDict[str, LLMProvider] = OrderedDict()
 
     @classmethod
-    def get_provider(cls, model_path: str, n_ctx: int = 4096) -> LLMProvider | str:
+    def get_provider(
+        cls, model_path: str, n_ctx: int = 4096, **kwargs
+    ) -> LLMProvider | str:
         if not HAS_LLAMA_CPP:
             logger.error("LLAMA_CPP not found")
             return "MISSING_LIBRARY"
@@ -281,8 +283,3 @@ class ModelManager:
                 f"Evicting model {model_path} from cache due to low memory "
                 f"(available RAM: {psutil.virtual_memory().available / 1024**3:.2f}GB)"
             )
-
-
-def get_llm_provider(model_path="models/Llama-3-8B.gguf", n_ctx=4096):
-    """Global utility for retrieving model instances"""
-    return ModelManager.get_provider(model_path, n_ctx=n_ctx)

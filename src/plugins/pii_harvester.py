@@ -3,12 +3,11 @@ import logging
 from typing import Dict, Any
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
-from src.llm.llama_cpp import get_llm_provider
+from src.llm.factory import get_llm_provider
 
 logger = logging.getLogger(__name__)
 
 # Using Llama-3-8B for general extraction (can swap to Qwen later for specialized speed)
-MODEL_PATH = "models/Llama-3-8B.gguf"
 
 
 @register_analyzer(
@@ -41,7 +40,8 @@ class PIIHarvesterPlugin(AnalyzerBase):
         # Scrape the first ~15,000 characters for secrets
         sample_text = extracted_text[:15000]
 
-        llm = get_llm_provider(model_path=MODEL_PATH, n_ctx=8192)
+        # 2. Get LLM Instance
+        llm = get_llm_provider(is_vision=False, n_ctx=8192)
         if not llm or llm in ("MISSING_MODEL", "MISSING_LIBRARY"):
             return {
                 "pii": {},

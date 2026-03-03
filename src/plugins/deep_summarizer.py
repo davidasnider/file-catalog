@@ -2,7 +2,7 @@ import logging
 from typing import Dict, Any
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
-from src.llm.llama_cpp import get_llm_provider
+from src.llm.factory import get_llm_provider
 
 logger = logging.getLogger(__name__)
 
@@ -45,11 +45,13 @@ class DeepSummarizerPlugin(AnalyzerBase):
 
         extracted_text = context.get("TextExtractor", {}).get("text", "")
 
-        llm = get_llm_provider(model_path=MODEL_PATH, n_ctx=8192)
+        # We pass n_ctx just in case the factory/manager respects it
+        llm = get_llm_provider(is_vision=False, n_ctx=8192)
         if not llm or llm in ("MISSING_MODEL", "MISSING_LIBRARY"):
             return {
                 "extensive_summary": "",
                 "skipped": True,
+                "model": getattr(llm, "model_name", "Unknown Model"),
                 "error": "LLM Provider unavailable for deep summarization",
             }
 
@@ -77,7 +79,7 @@ class DeepSummarizerPlugin(AnalyzerBase):
             """
             try:
                 # Setting higher max_tokens to capture extensive details
-                response = await llm.generate(prompt, max_tokens=400, temperature=0.2)
+                response = await llm.generate(prompt, max_tokens=1200, temperature=0.2)
                 chunk_summaries.append(response.strip())
             except Exception as e:
                 logger.error(f"Error summarizing chunk {i + 1} for {file_path}: {e}")
@@ -111,12 +113,14 @@ class DeepSummarizerPlugin(AnalyzerBase):
 
         try:
             final_response = await llm.generate(
-                final_prompt, max_tokens=800, temperature=0.3
+                final_prompt, max_tokens=3000, temperature=0.3
             )
             return {
                 "extensive_summary": final_response.strip(),
+                "summary": final_response.strip(),  # duplicate for UI backward compatibility
                 "skipped": False,
                 "chunks_processed": len(chunk_summaries),
+                "model": getattr(llm, "model_name", "Unknown Deep Model"),
             }
         except Exception as e:
             logger.error(f"Error during Reduce phase for {file_path}: {e}")
