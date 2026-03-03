@@ -36,10 +36,10 @@ st.markdown(
         font-weight: 700;
     }
     .stMetric {
-        background-color: white;
         padding: 1rem;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        border: 1px solid rgba(128,128,128,0.2);
     }
 </style>
 """,
@@ -149,6 +149,45 @@ def main():
 
         filtered_docs.append(doc)
 
+    # Render Document Index inside the Sidebar
+    with st.sidebar:
+        st.divider()
+        st.subheader("Document Index")
+
+        selected_row = None
+        if filtered_docs:
+            table_data = []
+            for doc in filtered_docs:
+                table_data.append(
+                    {
+                        "Document Status": f"{get_status_color(doc.status.name)}",  # Simplified
+                        "File": doc.path.split("/")[-1],
+                        "ID": doc.id,
+                    }
+                )
+
+            df = pd.DataFrame(table_data)
+
+            # Interactive Dataframe in sidebar
+            event = st.dataframe(
+                df[["Document Status", "File"]],
+                height=400,
+                width="stretch",
+                hide_index=True,
+                column_config={
+                    "Document Status": st.column_config.TextColumn(
+                        "Status", width="small"
+                    ),
+                    "File": st.column_config.TextColumn("File", width="large"),
+                },
+                on_select="rerun",
+                selection_mode="single-row",
+            )
+
+            if len(event.selection.rows) > 0:
+                selected_idx = event.selection.rows[0]
+                selected_row = df.iloc[selected_idx]
+
     # Metrics Row
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total Documents", len(documents))
@@ -156,151 +195,156 @@ def main():
     col3.metric("Completed", sum(1 for d in documents if d.status.name == "COMPLETED"))
     col4.metric("Failed", sum(1 for d in documents if d.status.name == "FAILED"))
 
-    st.divider()
-
-    # Main layout - Left column for table, right for details
-    left_col, right_col = st.columns([1.5, 1])
-
-    with left_col:
-        st.subheader("Document Index")
-
-        if filtered_docs:
-            # Prepare data for dataframe
-            table_data = []
-            for doc in filtered_docs:
-                doc_tasks = tasks_by_doc.get(doc.id, [])
-                task_badges = "".join([get_task_status_color(t) for t in doc_tasks])
-
-                table_data.append(
-                    {
-                        "Document Status": f"{get_status_color(doc.status.name)} {doc.status.name}",
-                        "Tasks": task_badges,
-                        "File": doc.path.split("/")[-1],
-                        "Type": doc.mime_type or "Unknown",
-                        "Path": doc.path,
-                        "ID": doc.id,
-                    }
-                )
-
-            df = pd.DataFrame(table_data)
-
-            # Interactive Dataframe
-            event = st.dataframe(
-                df[["Document Status", "Tasks", "File", "Type", "Path"]],
-                use_container_width=True,
-                hide_index=True,
-                on_select="rerun",
-                selection_mode="single-row",
-            )
-
-            # Check if a row was selected
-            selected_row = None
-            if len(event.selection.rows) > 0:
-                selected_idx = event.selection.rows[0]
-                selected_row = df.iloc[selected_idx]
-
     # Detail View Context
-    with right_col:
-        if selected_row is not None:
-            doc_id = int(selected_row["ID"])
-            selected_doc = next((d for d in filtered_docs if d.id == doc_id), None)
+    if selected_row is not None:
+        doc_id = int(selected_row["ID"])
+        selected_doc = next((d for d in filtered_docs if d.id == doc_id), None)
 
-            if selected_doc:
-                st.subheader("Document Details")
-                st.markdown(f"**File:** `{selected_doc.path.split('/')[-1]}`")
+        if selected_doc:
+            st.divider()
 
-                # Fetch Tasks
-                raw_tasks = tasks_by_doc.get(doc_id, [])
+            st.subheader("Document Details")
+            st.markdown(f"**File:** `{selected_doc.path.split('/')[-1]}`")
 
-                # Visually sort the tasks so Extractors appear before Analyzers
-                def task_sort_key(t):
-                    if t.task_name == "MetadataExtractor":
-                        return 0
-                    if t.task_name == "TextExtractor":
-                        return 1
-                    if t.task_name == "Summarizer":
-                        return 2
-                    return 3
+            # Fetch Tasks
+            raw_tasks = tasks_by_doc.get(doc_id, [])
 
-                tasks = sorted(raw_tasks, key=task_sort_key)
+            # Separate out the Summarizer
+            summarizer_task = next(
+                (t for t in raw_tasks if "summarizer" in t.task_name.lower()), None
+            )
+            main_tasks = [
+                t for t in raw_tasks if "summarizer" not in t.task_name.lower()
+            ]
 
-                if not tasks:
-                    st.info("No analysis tasks recorded for this document.")
+            # 1. AI Summary Section (Top)
+            if (
+                summarizer_task
+                and summarizer_task.status.name != "FAILED"
+                and summarizer_task.result_data
+            ):
+                try:
+                    data = json.loads(summarizer_task.result_data)
+                    if not data.get("skipped"):
+                        st.subheader("AI Summary")
+                        st.info(data.get("summary", ""))
+                        st.caption(f"Generated by: {data.get('model', 'Unknown')}")
+                        st.divider()
+                except json.JSONDecodeError:
+                    pass
+
+            # 2. Image Viewer Section (Middle)
+            import os
+
+            if selected_doc.mime_type and selected_doc.mime_type.startswith("image/"):
+                st.subheader("Image Viewer")
+                if os.path.exists(selected_doc.path):
+                    st.image(selected_doc.path)
                 else:
-                    for task in tasks:
-                        with st.expander(
-                            f"{get_task_status_color(task)} {task.task_name} (v{task.plugin_version})",
-                            expanded=True,
-                        ):
-                            if task.status.name == "FAILED":
-                                st.error(f"**Error:** {task.error_message}")
-                            elif task.result_data:
-                                try:
-                                    data = json.loads(task.result_data)
+                    st.warning("Image file not found on disk.")
+                st.divider()
 
-                                    # Formatted visualizations based on plugin type
-                                    if task.task_name == "Summarizer":
-                                        if data.get("skipped"):
-                                            st.warning(
-                                                f"Skipped: {data.get('error', 'Unknown reason')}"
-                                            )
-                                        else:
-                                            st.info(data.get("summary", ""))
-                                            st.caption(
-                                                f"Model: {data.get('model', 'Unknown')}"
-                                            )
+            # 3. Extraction Tasks Section (Bottom)
+            # Visually sort the tasks so Extractors appear before Analyzers, and skipped tasks go to the bottom
+            def task_sort_key(t):
+                is_skipped = get_task_status_color(t) == "⚪"
+                if t.task_name == "MetadataExtractor":
+                    order = 0
+                elif t.task_name == "TextExtractor":
+                    order = 1
+                else:
+                    order = 3
+                return (1 if is_skipped else 0, order, t.task_name)
 
-                                    elif task.task_name == "EstateAnalyzer":
-                                        if data.get("skipped"):
-                                            st.warning(
-                                                f"Skipped: {data.get('error', 'Unknown reason')}"
-                                            )
-                                        else:
-                                            is_estate = data.get(
-                                                "is_estate_document", False
-                                            )
-                                            if is_estate:
-                                                st.success(
-                                                    "Relevant to Estate/Financial Planning ✅"
-                                                )
-                                            else:
-                                                st.markdown(
-                                                    "Not relevant to Estate Planning ❌"
-                                                )
-                                            st.write(
-                                                data.get(
-                                                    "reasoning",
-                                                    "No reasoning provided.",
-                                                )
-                                            )
+            tasks = sorted(main_tasks, key=task_sort_key)
 
-                                    elif (
-                                        task.task_name == "TextExtractor"
-                                        or task.task_name == "OCRExtractor"
-                                    ):
-                                        text = data.get("text", "")
-                                        if text:
-                                            # Using text area to contain large text blocks
-                                            st.text_area(
-                                                "Extracted Text",
-                                                text,
-                                                height=150,
-                                                disabled=True,
-                                            )
-                                        else:
-                                            st.write("No text extracted.")
+            if not tasks:
+                st.info("No analysis tasks recorded for this document.")
+            else:
+                for task in tasks:
+                    is_skipped = get_task_status_color(task) == "⚪"
+                    with st.expander(
+                        f"{get_task_status_color(task)} {task.task_name} (v{task.plugin_version})",
+                        expanded=not is_skipped,
+                    ):
+                        if task.status.name == "FAILED":
+                            st.error(f"**Error:** {task.error_message}")
+                        elif task.result_data:
+                            try:
+                                data = json.loads(task.result_data)
 
+                                # Formatted visualizations based on plugin type
+                                if task.task_name == "EstateAnalyzer":
+                                    if data.get("skipped"):
+                                        st.warning(
+                                            f"Skipped: {data.get('error', 'Unknown reason')}"
+                                        )
                                     else:
-                                        # Generic raw JSON dump
-                                        st.json(data)
+                                        is_estate = data.get(
+                                            "is_estate_document", False
+                                        )
+                                        if is_estate:
+                                            st.success(
+                                                "Relevant to Estate/Financial Planning ✅"
+                                            )
+                                        else:
+                                            st.markdown(
+                                                "Not relevant to Estate Planning ❌"
+                                            )
+                                        st.write(
+                                            data.get(
+                                                "reasoning",
+                                                "No reasoning provided.",
+                                            )
+                                        )
 
-                                except json.JSONDecodeError:
-                                    st.warning("Failed to parse result data.")
-                                    st.code(task.result_data)
-                            else:
-                                st.write("No result data available.")
-        else:
-            st.info("Select a document from the table to view its analysis details.")
+                                elif (
+                                    task.task_name == "TextExtractor"
+                                    or task.task_name == "OCRExtractor"
+                                ):
+                                    text = data.get("text", "")
+                                    if text:
+                                        # Using text area to contain large text blocks
+                                        st.text_area(
+                                            "Extracted Text",
+                                            text,
+                                            height=150,
+                                            disabled=True,
+                                        )
+                                    else:
+                                        st.write("No text extracted.")
+
+                                else:
+                                    # Generic raw JSON dump => formatted list
+                                    if data.get("skipped"):
+                                        st.warning(
+                                            f"Skipped: {data.get('reason', 'Unknown reason')}"
+                                        )
+                                    else:
+                                        for k, v in data.items():
+                                            if k not in [
+                                                "skipped",
+                                                "source",
+                                                "source_plugin",
+                                            ]:
+                                                # Robustly format nested dictionaries/arrays or pass native strings
+                                                if isinstance(v, (list, dict)):
+                                                    val_str = f"```json\n{json.dumps(v, indent=2)}\n```"
+                                                    st.markdown(
+                                                        f"**{k.replace('_', ' ').title()}**:\n{val_str}"
+                                                    )
+                                                else:
+                                                    st.markdown(
+                                                        f"**{k.replace('_', ' ').title()}**: {v}"
+                                                    )
+                            except json.JSONDecodeError:
+                                st.warning("Failed to parse result data.")
+                                st.code(task.result_data)
+                        else:
+                            st.write("No result data available.")
+
+    else:
+        st.info("Select a document from the table to view its analysis details.")
 
 
 if __name__ == "__main__":

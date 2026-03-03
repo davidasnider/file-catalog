@@ -9,7 +9,9 @@ class MockLLM:
 
 @pytest.fixture
 def mock_get_llm_provider(monkeypatch):
-    monkeypatch.setattr("src.plugins.summarizer.get_llm_provider", lambda: MockLLM())
+    monkeypatch.setattr(
+        "src.plugins.summarizer.get_llm_provider", lambda **kwargs: MockLLM()
+    )
 
 
 @pytest.mark.asyncio

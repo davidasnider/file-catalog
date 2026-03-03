@@ -3,7 +3,7 @@ import logging
 from typing import Dict, Any
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
-from src.llm.llama_cpp import get_llm_provider
+from src.llm.factory import get_llm_provider
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ class EstateAnalyzerPlugin(AnalyzerBase):
             extracted_text = extracted_text[:max_chars] + "..."
 
         # 2. Get LLM Instance
-        llm = get_llm_provider()
+        llm = get_llm_provider(is_vision=False)
         if not llm:
             return {
                 "is_estate_document": False,
