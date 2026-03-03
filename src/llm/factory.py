@@ -51,6 +51,9 @@ def _instantiate_provider(
             return GeminiProvider(**kwargs)
         except ImportError:
             return "MISSING_LIBRARY"
+        except Exception as e:
+            logger.error(f"Failed to instantiate GeminiProvider: {e}")
+            return str(e)
     elif provider_type == "mlx":
         try:
             from src.llm.mlx_provider import MLXProvider
@@ -58,6 +61,9 @@ def _instantiate_provider(
             return MLXProvider(model_path, **kwargs)
         except ImportError:
             return "MISSING_LIBRARY"
+        except Exception as e:
+            logger.error(f"Failed to instantiate MLXProvider: {e}")
+            return str(e)
     else:
         logger.error(f"Unknown provider type: {provider_type}")
         return "UNKNOWN_PROVIDER"

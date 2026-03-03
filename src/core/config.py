@@ -13,7 +13,8 @@ class Settings(BaseSettings):
     # API Keys & Cloud Config
     vertex_api_key: str | None = None
     google_cloud_project: str | None = None
-    google_cloud_location: str | None = None
+    google_cloud_location: str | None = "global"
+    document_ai_location: str = "us"
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"

@@ -35,7 +35,7 @@ class GeminiProvider(LLMProvider):
             client_kwargs["vertexai"] = True
             client_kwargs["project"] = config.google_cloud_project
             # Gemini 3.1 preview models are currently only accessible via the 'global' region on Vertex AI
-            client_kwargs["location"] = "global"
+            client_kwargs["location"] = config.google_cloud_location or "global"
         # Fallback to pure API Key for Google AI Studio (Consumer)
         elif config.vertex_api_key:
             client_kwargs["api_key"] = config.vertex_api_key

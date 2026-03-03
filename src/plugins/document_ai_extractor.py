@@ -56,8 +56,10 @@ class DocumentAIExtractorPlugin(AnalyzerBase):
 
         project_id = config.google_cloud_project
         # Document AI uses multi-region locations ("us", "eu"), not Vertex AI
-        # regions like "us-central1". Use a dedicated setting or default to "us".
-        location = getattr(config, "document_ai_location", None) or "us"
+        # regions like "us-central1". Normalize input or default to "us".
+        location = config.document_ai_location or "us"
+        if "-" in location:
+            location = location.split("-")[0]
 
         if not project_id:
             logger.error("google_cloud_project is not configured for Document AI.")

@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import os
 import sys
@@ -19,23 +20,22 @@ def get_memory_usage():
     return process.memory_info().rss / (1024 * 1024)
 
 
-async def run_benchmark():
-    rfb_dir = Path.home() / "code" / "rfb"
+async def run_benchmark(root_dir: Path):
     sample_files = []
 
-    if not rfb_dir.exists():
-        print(f"Error: {rfb_dir} does not exist.")
+    if not root_dir.exists():
+        print(f"Error: {root_dir} does not exist.")
         return
 
     # Find a few sample text/markdown/python files
-    for path in rfb_dir.rglob("*"):
+    for path in root_dir.rglob("*"):
         if path.is_file() and path.suffix in [".txt", ".md", ".py"]:
             sample_files.append(path)
             if len(sample_files) >= 5:
                 break
 
     if not sample_files:
-        print(f"No text files found in {rfb_dir}")
+        print(f"No text files found in {root_dir}")
         return
 
     print(f"Found {len(sample_files)} sample files for testing.")
@@ -174,4 +174,12 @@ async def run_benchmark():
 
 
 if __name__ == "__main__":
-    asyncio.run(run_benchmark())
+    parser = argparse.ArgumentParser(description="Performance benchmark for LLMs.")
+    parser.add_argument(
+        "--dir",
+        type=Path,
+        default=Path.cwd(),
+        help="Root directory to search for sample text files.",
+    )
+    args = parser.parse_args()
+    asyncio.run(run_benchmark(args.dir))

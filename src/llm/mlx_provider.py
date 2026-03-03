@@ -46,6 +46,28 @@ class MLXProvider(LLMProvider):
                 from mlx_vlm import load as vlm_load
 
                 self.model, self.processor = vlm_load(model_path)
+
+                # Patch processor for older LLaVA 1.5 models where transformers'
+                # LlavaProcessor doesn't inherit patch_size from the vision config,
+                # causing "int // NoneType" in processing_llava.py
+                if getattr(self.processor, "patch_size", None) is None:
+                    vision_cfg = getattr(self.model.config, "vision_config", None)
+                    if vision_cfg:
+                        ps = getattr(vision_cfg, "patch_size", None)
+                        if ps:
+                            self.processor.patch_size = ps
+                            logger.info(
+                                f"Patched processor.patch_size = {ps} from vision config"
+                            )
+                if (
+                    getattr(self.processor, "vision_feature_select_strategy", None)
+                    is None
+                ):
+                    self.processor.vision_feature_select_strategy = "default"
+                    logger.info(
+                        "Patched processor.vision_feature_select_strategy = 'default'"
+                    )
+
             except Exception as e:
                 logger.error(f"Failed to load MLX VLM model at {model_path}: {e}")
                 raise
@@ -175,7 +197,7 @@ class MLXProvider(LLMProvider):
                     self.model,
                     self.processor,
                     prompt=formatted_prompt,
-                    image=[image_path],
+                    image=image_path,
                     max_tokens=max_tokens,
                     verbose=False,
                 )
