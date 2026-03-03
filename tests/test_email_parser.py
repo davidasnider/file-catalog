@@ -106,6 +106,13 @@ async def test_email_parser_mbox(tmp_path):
     assert result["emails"][0]["subject"] == "First Message"
     assert result["emails"][1]["subject"] == "Second Message"
 
+    # Test with a file that does not have .mbox extension but has application/mbox MIME type
+    mbox_no_ext = tmp_path / "test_email_archive"
+    mbox_no_ext.write_bytes(mbox_content)
+
+    result_no_ext = await plugin.analyze(str(mbox_no_ext), "application/mbox", {})
+    assert result_no_ext["total_emails"] == 2
+
 
 @pytest.mark.asyncio
 async def test_email_parser_should_run():

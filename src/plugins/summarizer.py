@@ -74,7 +74,7 @@ Text:
 
         try:
             summary_response = await llm.generate(
-                prompt, max_tokens=1024, temperature=0.3
+                prompt, max_tokens=150, temperature=0.3
             )
             return {
                 "summary": summary_response.strip(),

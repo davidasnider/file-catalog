@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aiosqlite>=0.22.1",
+    "av>=16.1.0",
     "beautifulsoup4>=4.14.3",
     "faster-whisper>=1.2.1",
     "google-cloud-aiplatform>=1.139.0",

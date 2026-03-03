@@ -172,7 +172,7 @@ def main():
             event = st.dataframe(
                 df[["Document Status", "File"]],
                 height=400,
-                width="stretch",
+                use_container_width=True,
                 hide_index=True,
                 column_config={
                     "Document Status": st.column_config.TextColumn(

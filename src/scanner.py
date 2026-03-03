@@ -99,9 +99,7 @@ async def ingest_directory(
             files_to_process.append(str((Path(root) / filename).resolve()))
 
     if progress and task_id is not None:
-        progress.update(
-            task_id, total=limit if limit is not None else len(files_to_process)
-        )
+        progress.update(task_id, total=len(files_to_process))
 
     for file_path in files_to_process:
         try:
@@ -187,13 +185,13 @@ async def run_scanner(
     # 0. Pre-flight checks: Ensure LLM models are downloaded before hijacking the console with Rich Progress
     try:
         from src.llm.llama_cpp import LlamaCppProvider, HAS_HF_HUB
-        from src.plugins.summarizer import MODEL_PATH
+        from src.core.config import config
 
-        if HAS_HF_HUB and not os.path.exists(MODEL_PATH):
+        if HAS_HF_HUB and not os.path.exists(config.llm_model_path):
             console.print(
                 "[yellow]⬇️  Downloading Local LLM (Llama-3-8B). This may take a few minutes...[/yellow]"
             )
-            LlamaCppProvider.download_model(MODEL_PATH)
+            LlamaCppProvider.download_model(config.llm_model_path)
             console.print("[green]✅ Download complete![/green]\n")
     except ImportError:
         pass
