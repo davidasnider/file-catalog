@@ -39,9 +39,22 @@ async def init_db():
             logger.info(
                 "Outdated schema detected, dropping all tables for migration..."
             )
+            await conn.execute(text("DROP TABLE IF EXISTS document_fts"))
             await conn.run_sync(SQLModel.metadata.drop_all)
 
         await conn.run_sync(SQLModel.metadata.create_all)
+
+        # Create FTS5 virtual table
+        await conn.execute(
+            text(
+                "CREATE VIRTUAL TABLE IF NOT EXISTS document_fts USING fts5("
+                "document_id UNINDEXED, "
+                "path, "
+                "content, "
+                "summary"
+                ");"
+            )
+        )
     logger.info("Database initialization complete.")
 
 

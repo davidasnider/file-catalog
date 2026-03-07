@@ -11,7 +11,7 @@
 ---
 
 ## Search & Retrieval
-- [ ] Add a full-text search engine (e.g., SQLite FTS5) so users can search across all extracted text, summaries, and PII results.
+- [x] Add a full-text search engine (e.g., SQLite FTS5) so users can search across all extracted text, summaries, and PII results.
 - [ ] Build a natural language query interface — let users ask questions about their files ("Find all documents mentioning estate tax") using an LLM + retrieval pipeline (RAG).
 - [ ] Generate and store vector embeddings for each document to enable semantic similarity search ("find documents similar to this one").
 - [ ] Add a tag/label system so users can manually or automatically tag files and filter by them in the dashboard.
