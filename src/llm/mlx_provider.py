@@ -32,7 +32,7 @@ except ImportError:
     HAS_MLX = False
 
 try:
-    from mlx_vlm import load as vlm_load, generate as vlm_generate
+    from mlx_vlm import load as vlm_load
 
     HAS_MLX_VLM = True
 except ImportError:
@@ -190,21 +190,29 @@ class MLXProvider(LLMProvider):
                     break
 
     async def process_image(self, image_path: str, prompt: str, **kwargs) -> str:
-        """Run multimodal (vision) analysis asynchronously using MLX."""
+        """Run multimodal (vision) analysis asynchronously using MLX.
+
+        Uses the processor directly (with PyTorch tensors) to get properly
+        tokenized inputs, then converts to MLX. This bypasses mlx_vlm.generate()
+        which has compatibility issues with transformers 5.x.
+        """
         if not self.is_vision:
             raise Exception("MLXProvider was not initialized as a vision provider.")
 
         loop = asyncio.get_running_loop()
-
         max_tokens = kwargs.get("max_tokens", 512)
 
         def _run_sync():
-            # MLX-VLM's generate wrapper automatically applies the processor chat template
-            # and handles the image passing.
-
-            # Different processors might have different requirements for the prompt
-            # but mlx_vlm generate attempts to format it
             try:
+                import mlx.core as mx
+                import torch
+                from PIL import Image
+                from mlx_vlm.models import cache as vlm_cache
+
+                with Image.open(image_path) as img:
+                    image = img.convert("RGB")
+
+                # Build the prompt with image placeholder
                 if hasattr(self.processor, "apply_chat_template"):
                     messages = [
                         {
@@ -219,23 +227,99 @@ class MLXProvider(LLMProvider):
                         messages, tokenize=False, add_generation_prompt=True
                     )
                 else:
-                    formatted_prompt = prompt
+                    formatted_prompt = f"USER: <image>\n{prompt} ASSISTANT:"
 
-                result = vlm_generate(
-                    self.model,
-                    self.processor,
-                    prompt=formatted_prompt,
-                    image=image_path,
-                    max_tokens=max_tokens,
-                    temperature=kwargs.get("temperature", 0.0),
-                    repetition_penalty=kwargs.get("repetition_penalty", 1.2),
-                    verbose=False,
+                # Use the processor directly to get correctly tokenized
+                # input_ids with expanded image tokens, pixel_values, and
+                # any model-specific extras (e.g., image_grid_thw for Qwen)
+                processed = self.processor(
+                    text=formatted_prompt,
+                    images=[image],
+                    return_tensors="pt",
                 )
 
-                # Check if it returned a GenerationResult or just a string
-                if hasattr(result, "text"):
-                    return result.text.strip()
-                return str(result).strip()
+                # Convert all tensors from PyTorch to MLX
+                input_ids_mx = mx.array(processed["input_ids"].numpy())
+                pixel_values_mx = mx.array(
+                    processed["pixel_values"].to(torch.float32).numpy()
+                )
+
+                # Collect extra kwargs the model might need
+                model_kwargs = {}
+                for key in ("image_grid_thw", "video_grid_thw"):
+                    if key in processed:
+                        model_kwargs[key] = mx.array(processed[key].numpy())
+
+                # Get input embeddings (vision tower + projector + merge)
+                input_embeds_result = self.model.get_input_embeddings(
+                    input_ids_mx, pixel_values_mx, **model_kwargs
+                )
+                inputs_embeds = input_embeds_result.inputs_embeds
+
+                # Create KV cache and causal mask
+                prompt_cache = vlm_cache.make_prompt_cache(self.model.language_model)
+                seq_len = inputs_embeds.shape[1]
+                mask = mx.triu(mx.full((seq_len, seq_len), float("-inf")), k=1)
+
+                # Run the language model with vision-enriched embeddings
+                output = self.model.language_model(
+                    input_ids_mx,
+                    inputs_embeds=inputs_embeds,
+                    cache=prompt_cache,
+                    mask=mask,
+                )
+                logits = output.logits if hasattr(output, "logits") else output
+
+                # Sampling parameters
+                temperature = kwargs.get("temperature", 0.0)
+                top_p = kwargs.get("top_p", 1.0)
+
+                # Decode with KV cache
+                tokenizer = getattr(self.processor, "tokenizer", self.processor)
+                generated_tokens = []
+                eos_token_id = getattr(
+                    self.model.config,
+                    "eos_token_id",
+                    getattr(tokenizer, "eos_token_id", 2),
+                )
+                for _ in range(max_tokens):
+                    if temperature > 0:
+                        # Temperature-scaled sampling with optional top-p
+                        scaled = logits[:, -1, :] / temperature
+                        probs = mx.softmax(scaled, axis=-1)
+                        if top_p < 1.0:
+                            sorted_indices = mx.argsort(probs, axis=-1)[..., ::-1]
+                            sorted_probs = mx.take_along_axis(
+                                probs, sorted_indices, axis=-1
+                            )
+                            cumsum = mx.cumsum(sorted_probs, axis=-1)
+                            mask = cumsum - sorted_probs > top_p
+                            sorted_probs = mx.where(mask, 0.0, sorted_probs)
+                            probs = mx.zeros_like(probs)
+                            probs = probs.at[
+                                mx.arange(probs.shape[0])[:, None],
+                                sorted_indices,
+                            ].add(sorted_probs)
+                        next_token = mx.random.categorical(mx.log(probs + 1e-10))
+                    else:
+                        # Greedy decode
+                        next_token = mx.argmax(logits[:, -1, :], axis=-1)
+
+                    token_id = next_token.item()
+
+                    if token_id == eos_token_id:
+                        break
+
+                    generated_tokens.append(token_id)
+                    output = self.model.language_model(
+                        next_token.reshape(1, 1),
+                        cache=prompt_cache,
+                    )
+                    logits = output.logits if hasattr(output, "logits") else output
+                    mx.eval(logits)
+
+                result = tokenizer.decode(generated_tokens, skip_special_tokens=True)
+                return result.strip()
 
             except Exception as e:
                 logger.error(f"MLX VLM execution failed: {e}")
