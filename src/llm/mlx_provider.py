@@ -32,7 +32,7 @@ except ImportError:
     HAS_MLX = False
 
 try:
-    from mlx_vlm import load as vlm_load, generate as vlm_generate
+    from mlx_vlm import load as vlm_load  # noqa: F401
 
     HAS_MLX_VLM = True
 except ImportError:
@@ -199,12 +199,13 @@ class MLXProvider(LLMProvider):
         max_tokens = kwargs.get("max_tokens", 512)
 
         def _run_sync():
-            # MLX-VLM's generate wrapper automatically applies the processor chat template
-            # and handles the image passing.
-
-            # Different processors might have different requirements for the prompt
-            # but mlx_vlm generate attempts to format it
             try:
+                import mlx.core as mx
+                from PIL import Image
+
+                image = Image.open(image_path).convert("RGB")
+
+                # Build the prompt with <image> placeholder
                 if hasattr(self.processor, "apply_chat_template"):
                     messages = [
                         {
@@ -219,23 +220,122 @@ class MLXProvider(LLMProvider):
                         messages, tokenize=False, add_generation_prompt=True
                     )
                 else:
-                    formatted_prompt = prompt
+                    formatted_prompt = f"USER: <image>\n{prompt} ASSISTANT:"
 
-                result = vlm_generate(
-                    self.model,
-                    self.processor,
-                    prompt=formatted_prompt,
-                    image=image_path,
-                    max_tokens=max_tokens,
-                    temperature=kwargs.get("temperature", 0.0),
-                    repetition_penalty=kwargs.get("repetition_penalty", 1.2),
-                    verbose=False,
+                # Compute expected image token count from vision config
+                # ViT produces (num_patches + 1) tokens: patches + CLS token
+                # 'default' strategy removes CLS → num_patches features
+                # 'full' strategy keeps CLS → num_patches + 1 features
+                vision_cfg = getattr(self.model.config, "vision_config", None)
+                if vision_cfg:
+                    img_size = getattr(vision_cfg, "image_size", 336)
+                    patch_sz = getattr(vision_cfg, "patch_size", 14)
+                    num_patches = (img_size // patch_sz) ** 2
+                    strategy = getattr(
+                        self.model.config,
+                        "vision_feature_select_strategy",
+                        "default",
+                    )
+                    if strategy == "default":
+                        num_image_tokens = num_patches
+                    else:
+                        num_image_tokens = num_patches + 1
+                else:
+                    num_image_tokens = 576  # fallback for (336/14)^2
+
+                # Split prompt on <image>, tokenize each part, and insert
+                # the correct number of image_token_index tokens between them
+                image_token_index = getattr(
+                    self.model.config, "image_token_index", 32000
                 )
+                parts = formatted_prompt.split("<image>")
 
-                # Check if it returned a GenerationResult or just a string
-                if hasattr(result, "text"):
-                    return result.text.strip()
-                return str(result).strip()
+                # Tokenize each text chunk
+                tokenizer = getattr(self.processor, "tokenizer", self.processor)
+                chunks = [tokenizer(p).input_ids for p in parts]
+
+                # Build input_ids: chunk[0] + [image_token]*N + chunk[1] + ...
+                input_ids = chunks[0]
+                for i in range(1, len(chunks)):
+                    input_ids += [image_token_index] * num_image_tokens
+                    input_ids += chunks[i]
+
+                input_ids_mx = mx.array([input_ids])
+
+                # Process image through the image processor
+                image_processor = getattr(self.processor, "image_processor", None)
+                if image_processor is not None:
+                    import torch
+
+                    pp_result = image_processor.preprocess(images=[image])
+                    # preprocess returns {'pixel_values': [tensor(3,H,W)]}
+                    pv_list = pp_result.get("pixel_values", pp_result)
+                    if isinstance(pv_list, list):
+                        stacked = torch.stack(pv_list)
+                    else:
+                        stacked = pv_list
+                    pixel_values_mx = mx.array(stacked.numpy())
+                else:
+                    # Fallback: use processor directly with PyTorch
+                    import torch
+
+                    processed = self.processor(
+                        text=formatted_prompt,
+                        images=[image],
+                        return_tensors="pt",
+                    )
+                    pixel_values_mx = mx.array(processed["pixel_values"].numpy())
+
+                # Create KV cache for autoregressive generation
+                from mlx_vlm.models import cache as vlm_cache
+
+                prompt_cache = vlm_cache.make_prompt_cache(self.model.language_model)
+
+                # First pass: get input embeddings from the full model
+                # (processes image through vision tower + projector)
+                input_embeds_result = self.model.get_input_embeddings(
+                    input_ids_mx, pixel_values_mx
+                )
+                inputs_embeds = input_embeds_result.inputs_embeds
+
+                # Create causal mask for the prompt
+                seq_len = inputs_embeds.shape[1]
+                mask = mx.triu(mx.full((seq_len, seq_len), float("-inf")), k=1)
+
+                # Run the language model with the vision-enriched embeddings
+                output = self.model.language_model(
+                    input_ids_mx,
+                    inputs_embeds=inputs_embeds,
+                    cache=prompt_cache,
+                    mask=mask,
+                )
+                logits = output.logits if hasattr(output, "logits") else output
+
+                # Greedy decode with KV cache
+                generated_tokens = []
+                eos_token_id = getattr(
+                    self.model.config,
+                    "eos_token_id",
+                    getattr(tokenizer, "eos_token_id", 2),
+                )
+                for _ in range(max_tokens):
+                    next_token = mx.argmax(logits[:, -1, :], axis=-1)
+                    token_id = next_token.item()
+
+                    if token_id == eos_token_id:
+                        break
+
+                    generated_tokens.append(token_id)
+                    # Subsequent tokens use language model with cache
+                    output = self.model.language_model(
+                        next_token.reshape(1, 1),
+                        cache=prompt_cache,
+                    )
+                    logits = output.logits if hasattr(output, "logits") else output
+                    mx.eval(logits)
+
+                result = tokenizer.decode(generated_tokens, skip_special_tokens=True)
+                return result.strip()
 
             except Exception as e:
                 logger.error(f"MLX VLM execution failed: {e}")
