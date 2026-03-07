@@ -2,15 +2,12 @@ import pytest
 import asyncio
 from typing import Dict, Any
 
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlmodel import SQLModel
 
 from src.db.models import Document, AnalysisTask, DocumentStatus, TaskStatus
 from src.core.task_engine import TaskEngine
 from src.core.plugin_registry import AnalyzerBase, register_analyzer, ANALYZER_REGISTRY
-
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 
 @pytest.fixture(scope="function")
@@ -18,26 +15,6 @@ def reset_registry():
     ANALYZER_REGISTRY.clear()
     yield
     ANALYZER_REGISTRY.clear()
-
-
-@pytest.fixture(scope="function")
-async def test_engine():
-    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-    async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
-    yield engine
-    async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.drop_all)
-    await engine.dispose()
-
-
-@pytest.fixture(scope="function")
-async def db_session(test_engine):
-    async_session = sessionmaker(
-        test_engine, class_=AsyncSession, expire_on_commit=False
-    )
-    async with async_session() as session:
-        yield session
 
 
 @pytest.mark.asyncio

@@ -39,6 +39,7 @@ async def init_db():
             logger.info(
                 "Outdated schema detected, dropping all tables for migration..."
             )
+            await conn.execute(text("DROP TABLE IF EXISTS document_fts"))
             await conn.run_sync(SQLModel.metadata.drop_all)
 
         await conn.run_sync(SQLModel.metadata.create_all)
