@@ -11,3 +11,4 @@ docs/_build/
 models/
 
 file_catalog.db*
+.DS_Store
