@@ -135,13 +135,9 @@ async def search_fts(session: AsyncSession, query: str, limit: int = 50):
         LIMIT :limit
     """
 
-    # SQLite FTS syntax: wrap queries in quotes to do phrase search if needed,
-    # but here we'll just pass the raw string and let FTS5 parse it.
-    # Note: FTS5 query parser can throw errors on standard punctuation,
-    # so often wrapping the string in double quotes or sanitizing is needed.
-
-    # Basic sanitization: remove quotes that might break the query
-    safe_query = query.replace('"', '""')
+    # SQLite FTS syntax: wrap queries in quotes to do phrase search and avoid syntax errors
+    # on punctuation. We escape internal double quotes by doubling them.
+    safe_query = f'"{query.replace(chr(34), chr(34)*2)}"'
 
     try:
         result = await session.execute(
@@ -150,14 +146,4 @@ async def search_fts(session: AsyncSession, query: str, limit: int = 50):
         return [dict(row._mapping) for row in result.fetchall()]
     except Exception as e:
         logger.error(f"FTS search failed for query '{query}': {e}")
-
-        # Fallback: try wrapping as a literal phrase if syntax error occurred
-        try:
-            phrase_query = f'"{safe_query}"'
-            result = await session.execute(
-                text(search_sql), {"query": phrase_query, "limit": limit}
-            )
-            return [dict(row._mapping) for row in result.fetchall()]
-        except Exception as e2:
-            logger.error(f"FTS phrase search fallback also failed: {e2}")
-            return []
+        return []
