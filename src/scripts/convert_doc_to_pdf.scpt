@@ -12,75 +12,101 @@ on run
 	end tell
 
 	repeat with aFile in fileList
-		-- Since find returns POSIX paths natively now, we just coerce them to AppleScript alias objects
 		set posixTarget to aFile as text
 
-		if posixTarget ends with ".doc" then
-			set newFileName to (text 1 thru -5 of posixTarget) & ".pdf"
+		-- Case-insensitive check for .doc extension
+		if (posixTarget as lowercase) ends with ".doc" then
+			set newPath to (text 1 thru -5 of posixTarget) & ".pdf"
 
-			-- Generate a Mac HFS path for TextEdit to "open" via System Events
+			-- Generate HFS path and get parent directory for the "Go to Folder" sheet
 			set fileAlias to POSIX file posixTarget as alias
+			set parentPath to getParentPath(posixTarget)
+			set pdfName to getFileName(newPath)
 
 			tell application "TextEdit"
-				open fileAlias
+				set targetDoc to open fileAlias
 			end tell
 
 			tell application "System Events"
 				tell process "TextEdit"
 					set frontmost to true
-					-- Usually the menu item is "Export as PDF…" with an ellipsis (Option-semicolon)
 					try
-						click menu item "Export as PDF…" of menu "File" of menu bar 1
-					on error
-						click menu item "Export as PDF..." of menu "File" of menu bar 1
-					end try
+						-- Usually the menu item is "Export as PDF…" with an ellipsis (Option-semicolon)
+						try
+							click menu item "Export as PDF…" of menu "File" of menu bar 1
+						on error
+							-- Fallback to three-dot version
+							click menu item "Export as PDF..." of menu "File" of menu bar 1
+						end try
 
-					-- wait for save sheet
-					repeat until exists sheet 1 of window 1
-						delay 0.1
-					end repeat
-
-					tell sheet 1 of window 1
-						-- change directory by invoking "Go to Folder"
-						keystroke "g" using {command down, shift down}
-
-						-- wait for the Go To folder sheet
-						repeat until exists sheet 1
+						-- Wait for save sheet with timeout
+						set waitCount to 0
+						repeat until (exists sheet 1 of window 1) or (waitCount > 50)
 							delay 0.1
+							set waitCount to waitCount + 1
 						end repeat
+						if waitCount > 50 then error "Timeout waiting for Export sheet"
 
-						delay 0.2
-						set the clipboard to newFileName
-						keystroke "v" using command down
-						delay 0.2
-						keystroke return
+						tell sheet 1 of window 1
+							-- change directory by invoking "Go to Folder"
+							keystroke "g" using {command down, shift down}
 
-						-- wait until the Go To folder sheet disappears
-						repeat while exists sheet 1
-							delay 0.1
-						end repeat
+							-- wait for the Go To folder sheet
+							set waitCount to 0
+							repeat until (exists sheet 1) or (waitCount > 30)
+								delay 0.1
+								set waitCount to waitCount + 1
+							end repeat
+							if waitCount > 30 then error "Timeout waiting for Go To Folder sheet"
+
+							delay 0.2
+							set oldClipboard to the clipboard
+							set the clipboard to parentPath
+							keystroke "v" using command down
+							delay 0.2
+							keystroke return
+
+							-- wait until the Go To folder sheet disappears
+							set waitCount to 0
+							repeat while (exists sheet 1) and (waitCount < 50)
+								delay 0.1
+								set waitCount to waitCount + 1
+							end repeat
+
+							delay 0.2
+							-- Set the PDF filename
+							set the clipboard to pdfName
+							keystroke "v" using command down
+							set the clipboard to oldClipboard
+							delay 0.2
+
+							-- Hit enter to confirm the Save sheet
+							keystroke return
+						end tell
 
 						delay 0.5
 
-						-- Hit enter to confirm the Save sheet
-						keystroke return
-					end tell
-
-					delay 0.5
-
-					-- If a document existing prompt appears, click replace
-					if exists sheet 1 of sheet 1 of window 1 then
-						try
-							click button "Replace" of sheet 1 of sheet 1 of window 1
-						end try
-					end if
+						-- If a document existing prompt appears, click replace
+						if exists sheet 1 of sheet 1 of window 1 then
+							try
+								click button "Replace" of sheet 1 of sheet 1 of window 1
+							end try
+						end if
+					on error errMsg
+						display dialog "Unable to control TextEdit via System Events." & return & return & ¬
+							"Please enable “TextEdit” and “System Events” in:" & return & ¬
+							"  • System Settings > Privacy & Security > Accessibility" & return & ¬
+							"  • System Settings > Privacy & Security > Automation" & return & return & ¬
+							"Error: " & errMsg buttons {"OK"} default button 1
+						error number -128
+					end try
 				end tell
 			end tell
 
 			delay 1
 
 			tell application "TextEdit"
-				close document 1 saving no
+				close targetDoc saving no
 			end tell
 		end if
 	end repeat
@@ -91,9 +117,6 @@ end run
 
 on getFileNames(sourceFolder)
 	set sourcePath to POSIX path of sourceFolder
-	-- We use `do shell script` to perform an instant, deeply recursive search
-	-- on the folder for all .doc files. It is thousands of times faster
-	-- and much more reliable than native System Events recursion
 	set cmd to "find " & quoted form of sourcePath & " -type f -iname \"*.doc\""
 	try
 		set findResult to do shell script cmd
@@ -102,3 +125,13 @@ on getFileNames(sourceFolder)
 		return {}
 	end try
 end getFileNames
+
+on getParentPath(posixPath)
+	set cmd to "dirname " & quoted form of posixPath
+	return (do shell script cmd) & "/"
+end getParentPath
+
+on getFileName(posixPath)
+	set cmd to "basename " & quoted form of posixPath
+	return do shell script cmd
+end getFileName
