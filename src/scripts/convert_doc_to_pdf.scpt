@@ -14,8 +14,8 @@ on run
 	repeat with aFile in fileList
 		set posixTarget to aFile as text
 
-		-- Case-insensitive check for .doc extension
-		if (posixTarget as lowercase) ends with ".doc" then
+		-- AppleScript string comparisons are case-insensitive by default.
+		if posixTarget ends with ".doc" then
 			set newPath to (text 1 thru -5 of posixTarget) & ".pdf"
 
 			-- Generate HFS path and get parent directory for the "Go to Folder" sheet
@@ -23,6 +23,7 @@ on run
 			set parentPath to getParentPath(posixTarget)
 			set pdfName to getFileName(newPath)
 
+			set targetDoc to missing value
 			tell application "TextEdit"
 				set targetDoc to open fileAlias
 			end tell
@@ -105,9 +106,11 @@ on run
 
 			delay 1
 
-			tell application "TextEdit"
-				close targetDoc saving no
-			end tell
+			if targetDoc is not missing value then
+				tell application "TextEdit"
+					close targetDoc saving no
+				end tell
+			end if
 		end if
 	end repeat
 
