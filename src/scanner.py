@@ -278,7 +278,15 @@ async def run_scanner(
             # Briefly check the DB to see if any tasks on this doc failed due to missing LLM dependencies
             # We do this quickly to aggregate the end-of-run warning
             async def check_doc_errors():
+                from src.db.fts import sync_document_to_fts
+
                 async with async_session_maker() as session:
+                    # Sync to FTS index
+                    try:
+                        await sync_document_to_fts(session, doc_id)
+                    except Exception as e:
+                        logger.error(f"FTS sync failed for doc {doc_id}: {e}")
+
                     result = await session.execute(
                         select(AnalysisTask).where(AnalysisTask.document_id == doc_id)
                     )

@@ -6,6 +6,7 @@ import json
 
 from src.db.engine import async_session_maker
 from src.db.models import Document, AnalysisTask
+from src.db.fts import search_fts
 
 # Configure page
 st.set_page_config(
@@ -131,6 +132,11 @@ def main():
         )
 
         search_query = st.text_input("Search path...", "")
+        fts_query = st.text_input(
+            "Full Text Content Search...",
+            "",
+            help="Search extracted text, summaries, and transcripts using SQLite FTS5",
+        )
 
     # Apply filters
     filtered_docs = []
@@ -148,6 +154,25 @@ def main():
                 continue
 
         filtered_docs.append(doc)
+
+    # Perform FTS Search if query is provided
+    fts_results = {}
+    if fts_query.strip():
+        with st.spinner("Searching full text index..."):
+
+            async def run_fts():
+                async with async_session_maker() as session:
+                    return await search_fts(session, fts_query.strip(), limit=100)
+
+            try:
+                results = asyncio.run(run_fts())
+                for r in results:
+                    fts_results[r["document_id"]] = r
+
+                # Filter our already-filtered docs down to only FTS matches
+                filtered_docs = [d for d in filtered_docs if d.id in fts_results]
+            except Exception as e:
+                st.sidebar.error(f"FTS Search Error: {e}")
 
     # Render Document Index inside the Sidebar
     with st.sidebar:
@@ -198,6 +223,23 @@ def main():
     # Detail View Context
     if selected_row is not None:
         doc_id = int(selected_row["ID"])
+
+        # Display FTS Search snippets if applicable
+        if fts_results and doc_id in fts_results:
+            st.markdown("### 🔍 Search Match")
+            match = fts_results[doc_id]
+
+            if match.get("summary_snippet"):
+                st.markdown(
+                    f"**In Summary:** ...{match['summary_snippet']}...",
+                    unsafe_allow_html=True,
+                )
+            if match.get("content_snippet"):
+                st.markdown(
+                    f"**In Content:** ...{match['content_snippet']}...",
+                    unsafe_allow_html=True,
+                )
+            st.divider()
         selected_doc = next((d for d in filtered_docs if d.id == doc_id), None)
 
         if selected_doc:

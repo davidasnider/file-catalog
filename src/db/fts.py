@@ -1,0 +1,163 @@
+import json
+import logging
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
+from src.db.models import DocumentStatus, TaskStatus
+
+logger = logging.getLogger(__name__)
+
+
+async def sync_document_to_fts(session: AsyncSession, document_id: int):
+    """
+    Sync a completed document and its analysis tasks into the FTS5 virtual table
+    for full-text search.
+    """
+    # Fetch the document to ensure it exists and get its path
+    result = await session.execute(
+        text("SELECT path, status FROM document WHERE id = :doc_id"),
+        {"doc_id": document_id},
+    )
+    doc = result.fetchone()
+
+    if not doc:
+        logger.warning(f"Cannot sync document {document_id} to FTS: not found")
+        return
+
+    path, status = doc
+
+    # We only want to index documents that have attempted processing
+    if status in (DocumentStatus.PENDING, DocumentStatus.EXTRACTING):
+        return
+
+    # Fetch all COMPLETED tasks for this document to build the FTS content
+    tasks_result = await session.execute(
+        text(
+            "SELECT task_name, result_data FROM analysistask WHERE document_id = :doc_id AND status = :status"
+        ),
+        {"doc_id": document_id, "status": TaskStatus.COMPLETED.value},
+    )
+    tasks = tasks_result.fetchall()
+
+    content_parts = []
+    summary_text = ""
+
+    for task_name, result_data_str in tasks:
+        if not result_data_str:
+            continue
+
+        try:
+            data = json.loads(result_data_str)
+        except json.JSONDecodeError:
+            continue
+
+        # Extract textual content based on the task type
+        if task_name == "TextExtractor":
+            if text_content := data.get("text"):
+                content_parts.append(text_content)
+
+        elif task_name == "DocumentAIExtractor":
+            if text_content := data.get("text"):
+                content_parts.append(text_content)
+
+        elif task_name == "AudioTranscriber":
+            if text_content := data.get("text"):
+                content_parts.append(text_content)
+
+        elif task_name == "VisionAnalyzer":
+            if description := data.get("description"):
+                content_parts.append(description)
+
+        elif task_name == "VideoAnalyzer":
+            if description := data.get("visual_description"):
+                content_parts.append(description)
+
+        elif task_name == "EmailParser":
+            if subject := data.get("subject"):
+                content_parts.append(f"Subject: {subject}")
+            if text_content := data.get("text_body"):
+                content_parts.append(text_content)
+
+        elif task_name == "SpreadsheetAnalyzer":
+            if text_content := data.get("raw_text_content"):
+                content_parts.append(text_content)
+            elif summary := data.get("summary"):
+                content_parts.append(summary)
+
+        elif task_name == "Summarizer":
+            if summary := data.get("summary"):
+                summary_text = summary
+
+    # Combine all extracted content into a single searchable body
+    full_content = "\n\n".join(content_parts)
+
+    # Execute the two statements (delete old, insert new) separately
+
+    # 1. Delete existing entry if it exists
+    await session.execute(
+        text("DELETE FROM document_fts WHERE rowid = :doc_id"), {"doc_id": document_id}
+    )
+
+    # 2. Insert new entry
+    await session.execute(
+        text(
+            "INSERT INTO document_fts(rowid, document_id, path, content, summary) "
+            "VALUES(:doc_id, :doc_id, :path, :content, :summary)"
+        ),
+        {
+            "doc_id": document_id,
+            "path": path,
+            "content": full_content,
+            "summary": summary_text,
+        },
+    )
+
+    await session.commit()
+    logger.info(f"Synced document {document_id} to FTS")
+
+
+async def search_fts(session: AsyncSession, query: str, limit: int = 50):
+    """
+    Search the FTS5 table and return results with snippets.
+    """
+    if not query or not query.strip():
+        return []
+
+    search_sql = """
+        SELECT
+            document_id,
+            path,
+            snippet(document_fts, 2, '<b>', '</b>', '...', 64) as content_snippet,
+            snippet(document_fts, 3, '<b>', '</b>', '...', 64) as summary_snippet,
+            rank
+        FROM document_fts
+        WHERE document_fts MATCH :query
+        ORDER BY rank
+        LIMIT :limit
+    """
+
+    # SQLite FTS syntax: wrap queries in quotes to do phrase search if needed,
+    # but here we'll just pass the raw string and let FTS5 parse it.
+    # Note: FTS5 query parser can throw errors on standard punctuation,
+    # so often wrapping the string in double quotes or sanitizing is needed.
+
+    # Basic sanitization: remove quotes that might break the query
+    safe_query = query.replace('"', '""')
+
+    try:
+        result = await session.execute(
+            text(search_sql), {"query": safe_query, "limit": limit}
+        )
+        return [dict(row._mapping) for row in result.fetchall()]
+    except Exception as e:
+        logger.error(f"FTS search failed for query '{query}': {e}")
+
+        # Fallback: try wrapping as a literal phrase if syntax error occurred
+        try:
+            phrase_query = f'"{safe_query}"'
+            result = await session.execute(
+                text(search_sql), {"query": phrase_query, "limit": limit}
+            )
+            return [dict(row._mapping) for row in result.fetchall()]
+        except Exception as e2:
+            logger.error(f"FTS phrase search fallback also failed: {e2}")
+            return []
