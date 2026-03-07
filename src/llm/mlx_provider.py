@@ -32,7 +32,7 @@ except ImportError:
     HAS_MLX = False
 
 try:
-    from mlx_vlm import load as vlm_load  # noqa: F401
+    from mlx_vlm import load as vlm_load
 
     HAS_MLX_VLM = True
 except ImportError:
@@ -209,7 +209,8 @@ class MLXProvider(LLMProvider):
                 from PIL import Image
                 from mlx_vlm.models import cache as vlm_cache
 
-                image = Image.open(image_path).convert("RGB")
+                with Image.open(image_path) as img:
+                    image = img.convert("RGB")
 
                 # Build the prompt with image placeholder
                 if hasattr(self.processor, "apply_chat_template"):
@@ -269,7 +270,11 @@ class MLXProvider(LLMProvider):
                 )
                 logits = output.logits if hasattr(output, "logits") else output
 
-                # Greedy decode with KV cache
+                # Sampling parameters
+                temperature = kwargs.get("temperature", 0.0)
+                top_p = kwargs.get("top_p", 1.0)
+
+                # Decode with KV cache
                 tokenizer = getattr(self.processor, "tokenizer", self.processor)
                 generated_tokens = []
                 eos_token_id = getattr(
@@ -278,7 +283,28 @@ class MLXProvider(LLMProvider):
                     getattr(tokenizer, "eos_token_id", 2),
                 )
                 for _ in range(max_tokens):
-                    next_token = mx.argmax(logits[:, -1, :], axis=-1)
+                    if temperature > 0:
+                        # Temperature-scaled sampling with optional top-p
+                        scaled = logits[:, -1, :] / temperature
+                        probs = mx.softmax(scaled, axis=-1)
+                        if top_p < 1.0:
+                            sorted_indices = mx.argsort(probs, axis=-1)[..., ::-1]
+                            sorted_probs = mx.take_along_axis(
+                                probs, sorted_indices, axis=-1
+                            )
+                            cumsum = mx.cumsum(sorted_probs, axis=-1)
+                            mask = cumsum - sorted_probs > top_p
+                            sorted_probs = mx.where(mask, 0.0, sorted_probs)
+                            probs = mx.zeros_like(probs)
+                            probs = probs.at[
+                                mx.arange(probs.shape[0])[:, None],
+                                sorted_indices,
+                            ].add(sorted_probs)
+                        next_token = mx.random.categorical(mx.log(probs + 1e-10))
+                    else:
+                        # Greedy decode
+                        next_token = mx.argmax(logits[:, -1, :], axis=-1)
+
                     token_id = next_token.item()
 
                     if token_id == eos_token_id:
