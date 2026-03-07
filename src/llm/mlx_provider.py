@@ -190,22 +190,28 @@ class MLXProvider(LLMProvider):
                     break
 
     async def process_image(self, image_path: str, prompt: str, **kwargs) -> str:
-        """Run multimodal (vision) analysis asynchronously using MLX."""
+        """Run multimodal (vision) analysis asynchronously using MLX.
+
+        Uses the processor directly (with PyTorch tensors) to get properly
+        tokenized inputs, then converts to MLX. This bypasses mlx_vlm.generate()
+        which has compatibility issues with transformers 5.x.
+        """
         if not self.is_vision:
             raise Exception("MLXProvider was not initialized as a vision provider.")
 
         loop = asyncio.get_running_loop()
-
         max_tokens = kwargs.get("max_tokens", 512)
 
         def _run_sync():
             try:
                 import mlx.core as mx
+                import torch
                 from PIL import Image
+                from mlx_vlm.models import cache as vlm_cache
 
                 image = Image.open(image_path).convert("RGB")
 
-                # Build the prompt with <image> placeholder
+                # Build the prompt with image placeholder
                 if hasattr(self.processor, "apply_chat_template"):
                     messages = [
                         {
@@ -222,87 +228,39 @@ class MLXProvider(LLMProvider):
                 else:
                     formatted_prompt = f"USER: <image>\n{prompt} ASSISTANT:"
 
-                # Compute expected image token count from vision config
-                # ViT produces (num_patches + 1) tokens: patches + CLS token
-                # 'default' strategy removes CLS → num_patches features
-                # 'full' strategy keeps CLS → num_patches + 1 features
-                vision_cfg = getattr(self.model.config, "vision_config", None)
-                if vision_cfg:
-                    img_size = getattr(vision_cfg, "image_size", 336)
-                    patch_sz = getattr(vision_cfg, "patch_size", 14)
-                    num_patches = (img_size // patch_sz) ** 2
-                    strategy = getattr(
-                        self.model.config,
-                        "vision_feature_select_strategy",
-                        "default",
-                    )
-                    if strategy == "default":
-                        num_image_tokens = num_patches
-                    else:
-                        num_image_tokens = num_patches + 1
-                else:
-                    num_image_tokens = 576  # fallback for (336/14)^2
-
-                # Split prompt on <image>, tokenize each part, and insert
-                # the correct number of image_token_index tokens between them
-                image_token_index = getattr(
-                    self.model.config, "image_token_index", 32000
+                # Use the processor directly to get correctly tokenized
+                # input_ids with expanded image tokens, pixel_values, and
+                # any model-specific extras (e.g., image_grid_thw for Qwen)
+                processed = self.processor(
+                    text=formatted_prompt,
+                    images=[image],
+                    return_tensors="pt",
                 )
-                parts = formatted_prompt.split("<image>")
 
-                # Tokenize each text chunk
-                tokenizer = getattr(self.processor, "tokenizer", self.processor)
-                chunks = [tokenizer(p).input_ids for p in parts]
+                # Convert all tensors from PyTorch to MLX
+                input_ids_mx = mx.array(processed["input_ids"].numpy())
+                pixel_values_mx = mx.array(
+                    processed["pixel_values"].to(torch.float32).numpy()
+                )
 
-                # Build input_ids: chunk[0] + [image_token]*N + chunk[1] + ...
-                input_ids = chunks[0]
-                for i in range(1, len(chunks)):
-                    input_ids += [image_token_index] * num_image_tokens
-                    input_ids += chunks[i]
+                # Collect extra kwargs the model might need
+                model_kwargs = {}
+                for key in ("image_grid_thw", "video_grid_thw"):
+                    if key in processed:
+                        model_kwargs[key] = mx.array(processed[key].numpy())
 
-                input_ids_mx = mx.array([input_ids])
-
-                # Process image through the image processor
-                image_processor = getattr(self.processor, "image_processor", None)
-                if image_processor is not None:
-                    import torch
-
-                    pp_result = image_processor.preprocess(images=[image])
-                    # preprocess returns {'pixel_values': [tensor(3,H,W)]}
-                    pv_list = pp_result.get("pixel_values", pp_result)
-                    if isinstance(pv_list, list):
-                        stacked = torch.stack(pv_list)
-                    else:
-                        stacked = pv_list
-                    pixel_values_mx = mx.array(stacked.numpy())
-                else:
-                    # Fallback: use processor directly with PyTorch
-                    import torch
-
-                    processed = self.processor(
-                        text=formatted_prompt,
-                        images=[image],
-                        return_tensors="pt",
-                    )
-                    pixel_values_mx = mx.array(processed["pixel_values"].numpy())
-
-                # Create KV cache for autoregressive generation
-                from mlx_vlm.models import cache as vlm_cache
-
-                prompt_cache = vlm_cache.make_prompt_cache(self.model.language_model)
-
-                # First pass: get input embeddings from the full model
-                # (processes image through vision tower + projector)
+                # Get input embeddings (vision tower + projector + merge)
                 input_embeds_result = self.model.get_input_embeddings(
-                    input_ids_mx, pixel_values_mx
+                    input_ids_mx, pixel_values_mx, **model_kwargs
                 )
                 inputs_embeds = input_embeds_result.inputs_embeds
 
-                # Create causal mask for the prompt
+                # Create KV cache and causal mask
+                prompt_cache = vlm_cache.make_prompt_cache(self.model.language_model)
                 seq_len = inputs_embeds.shape[1]
                 mask = mx.triu(mx.full((seq_len, seq_len), float("-inf")), k=1)
 
-                # Run the language model with the vision-enriched embeddings
+                # Run the language model with vision-enriched embeddings
                 output = self.model.language_model(
                     input_ids_mx,
                     inputs_embeds=inputs_embeds,
@@ -312,6 +270,7 @@ class MLXProvider(LLMProvider):
                 logits = output.logits if hasattr(output, "logits") else output
 
                 # Greedy decode with KV cache
+                tokenizer = getattr(self.processor, "tokenizer", self.processor)
                 generated_tokens = []
                 eos_token_id = getattr(
                     self.model.config,
@@ -326,7 +285,6 @@ class MLXProvider(LLMProvider):
                         break
 
                     generated_tokens.append(token_id)
-                    # Subsequent tokens use language model with cache
                     output = self.model.language_model(
                         next_token.reshape(1, 1),
                         cache=prompt_cache,
