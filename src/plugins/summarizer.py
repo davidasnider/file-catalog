@@ -45,7 +45,7 @@ class SummarizerPlugin(AnalyzerBase):
                 f"Text too large for standard summarizer ({len(extracted_text)} chars). Skipping in favor of DeepSummarizer."
             )
             return {
-                "summary": "Deep summarization in progress...",
+                "summary": "",
                 "skipped": True,
                 "reason": "text_too_large",
             }

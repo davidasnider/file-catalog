@@ -79,39 +79,46 @@ class TextExtractorPlugin(AnalyzerBase):
                     extracted_text = rtf_to_text(f.read())
             elif mime_type == "application/mbox":
                 import mailbox
+                import contextlib
 
-                mbox = mailbox.mbox(file_path)
-                texts = []
-                for i, msg in enumerate(mbox):
-                    if msg.is_multipart():
-                        for part in msg.walk():
-                            if part.get_content_type() == "text/plain":
-                                payload = part.get_payload(decode=True)
-                                if payload:
-                                    charset = part.get_content_charset() or "utf-8"
-                                    texts.append(
-                                        payload.decode(charset, errors="replace")
-                                    )
-                    else:
-                        payload = msg.get_payload(decode=True)
-                        if payload:
-                            charset = msg.get_content_charset() or "utf-8"
-                            texts.append(payload.decode(charset, errors="replace"))
-                extracted_text = "\n\n".join(texts)
+                with contextlib.closing(mailbox.mbox(file_path)) as mbox:
+                    texts = []
+                    for i, msg in enumerate(mbox):
+                        if msg.is_multipart():
+                            for part in msg.walk():
+                                if part.get_content_type() == "text/plain":
+                                    payload = part.get_payload(decode=True)
+                                    if payload:
+                                        charset = part.get_content_charset() or "utf-8"
+                                        try:
+                                            text = payload.decode(
+                                                charset, errors="replace"
+                                            )
+                                        except LookupError:
+                                            text = payload.decode(
+                                                "utf-8", errors="replace"
+                                            )
+                                        texts.append(text)
+                        else:
+                            payload = msg.get_payload(decode=True)
+                            if payload:
+                                charset = msg.get_content_charset() or "utf-8"
+                                try:
+                                    text = payload.decode(charset, errors="replace")
+                                except LookupError:
+                                    text = payload.decode("utf-8", errors="replace")
+                                texts.append(text)
+                    extracted_text = "\n\n".join(texts)
             elif mime_type == "application/vnd.ms-outlook":
                 import extract_msg
 
                 with extract_msg.openMsg(file_path) as msg:
                     extracted_text = msg.body if msg.body else ""
             elif mime_type == "audio/x-wav":
-                try:
-                    from src.plugins.audio_transcriber import AudioTranscriberPlugin
-
-                    transcriber = AudioTranscriberPlugin()
-                    res = await transcriber.analyze(file_path, mime_type, {})
-                    extracted_text = res.get("text", "")
-                except (ImportError, Exception) as e:
-                    logger.warning(f"Audio transcription failed in TextExtractor: {e}")
+                logger.debug(
+                    "Skipping text extraction for WAV audio; "
+                    "audio transcription should be handled by the audio_transcriber analyzer."
+                )
             elif mime_type == "chemical/x-cdx":
                 import re
 

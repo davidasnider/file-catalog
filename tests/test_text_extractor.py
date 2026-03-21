@@ -23,3 +23,36 @@ async def test_text_extractor_unsupported():
 
     assert result["extracted"] is False
     assert result["text"] == ""
+
+
+@pytest.mark.asyncio
+async def test_text_extractor_rtf(tmp_path):
+    plugin = TextExtractorPlugin()
+
+    test_file = tmp_path / "test.rtf"
+    test_file.write_text("{\\rtf1 This is rich text.}", encoding="utf-8")
+
+    result = await plugin.analyze(str(test_file), "text/rtf", {})
+
+    assert result["extracted"] is True
+    assert "This is rich text." in result["text"]
+
+
+@pytest.mark.asyncio
+async def test_text_extractor_mbox(tmp_path):
+    import mailbox
+
+    plugin = TextExtractorPlugin()
+
+    test_file = tmp_path / "test.mbox"
+    mbox = mailbox.mbox(test_file)
+    msg = mailbox.Message()
+    msg.set_payload("Hello from mbox.")
+    msg["From"] = "test@example.com"
+    mbox.add(msg)
+    mbox.close()
+
+    result = await plugin.analyze(str(test_file), "application/mbox", {})
+
+    assert result["extracted"] is True
+    assert "Hello from mbox." in result["text"]

@@ -22,8 +22,9 @@ class DeepSummarizerPlugin(AnalyzerBase):
     def should_run(
         self, file_path: str, mime_type: str, context: Dict[str, Any]
     ) -> bool:
-        text_data = context.get("TextExtractor", {})
-        extracted_text = text_data.get("text", "")
+        from src.core.text_utils import get_all_extracted_text
+
+        extracted_text = get_all_extracted_text(context)
         # Only trigger Deep Summarization for large texts (> 20,000 characters)
         if len(extracted_text) < 20000:
             return False
