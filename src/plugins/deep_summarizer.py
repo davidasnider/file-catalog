@@ -42,7 +42,9 @@ class DeepSummarizerPlugin(AnalyzerBase):
     ) -> Dict[str, Any]:
         logger.info(f"Starting Map-Reduce Deep Summarization for {file_path}")
 
-        extracted_text = context.get("TextExtractor", {}).get("text", "")
+        from src.core.text_utils import get_all_extracted_text
+
+        extracted_text = get_all_extracted_text(context)
 
         # We pass n_ctx just in case the factory/manager respects it
         llm = get_llm_provider(is_vision=False, n_ctx=8192)

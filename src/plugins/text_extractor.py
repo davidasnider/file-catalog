@@ -72,6 +72,56 @@ class TextExtractorPlugin(AnalyzerBase):
                 logger.info(f"Running OCR on {file_path}")
                 with Image.open(file_path) as img:
                     extracted_text = pytesseract.image_to_string(img)
+            elif mime_type == "text/rtf":
+                from striprtf.striprtf import rtf_to_text
+
+                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                    extracted_text = rtf_to_text(f.read())
+            elif mime_type == "application/mbox":
+                import mailbox
+
+                mbox = mailbox.mbox(file_path)
+                texts = []
+                for i, msg in enumerate(mbox):
+                    if msg.is_multipart():
+                        for part in msg.walk():
+                            if part.get_content_type() == "text/plain":
+                                payload = part.get_payload(decode=True)
+                                if payload:
+                                    charset = part.get_content_charset() or "utf-8"
+                                    texts.append(
+                                        payload.decode(charset, errors="replace")
+                                    )
+                    else:
+                        payload = msg.get_payload(decode=True)
+                        if payload:
+                            charset = msg.get_content_charset() or "utf-8"
+                            texts.append(payload.decode(charset, errors="replace"))
+                extracted_text = "\n\n".join(texts)
+            elif mime_type == "application/vnd.ms-outlook":
+                import extract_msg
+
+                with extract_msg.openMsg(file_path) as msg:
+                    extracted_text = msg.body if msg.body else ""
+            elif mime_type == "audio/x-wav":
+                try:
+                    from src.plugins.audio_transcriber import AudioTranscriberPlugin
+
+                    transcriber = AudioTranscriberPlugin()
+                    res = await transcriber.analyze(file_path, mime_type, {})
+                    extracted_text = res.get("text", "")
+                except (ImportError, Exception) as e:
+                    logger.warning(f"Audio transcription failed in TextExtractor: {e}")
+            elif mime_type == "chemical/x-cdx":
+                import re
+
+                with open(file_path, "rb") as f:
+                    content = f.read()
+                # Extract printable strings as a fallback for binary CDX files (ASCII range)
+                strings = re.findall(b"[\x20-\x7e]{4,}", content)
+                extracted_text = "\n".join(
+                    [s.decode("ascii", errors="ignore") for s in strings]
+                )
             else:
                 # We skip non-textual types or types we don't support yet, returning empty text.
                 logger.debug(
