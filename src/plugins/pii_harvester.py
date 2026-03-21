@@ -26,7 +26,9 @@ class PIIHarvesterPlugin(AnalyzerBase):
         if category in ["Image", "Video", "Audio"]:
             return False
 
-        extracted_text = context.get("TextExtractor", {}).get("text", "")
+        from src.core.text_utils import get_all_extracted_text
+
+        extracted_text = get_all_extracted_text(context)
         return len(extracted_text) > 50
 
     async def analyze(
@@ -34,7 +36,9 @@ class PIIHarvesterPlugin(AnalyzerBase):
     ) -> Dict[str, Any]:
         logger.info(f"Harvesting PII/Secrets for {file_path}")
 
-        extracted_text = context.get("TextExtractor", {}).get("text", "")
+        from src.core.text_utils import get_all_extracted_text
+
+        extracted_text = get_all_extracted_text(context)
 
         # Scrape the first ~15,000 characters for secrets
         sample_text = extracted_text[:15000]
@@ -50,15 +54,15 @@ class PIIHarvesterPlugin(AnalyzerBase):
 
         prompt = f"""
         You are a forensic PII extractor. Read the following text and extract all PII, names, emails, addresses, financial accounts, or secrets.
-        If none are found, return empty lists.
+        CRITICAL: If none are found, return empty lists. DO NOT invent placeholder data.
         Output valid JSON ONLY.
 
         Desired Output Format (Valid JSON ONLY):
         {{
-          "names": ["Name 1", "Name 2"],
-          "emails": ["email@example.com"],
-          "addresses": ["123 Main St"],
-          "secrets": ["API_KEY_123"]
+          "names": [],
+          "emails": [],
+          "addresses": [],
+          "secrets": []
         }}
 
         Text:

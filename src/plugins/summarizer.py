@@ -37,10 +37,18 @@ class SummarizerPlugin(AnalyzerBase):
             logger.debug(f"No text extracted for {file_path}. Skipping summarization.")
             return {"summary": "", "skipped": True, "error": "No text extracted."}
 
-        # Truncate text aggressively for local context limits (MVP behavior)
-        max_chars = 12000
+        # If text is large, we skip the standard summarizer and rely on DeepSummarizer
+        # to avoid providing a truncated/incomplete summary.
+        max_chars = 20000
         if len(extracted_text) > max_chars:
-            extracted_text = extracted_text[:max_chars] + "... [TRUNCATED]"
+            logger.info(
+                f"Text too large for standard summarizer ({len(extracted_text)} chars). Skipping in favor of DeepSummarizer."
+            )
+            return {
+                "summary": "",
+                "skipped": True,
+                "reason": "text_too_large",
+            }
 
         # 2. Get LLM Instance
         llm = get_llm_provider(is_vision=False)

@@ -8,6 +8,7 @@ dependencies = [
     "aiosqlite>=0.22.1",
     "av>=16.1.0",
     "beautifulsoup4>=4.14.3",
+    "extract-msg>=0.37.1",
     "faster-whisper>=1.2.1",
     "google-cloud-aiplatform>=1.139.0",
     "google-cloud-documentai>=3.10.0",
@@ -37,6 +38,7 @@ dependencies = [
     "ruff>=0.15.2",
     "sqlmodel>=0.0.37",
     "streamlit>=1.54.0",
+    "striprtf>=0.0.29",
     "torch>=2.10.0",
     "torchvision>=0.25.0",
 ]
