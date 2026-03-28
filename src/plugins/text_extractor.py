@@ -1,5 +1,5 @@
 import logging
-import subprocess
+import asyncio
 import shutil
 from typing import Dict, Any
 import pdfplumber
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/bmp", "image/tiff"}
 
 
-@register_analyzer(name="TextExtractor", depends_on=[], version="1.2")
+@register_analyzer(name="TextExtractor", depends_on=[], version="1.3")
 class TextExtractorPlugin(AnalyzerBase):
     """
     Extracts raw text from common document types (PDFs, docs) and images (OCR).
@@ -134,20 +134,40 @@ class TextExtractorPlugin(AnalyzerBase):
             elif mime_type == "application/msword":
                 if shutil.which("antiword"):
                     try:
-                        result = subprocess.run(
-                            ["antiword", "-t", file_path],
-                            capture_output=True,
-                            text=True,
-                            check=True,
+                        # Use asyncio to run the subprocess without blocking the event loop
+                        proc = await asyncio.create_subprocess_exec(
+                            "antiword",
+                            "-t",
+                            file_path,
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=asyncio.subprocess.PIPE,
                         )
-                        extracted_text = result.stdout
-                    except subprocess.CalledProcessError as e:
-                        logger.error(f"Antiword failed for {file_path}: {e}")
+                        try:
+                            # Add a 30-second timeout to handle corrupt or hung documents
+                            stdout, stderr = await asyncio.wait_for(
+                                proc.communicate(), timeout=30.0
+                            )
+                            if proc.returncode == 0:
+                                extracted_text = stdout.decode(
+                                    "utf-8", errors="replace"
+                                )
+                            else:
+                                logger.error(
+                                    f"Antiword failed for {file_path} (code {proc.returncode}): {stderr.decode('utf-8', errors='replace')}"
+                                )
+                                extracted_text = ""
+                        except asyncio.TimeoutError:
+                            logger.error(f"Antiword TIMED OUT for {file_path}")
+                            proc.kill()
+                            await proc.wait()
+                            extracted_text = ""
+                    except Exception as e:
+                        logger.error(f"Failed to run antiword for {file_path}: {e}")
                         extracted_text = ""
                 else:
                     logger.warning(
-                        f"Skipping {file_path}: antiword is not installed. "
-                        "Install it via 'brew install antiword' for legacy .doc support."
+                        f"Skipping {file_path}: 'antiword' is not installed. "
+                        "Please install 'antiword' and ensure it is on your PATH for legacy .doc support."
                     )
                     extracted_text = ""
             else:
