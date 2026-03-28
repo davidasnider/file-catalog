@@ -1,4 +1,6 @@
 import logging
+import subprocess
+import shutil
 from typing import Dict, Any
 import pdfplumber
 import pytesseract
@@ -129,6 +131,25 @@ class TextExtractorPlugin(AnalyzerBase):
                 extracted_text = "\n".join(
                     [s.decode("ascii", errors="ignore") for s in strings]
                 )
+            elif mime_type == "application/msword":
+                if shutil.which("antiword"):
+                    try:
+                        result = subprocess.run(
+                            ["antiword", "-t", file_path],
+                            capture_output=True,
+                            text=True,
+                            check=True,
+                        )
+                        extracted_text = result.stdout
+                    except subprocess.CalledProcessError as e:
+                        logger.error(f"Antiword failed for {file_path}: {e}")
+                        extracted_text = ""
+                else:
+                    logger.warning(
+                        f"Skipping {file_path}: antiword is not installed. "
+                        "Install it via 'brew install antiword' for legacy .doc support."
+                    )
+                    extracted_text = ""
             else:
                 # We skip non-textual types or types we don't support yet, returning empty text.
                 logger.debug(
