@@ -22,8 +22,9 @@ class DeepSummarizerPlugin(AnalyzerBase):
     def should_run(
         self, file_path: str, mime_type: str, context: Dict[str, Any]
     ) -> bool:
-        text_data = context.get("TextExtractor", {})
-        extracted_text = text_data.get("text", "")
+        from src.core.text_utils import get_all_extracted_text
+
+        extracted_text = get_all_extracted_text(context)
         # Only trigger Deep Summarization for large texts (> 20,000 characters)
         if len(extracted_text) < 20000:
             return False
@@ -42,7 +43,9 @@ class DeepSummarizerPlugin(AnalyzerBase):
     ) -> Dict[str, Any]:
         logger.info(f"Starting Map-Reduce Deep Summarization for {file_path}")
 
-        extracted_text = context.get("TextExtractor", {}).get("text", "")
+        from src.core.text_utils import get_all_extracted_text
+
+        extracted_text = get_all_extracted_text(context)
 
         # We pass n_ctx just in case the factory/manager respects it
         llm = get_llm_provider(is_vision=False, n_ctx=8192)
