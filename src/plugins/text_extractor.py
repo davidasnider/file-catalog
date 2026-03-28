@@ -1,4 +1,6 @@
 import logging
+import asyncio
+import shutil
 from typing import Dict, Any
 import pdfplumber
 import pytesseract
@@ -12,7 +14,7 @@ logger = logging.getLogger(__name__)
 SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/bmp", "image/tiff"}
 
 
-@register_analyzer(name="TextExtractor", depends_on=[], version="1.2")
+@register_analyzer(name="TextExtractor", depends_on=[], version="1.3")
 class TextExtractorPlugin(AnalyzerBase):
     """
     Extracts raw text from common document types (PDFs, docs) and images (OCR).
@@ -72,6 +74,103 @@ class TextExtractorPlugin(AnalyzerBase):
                 logger.info(f"Running OCR on {file_path}")
                 with Image.open(file_path) as img:
                     extracted_text = pytesseract.image_to_string(img)
+            elif mime_type == "text/rtf":
+                from striprtf.striprtf import rtf_to_text
+
+                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                    extracted_text = rtf_to_text(f.read())
+            elif mime_type == "application/mbox":
+                import mailbox
+                import contextlib
+
+                with contextlib.closing(mailbox.mbox(file_path)) as mbox:
+                    texts = []
+                    for i, msg in enumerate(mbox):
+                        if msg.is_multipart():
+                            for part in msg.walk():
+                                if part.get_content_type() == "text/plain":
+                                    payload = part.get_payload(decode=True)
+                                    if payload:
+                                        charset = part.get_content_charset() or "utf-8"
+                                        try:
+                                            text = payload.decode(
+                                                charset, errors="replace"
+                                            )
+                                        except LookupError:
+                                            text = payload.decode(
+                                                "utf-8", errors="replace"
+                                            )
+                                        texts.append(text)
+                        else:
+                            payload = msg.get_payload(decode=True)
+                            if payload:
+                                charset = msg.get_content_charset() or "utf-8"
+                                try:
+                                    text = payload.decode(charset, errors="replace")
+                                except LookupError:
+                                    text = payload.decode("utf-8", errors="replace")
+                                texts.append(text)
+                    extracted_text = "\n\n".join(texts)
+            elif mime_type == "application/vnd.ms-outlook":
+                import extract_msg
+
+                with extract_msg.openMsg(file_path) as msg:
+                    extracted_text = msg.body if msg.body else ""
+            elif mime_type == "audio/x-wav":
+                logger.debug(
+                    "Skipping text extraction for WAV audio; "
+                    "audio transcription should be handled by the audio_transcriber analyzer."
+                )
+            elif mime_type == "chemical/x-cdx":
+                import re
+
+                with open(file_path, "rb") as f:
+                    content = f.read()
+                # Extract printable strings as a fallback for binary CDX files (ASCII range)
+                strings = re.findall(b"[\x20-\x7e]{4,}", content)
+                extracted_text = "\n".join(
+                    [s.decode("ascii", errors="ignore") for s in strings]
+                )
+            elif mime_type == "application/msword":
+                antiword_path = shutil.which("antiword")
+                if antiword_path:
+                    try:
+                        # Use asyncio to run the subprocess without blocking the event loop
+                        proc = await asyncio.create_subprocess_exec(
+                            antiword_path,
+                            "-t",
+                            file_path,
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=asyncio.subprocess.PIPE,
+                        )
+                        try:
+                            # Add a 30-second timeout to handle corrupt or hung documents
+                            stdout, stderr = await asyncio.wait_for(
+                                proc.communicate(), timeout=30.0
+                            )
+                            if proc.returncode == 0:
+                                extracted_text = stdout.decode(
+                                    "utf-8", errors="replace"
+                                )
+                            else:
+                                logger.error(
+                                    f"Antiword failed for {file_path} (code {proc.returncode}): {stderr.decode('utf-8', errors='replace')}"
+                                )
+                                extracted_text = ""
+                        except asyncio.TimeoutError:
+                            logger.error(f"Antiword TIMED OUT for {file_path}")
+                            proc.kill()
+                            await proc.wait()
+                            extracted_text = ""
+                    except Exception as e:
+                        logger.error(f"Failed to run antiword for {file_path}: {e}")
+                        extracted_text = ""
+                else:
+                    logger.warning(
+                        f"Skipping {file_path}: 'antiword' is not installed. "
+                        "Please install 'antiword' and ensure it is on your PATH for legacy .doc support."
+                    )
+                    extracted_text = ""
             else:
                 # We skip non-textual types or types we don't support yet, returning empty text.
                 logger.debug(

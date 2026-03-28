@@ -233,12 +233,7 @@ async def run_scanner(
             if not ingested_ids:
                 return
 
-            docs_to_process = []
-            result = await session.execute(
-                select(Document).where(Document.id.in_(ingested_ids))
-            )
-            for doc in result.scalars().all():
-                docs_to_process.append(doc.id)
+            docs_to_process = ingested_ids
 
         if not docs_to_process:
             console.print("[yellow]No documents to process.")

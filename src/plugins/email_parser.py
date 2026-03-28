@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 EMAIL_MIMES = {"message/rfc822", "application/mbox"}
 EMAIL_EXTENSIONS = {".eml", ".mbox"}
 
-MAX_EMAILS_FROM_MBOX = 100
+MAX_EMAILS_FROM_MBOX = 1000
 
 
 @register_analyzer(name="EmailParser", depends_on=[], version="1.0")
