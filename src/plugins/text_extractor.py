@@ -132,11 +132,12 @@ class TextExtractorPlugin(AnalyzerBase):
                     [s.decode("ascii", errors="ignore") for s in strings]
                 )
             elif mime_type == "application/msword":
-                if shutil.which("antiword"):
+                antiword_path = shutil.which("antiword")
+                if antiword_path:
                     try:
                         # Use asyncio to run the subprocess without blocking the event loop
                         proc = await asyncio.create_subprocess_exec(
-                            "antiword",
+                            antiword_path,
                             "-t",
                             file_path,
                             stdout=asyncio.subprocess.PIPE,
