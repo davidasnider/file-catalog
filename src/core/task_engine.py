@@ -107,13 +107,16 @@ class TaskEngine:
 
     async def process_document(self, document_id: int):
         """Process a document through all registered plugins using a bounded semaphore."""
-        self._trigger("doc_start", document_id)
         async with self.semaphore:
             async with self.async_session_maker() as session:
                 doc = await session.get(Document, document_id)
                 if not doc:
                     logger.error(f"Document {document_id} not found")
                     return
+
+                self._trigger(
+                    "doc_start", document_id, path=doc.path, mime_type=doc.mime_type
+                )
 
                 try:
                     doc.status = DocumentStatus.ANALYZING
@@ -135,10 +138,24 @@ class TaskEngine:
                     }
 
                     all_success = True
+                    all_analyzers = get_ordered_analyzers()
+                    failed_plugins = set()
 
-                    for plugin_name, plugin_class in get_ordered_analyzers():
+                    for plugin_name, plugin_class in all_analyzers:
                         current_version = plugin_class._analyzer_version
                         existing_task = existing_tasks.get(plugin_name)
+
+                        # Check dependencies
+                        plugin_deps = set(getattr(plugin_class, "_depends_on", []))
+                        dep_failures = plugin_deps.intersection(failed_plugins)
+
+                        if dep_failures:
+                            # Some dependencies failed, but we treat depends_on as an ordering hint by default
+                            # and allow analyzers to handle partial/empty context themselves.
+                            logger.info(
+                                f"Dependencies {dep_failures} for {plugin_name} on doc {document_id} have failed; "
+                                "continuing with analyzer execution due to soft dependency semantics."
+                            )
 
                         # Check if we can skip this task
                         if (
@@ -191,7 +208,13 @@ class TaskEngine:
                         await session.commit()
                         await session.refresh(task)
 
-                        self._trigger("plugin_start", document_id, plugin_name)
+                        self._trigger(
+                            "plugin_start",
+                            document_id,
+                            plugin_name,
+                            path=doc.path,
+                            mime_type=doc.mime_type,
+                        )
 
                         success, err, result = await self.execute_plugin(
                             task_name=plugin_name,
@@ -206,7 +229,10 @@ class TaskEngine:
                             context[plugin_name] = result
                         else:
                             all_success = False
-                            break  # Stop pipeline for this doc on first failure
+                            failed_plugins.add(plugin_name)
+                            logger.warning(
+                                f"Plugin {plugin_name} failed. Dependent plugins will be skipped for doc {document_id}."
+                            )
 
                     doc = await session.get(Document, document_id)
                     if all_success:

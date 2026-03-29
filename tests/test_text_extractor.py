@@ -19,10 +19,8 @@ async def test_text_extractor_plain_text(tmp_path):
 @pytest.mark.asyncio
 async def test_text_extractor_unsupported():
     plugin = TextExtractorPlugin()
-    result = await plugin.analyze("/fake/path.exe", "application/octet-stream", {})
-
-    assert result["extracted"] is False
-    assert result["text"] == ""
+    with pytest.raises(ValueError, match="No text extracted"):
+        await plugin.analyze("/fake/path.exe", "application/octet-stream", {})
 
 
 @pytest.mark.asyncio

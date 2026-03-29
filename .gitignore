@@ -12,3 +12,4 @@ models/
 
 file_catalog.db*
 .DS_Store
+scanner.log

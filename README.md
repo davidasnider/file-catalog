@@ -21,15 +21,23 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 - **Two-Tier Summarization**:
   - **Universal Short Summary**: A lightning-fast, 3-sentence summary generated for *every* standard document.
   - **Deep Map-Reduce Summarization**: A specialized `DeepSummarizerPlugin` built for massive documents. It dynamically chunks text exceeding the context window, summarizes each chunk sequentially (Map), and synthesizes a final cohesive report (Reduce).
-- **PII & Secrets Harvesting**: A dedicated `PIIHarvesterPlugin` leverages strict JSON-Schema enforcement (via Chat Completions) to extract named entities, addresses, and secrets into the database without altering or masking the original local file.
-- **Estate & Legal Analysis**: `EstateAnalyzerPlugin` checks heavily constrained tax/legal documents and flags them for importance within an Estate Planning context.
+- **PII Harvesting**: A specialized `PIIHarvesterPlugin` leverages strict JSON-Schema enforcement to extract named entities (Names, Emails, Addresses) into the database.
+- **Credential Detection**: A high-precision `PasswordExtractorPlugin` specifically identifies authentication passwords, PINs, and secrets with advanced hallucination filtering.
+- **Estate & Legal Analysis**: `EstateAnalyzerPlugin` identifies critical documents for estate planning (Wills, Trusts, Financial Assets) using forensic-level reasoning.
 
 ### 5. Rich Text & Metadata Extraction
 - **Broad File Support**: Extract metadata and content from PDFs (`pdfplumber`), Word Docs (`python-docx`), HTML web pages (`BeautifulSoup4`), and standard text/code files.
-- **Optical Character Recognition (OCR)**: Automatically detects images and extracts text using Tesseract OCR (`pytesseract`).
+- **Optical Character Recognition (OCR) & Vision Fallback**: Automatically detects images and extracts text using Tesseract OCR (`pytesseract`). For complex images or failed OCR, it utilizes a multimodal Vision LLM to describe the content.
 
-### 6. Interactive Visualization
-- **Streamlit Dashboard**: A beautiful, real-time UI available at `localhost:8501`. Filter processed documents by their completion status, view extracted text, taxonomy routes, PII harvesting results, and generated summaries in an interactive grid format.
+### 6. Interactive Visualization & Monitoring
+- **Real-time Scanner UI**: A rich, multi-pane terminal interface showing:
+  - **Live Progress**: Detailed status of concurrent document processing.
+  - **Scanner Intel**: Real-time aggregated statistics for every plugin (Runs, Skips, Successes, Errors).
+  - **Log Tail**: Integrated tail of `scanner.log` for immediate visibility into background LLM activity.
+- **Streamlit Dashboard**: A beautiful dashboard at `localhost:8501` featuring:
+  - **Smart Filters**: One-click filtering for "Estate Documents", "NSFW Content", and "Contains Passwords".
+  - **Full-Text Search**: Search through extracted text, AI summaries, and Vision descriptions using SQLite FTS5.
+  - **Interactive Detail View**: Drill down into document metadata, AI results, and visual previews.
 
 ---
 *Built with Python, SQLite (SQLModel), Streamlit, and Llama.cpp.*

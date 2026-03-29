@@ -39,15 +39,17 @@
 - [x] **P6 — Add OLE container extraction (~250 files)** — Use `olefile` to identify and extract text streams from `application/x-ole-storage` containers.
 
 ## Dashboard & UI Improvements
-- [ ] Add a document detail view with a file preview pane (PDF viewer, image viewer, text viewer) integrated into the Streamlit dashboard.
-- [ ] Add search and filter controls to the dashboard (by category, status, date range, SFW/NSFW, PII presence).
+- [x] Add a document detail view with a file preview pane (PDF viewer, image viewer, text viewer) integrated into the Streamlit dashboard.
+- [x] Add search and filter controls to the dashboard (by category, status, date range, SFW/NSFW, PII presence).
 - [ ] Show aggregated statistics — charts showing file type distribution, processing pipeline health, storage usage by category.
 - [ ] Add a re-process button per document so users can re-run the pipeline on individual files that failed or need updated analysis.
 - [ ] Support dark mode toggle in the Streamlit UI.
 
 ## Infrastructure & Reliability
 - [ ] Add a retry mechanism with exponential backoff for failed analysis tasks (the `RETRIES` status exists in the schema but isn't implemented).
-- [ ] Add a CLI progress report / summary that runs after scanning completes (total processed, failed, skipped, time elapsed).
+- [x] Add a CLI progress report / summary that runs after scanning completes (total processed, failed, skipped, time elapsed).
+- [x] Implement a rich, multi-pane scanner interface with live log tailing and plugin stats.
+- [x] Fix database locking issues by implementing WAL mode and FTS write serialization.
 - [ ] Implement incremental scanning — detect changed files (via mtime or hash comparison) and only re-process modified files.
 - [ ] Add a configuration file (`config.yaml` or `.env`) to centralize settings: target directory, model paths, concurrency limits, RAM thresholds.
 - [ ] Separate dev dependencies (`pytest`, `ruff`, `pre-commit`) from runtime dependencies in `pyproject.toml` using `[project.optional-dependencies]`.

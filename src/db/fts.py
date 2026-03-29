@@ -1,10 +1,14 @@
 import json
 import logging
+import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from src.db.models import DocumentStatus, TaskStatus
 
 logger = logging.getLogger(__name__)
+
+# Global semaphore to serialize FTS writes and prevent "database is locked" errors
+fts_semaphore = asyncio.Semaphore(1)
 
 
 async def sync_document_to_fts(session: AsyncSession, document_id: int):
@@ -12,107 +16,125 @@ async def sync_document_to_fts(session: AsyncSession, document_id: int):
     Sync a completed document and its analysis tasks into the FTS5 virtual table
     for full-text search.
     """
-    # Fetch the document to ensure it exists and get its path
-    result = await session.execute(
-        text("SELECT path, status FROM document WHERE id = :doc_id"),
-        {"doc_id": document_id},
-    )
-    doc = result.fetchone()
+    async with fts_semaphore:
+        # Fetch the document to ensure it exists and get its path
+        result = await session.execute(
+            text("SELECT path, status FROM document WHERE id = :doc_id"),
+            {"doc_id": document_id},
+        )
+        doc = result.fetchone()
 
-    if not doc:
-        logger.warning(f"Cannot sync document {document_id} to FTS: not found")
-        return
+        if not doc:
+            logger.warning(f"Cannot sync document {document_id} to FTS: not found")
+            return
 
-    path, status = doc
+        path, status = doc
 
-    # We only want to index documents that have attempted processing
-    if status in (DocumentStatus.PENDING, DocumentStatus.EXTRACTING):
-        return
+        # We only want to index documents that have attempted processing
+        if status in (DocumentStatus.PENDING, DocumentStatus.EXTRACTING):
+            return
 
-    # Fetch all COMPLETED tasks for this document to build the FTS content
-    tasks_result = await session.execute(
-        text(
-            "SELECT task_name, result_data FROM analysistask WHERE document_id = :doc_id AND status = :status"
-        ),
-        {"doc_id": document_id, "status": TaskStatus.COMPLETED.value},
-    )
-    tasks = tasks_result.fetchall()
+        # Fetch all COMPLETED tasks for this document to build the FTS content
+        tasks_result = await session.execute(
+            text(
+                "SELECT task_name, result_data FROM analysistask WHERE document_id = :doc_id AND status = :status"
+            ),
+            {"doc_id": document_id, "status": TaskStatus.COMPLETED.value},
+        )
+        tasks = tasks_result.fetchall()
 
-    content_parts = []
-    summary_text = ""
+        content_parts = []
+        summary_text = ""
 
-    for task_name, result_data_str in tasks:
-        if not result_data_str:
-            continue
+        for task_name, result_data_str in tasks:
+            if not result_data_str:
+                continue
 
-        try:
-            data = json.loads(result_data_str)
-        except json.JSONDecodeError:
-            continue
+            try:
+                data = json.loads(result_data_str)
+            except json.JSONDecodeError:
+                continue
 
-        # Extract textual content based on the task type
-        if task_name == "TextExtractor":
-            if text_content := data.get("text"):
-                content_parts.append(text_content)
+            normalized_task_name = task_name.lower()
 
-        elif task_name == "DocumentAIExtractor":
-            if text_content := data.get("text"):
-                content_parts.append(text_content)
+            # Extract textual content based on the task type
+            if task_name == "TextExtractor" or normalized_task_name == "text_extractor":
+                if text_content := data.get("text"):
+                    content_parts.append(text_content)
 
-        elif task_name == "AudioTranscriber":
-            if text_content := data.get("text"):
-                content_parts.append(text_content)
+            elif (
+                task_name == "DocumentAIExtractor"
+                or normalized_task_name == "document_ai_extractor"
+            ):
+                if text_content := data.get("text"):
+                    content_parts.append(text_content)
 
-        elif task_name == "VisionAnalyzer":
-            if description := data.get("description"):
-                content_parts.append(description)
+            elif (
+                task_name == "AudioTranscriber"
+                or normalized_task_name == "audio_transcriber"
+            ):
+                if text_content := data.get("text"):
+                    content_parts.append(text_content)
 
-        elif task_name == "VideoAnalyzer":
-            if description := data.get("visual_description"):
-                content_parts.append(description)
+            elif (
+                task_name == "VisionAnalyzer"
+                or normalized_task_name == "vision_analyzer"
+            ):
+                if description := data.get("description"):
+                    content_parts.append(description)
 
-        elif task_name == "EmailParser":
-            if subject := data.get("subject"):
-                content_parts.append(f"Subject: {subject}")
-            if text_content := data.get("text_body"):
-                content_parts.append(text_content)
+            elif (
+                task_name == "VideoAnalyzer" or normalized_task_name == "video_analyzer"
+            ):
+                if description := data.get("visual_description"):
+                    content_parts.append(description)
 
-        elif task_name == "SpreadsheetAnalyzer":
-            if text_content := data.get("raw_text_content"):
-                content_parts.append(text_content)
-            elif summary := data.get("summary"):
-                content_parts.append(summary)
+            elif task_name == "EmailParser" or normalized_task_name == "email_parser":
+                if subject := data.get("subject"):
+                    content_parts.append(f"Subject: {subject}")
+                if text_content := data.get("text_body"):
+                    content_parts.append(text_content)
 
-        elif task_name == "Summarizer":
-            if summary := data.get("summary"):
-                summary_text = summary
+            elif (
+                task_name == "SpreadsheetAnalyzer"
+                or normalized_task_name == "spreadsheet_analyzer"
+            ):
+                if text_content := data.get("raw_text_content"):
+                    content_parts.append(text_content)
+                elif summary := data.get("summary"):
+                    content_parts.append(summary)
 
-    # Combine all extracted content into a single searchable body
-    full_content = "\n\n".join(content_parts)
+            elif task_name == "Summarizer" or normalized_task_name == "summarizer":
+                if summary := data.get("summary"):
+                    summary_text = summary
 
-    # Execute the two statements (delete old, insert new) separately
+        # Combine all extracted content into a single searchable body
+        full_content = "\n\n".join(content_parts)
 
-    # 1. Delete existing entry if it exists
-    await session.execute(
-        text("DELETE FROM document_fts WHERE rowid = :doc_id"), {"doc_id": document_id}
-    )
+        # Execute the two statements (delete old, insert new) separately
 
-    # 2. Insert new entry
-    await session.execute(
-        text(
-            "INSERT INTO document_fts(rowid, document_id, path, content, summary) "
-            "VALUES(:doc_id, :doc_id, :path, :content, :summary)"
-        ),
-        {
-            "doc_id": document_id,
-            "path": path,
-            "content": full_content,
-            "summary": summary_text,
-        },
-    )
+        # 1. Delete existing entry if it exists
+        await session.execute(
+            text("DELETE FROM document_fts WHERE rowid = :doc_id"),
+            {"doc_id": document_id},
+        )
 
-    await session.commit()
-    logger.info(f"Synced document {document_id} to FTS")
+        # 2. Insert new entry
+        await session.execute(
+            text(
+                "INSERT INTO document_fts(rowid, document_id, path, content, summary) "
+                "VALUES(:doc_id, :doc_id, :path, :content, :summary)"
+            ),
+            {
+                "doc_id": document_id,
+                "path": path,
+                "content": full_content,
+                "summary": summary_text,
+            },
+        )
+
+        await session.commit()
+        logger.info(f"Synced document {document_id} to FTS")
 
 
 async def search_fts(session: AsyncSession, query: str, limit: int = 50):
@@ -137,7 +159,7 @@ async def search_fts(session: AsyncSession, query: str, limit: int = 50):
 
     # SQLite FTS syntax: wrap queries in quotes to do phrase search and avoid syntax errors
     # on punctuation. We escape internal double quotes by doubling them.
-    safe_query = f'"{query.replace(chr(34), chr(34)*2)}"'
+    safe_query = f'"{query.replace(chr(34), chr(34) * 2)}"'
 
     try:
         result = await session.execute(

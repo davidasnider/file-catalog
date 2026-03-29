@@ -47,20 +47,19 @@ async def test_text_extractor_doc_mock(tmp_path):
 
 @pytest.mark.asyncio
 async def test_text_extractor_doc_missing_antiword(tmp_path):
-    """Test that the plugin handles missing antiword gracefully."""
+    """Test that the plugin handles missing antiword gracefully by raising ValueError."""
     plugin = TextExtractorPlugin()
     doc_file = tmp_path / "test.doc"
     doc_file.write_text("Binary word garbage")
 
     with patch("src.plugins.text_extractor.shutil.which", return_value=None):
-        result = await plugin.analyze(str(doc_file), "application/msword", {})
-        assert result["extracted"] is False
-        assert result["text"] == ""
+        with pytest.raises(ValueError, match="No text extracted"):
+            await plugin.analyze(str(doc_file), "application/msword", {})
 
 
 @pytest.mark.asyncio
 async def test_text_extractor_doc_timeout(tmp_path):
-    """Test that the plugin handles antiword timeouts gracefully."""
+    """Test that the plugin handles antiword timeouts by raising ValueError."""
     plugin = TextExtractorPlugin()
     doc_file = tmp_path / "test.doc"
     doc_file.write_text("Binary word garbage")
@@ -82,8 +81,7 @@ async def test_text_extractor_doc_timeout(tmp_path):
                 "src.plugins.text_extractor.asyncio.wait_for",
                 side_effect=asyncio.TimeoutError,
             ):
-                result = await plugin.analyze(str(doc_file), "application/msword", {})
+                with pytest.raises(ValueError, match="No text extracted"):
+                    await plugin.analyze(str(doc_file), "application/msword", {})
 
-                assert result["extracted"] is False
-                assert result["text"] == ""
                 assert mock_proc.kill.called

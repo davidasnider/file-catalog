@@ -108,7 +108,7 @@ async def run_benchmark(root_dir: Path):
         total_tokens_generated = 0
 
         for i, prompt in enumerate(prompts):
-            print(f"\n  Running prompt {i+1}/{len(prompts)} ({len(prompt)} chars)...")
+            print(f"\n  Running prompt {i + 1}/{len(prompts)} ({len(prompt)} chars)...")
 
             t_inf_start = time.time()
             try:

@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import Dict, Any
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
@@ -10,12 +11,12 @@ logger = logging.getLogger(__name__)
 
 
 @register_analyzer(
-    name="PIIHarvester", depends_on=["TextExtractor", "Router"], version="1.0"
+    name="PIIHarvester", depends_on=["TextExtractor", "Router"], version="1.7"
 )
 class PIIHarvesterPlugin(AnalyzerBase):
     """
-    Extracts PII and secrets from document text using strict JSON schema formatting.
-    This does not mask the original files.
+    Extracts PII (Names, Emails, Addresses) from document text.
+    Security credentials are now handled by the specialized PasswordExtractor.
     """
 
     def should_run(
@@ -34,17 +35,17 @@ class PIIHarvesterPlugin(AnalyzerBase):
     async def analyze(
         self, file_path: str, mime_type: str, context: Dict[str, Any]
     ) -> Dict[str, Any]:
-        logger.info(f"Harvesting PII/Secrets for {file_path}")
+        logger.info(f"Harvesting PII for {file_path}")
 
         from src.core.text_utils import get_all_extracted_text
 
         extracted_text = get_all_extracted_text(context)
 
-        # Scrape the first ~15,000 characters for secrets
-        sample_text = extracted_text[:15000]
+        # Scrape the first ~10,000 characters
+        sample_text = extracted_text[:10000]
 
         # 2. Get LLM Instance
-        llm = get_llm_provider(is_vision=False, n_ctx=8192)
+        llm = get_llm_provider(is_vision=False, n_ctx=4096)
         if not llm or llm in ("MISSING_MODEL", "MISSING_LIBRARY"):
             return {
                 "pii": {},
@@ -53,16 +54,20 @@ class PIIHarvesterPlugin(AnalyzerBase):
             }
 
         prompt = f"""
-        You are a forensic PII extractor. Read the following text and extract all PII, names, emails, addresses, financial accounts, or secrets.
-        CRITICAL: If none are found, return empty lists. DO NOT invent placeholder data.
+        You are a forensic PII extractor. Read the following text and extract all PII (Names, Emails, Addresses).
+
+        CRITICAL RULES:
+        - Emails MUST be valid email addresses (e.g., 'user@domain.com').
+        - NEVER extract phrases like 'Email from X' or 'Sent via Email' into the emails field.
+        - If no valid PII is found, return empty lists. DO NOT invent data.
+
         Output valid JSON ONLY.
 
-        Desired Output Format (Valid JSON ONLY):
+        Desired Output Format:
         {{
           "names": [],
           "emails": [],
-          "addresses": [],
-          "secrets": []
+          "addresses": []
         }}
 
         Text:
@@ -82,9 +87,8 @@ class PIIHarvesterPlugin(AnalyzerBase):
                             "names": {"type": "array", "items": {"type": "string"}},
                             "emails": {"type": "array", "items": {"type": "string"}},
                             "addresses": {"type": "array", "items": {"type": "string"}},
-                            "secrets": {"type": "array", "items": {"type": "string"}},
                         },
-                        "required": ["names", "emails", "addresses", "secrets"],
+                        "required": ["names", "emails", "addresses"],
                     },
                 },
             )
@@ -93,12 +97,22 @@ class PIIHarvesterPlugin(AnalyzerBase):
 
             parsed = repair_and_load_json(response)
             if not parsed:
-                parsed = {"names": [], "emails": [], "addresses": [], "secrets": []}
+                parsed = {"names": [], "emails": [], "addresses": []}
             else:
                 parsed.setdefault("names", [])
                 parsed.setdefault("emails", [])
                 parsed.setdefault("addresses", [])
-                parsed.setdefault("secrets", [])
+
+            # Post-extraction validation for emails
+            email_regex = re.compile(
+                r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+            )
+            valid_emails = []
+            for email in parsed["emails"]:
+                if email_regex.match(email.strip()):
+                    valid_emails.append(email.strip())
+            parsed["emails"] = valid_emails
+
             return {"pii": parsed, "skipped": False, "method": "llm_json_expert"}
         except Exception as e:
             logger.error(f"Failed to harvest PII for {file_path}: {e}")
