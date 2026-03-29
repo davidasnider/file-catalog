@@ -30,7 +30,9 @@ async def test_password_extractor_success():
         return_value=json.dumps({"passwords": ["Secret123!", "0:45", "Password"]})
     )
 
-    with patch("src.llm.factory.get_llm_provider", return_value=mock_llm):
+    with patch(
+        "src.plugins.password_extractor.get_llm_provider", return_value=mock_llm
+    ):
         with patch(
             "src.core.text_utils.get_all_extracted_text",
             return_value="Password: Secret123!",
@@ -51,7 +53,9 @@ async def test_password_extractor_empty():
     mock_llm = MagicMock()
     mock_llm.generate = AsyncMock(return_value=json.dumps({"passwords": []}))
 
-    with patch("src.llm.factory.get_llm_provider", return_value=mock_llm):
+    with patch(
+        "src.plugins.password_extractor.get_llm_provider", return_value=mock_llm
+    ):
         with patch(
             "src.core.text_utils.get_all_extracted_text",
             return_value="Just some random text",

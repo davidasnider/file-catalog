@@ -308,30 +308,23 @@ async def run_scanner(
                 or 0
             )
 
-            # Query only necessary columns for tasks
-            task_result = await session.execute(
+            # Query aggregated task counts by status
+            task_counts_result = await session.execute(
                 select(
-                    AnalysisTask.task_name,
                     AnalysisTask.status,
-                    AnalysisTask.error_message,
-                    AnalysisTask.result_data,
+                    func.count().label("count"),
+                ).group_by(AnalysisTask.status)
+            )
+            status_counts = {}
+            for status, count in task_counts_result.all():
+                status_key = status.name if hasattr(status, "name") else str(status)
+                status_counts[status_key] = status_counts.get(status_key, 0) + (
+                    count or 0
                 )
-            )
-            all_tasks = task_result.all()
 
-            total_tasks = len(all_tasks)
-            completed_tasks = sum(
-                1
-                for t in all_tasks
-                if (t.status.name if hasattr(t.status, "name") else str(t.status))
-                == "COMPLETED"
-            )
-            failed_tasks = sum(
-                1
-                for t in all_tasks
-                if (t.status.name if hasattr(t.status, "name") else str(t.status))
-                == "FAILED"
-            )
+            total_tasks = sum(status_counts.values())
+            completed_tasks = status_counts.get("COMPLETED", 0)
+            failed_tasks = status_counts.get("FAILED", 0)
 
             stats_text.append("📊 Global Status\n", style="bold white underline")
             stats_text.append(f"  Docs:  {completed_docs}/{total_docs}\n", style="cyan")
@@ -342,6 +335,17 @@ async def run_scanner(
                 f"({failed_tasks} failed)\n\n",
                 style="bold red" if failed_tasks > 0 else "dim",
             )
+
+            # Query only necessary columns for the plugin table
+            task_result = await session.execute(
+                select(
+                    AnalysisTask.task_name,
+                    AnalysisTask.status,
+                    AnalysisTask.error_message,
+                    AnalysisTask.result_data,
+                )
+            )
+            all_tasks = task_result.all()
 
             # plugin_name -> {total: X, error: Y, skipped: Z, success: W, results: []}
             plugin_stats = {}

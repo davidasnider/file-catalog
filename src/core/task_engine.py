@@ -149,15 +149,36 @@ class TaskEngine:
                         plugin_deps = set(getattr(plugin_class, "_depends_on", []))
                         dep_failures = plugin_deps.intersection(failed_plugins)
 
-                        # We treat depends_on as an ordering hint by default,
-                        # but some plugins might be marked as strict. For now, we continue
-                        # and let the plugins handle partial context (soft dependency).
-                        # Exception: If we wanted to skip, we would record it here.
                         if dep_failures:
                             logger.info(
-                                f"Dependencies {dep_failures} for {plugin_name} on doc {document_id} have failed; "
-                                "continuing with analyzer execution due to soft dependency semantics."
+                                f"Skipping {plugin_name} for doc {document_id} because dependencies failed: {dep_failures}"
                             )
+                            # Record a task entry for this skipped plugin so that UI stats
+                            # and future runs correctly reflect the dependency failure.
+                            skip_payload = {
+                                "skipped": True,
+                                "reason": "dependency_failed",
+                                "failed_dependencies": list(dep_failures),
+                            }
+                            if existing_task:
+                                existing_task.status = TaskStatus.COMPLETED
+                                existing_task.plugin_version = current_version
+                                existing_task.result_data = json.dumps(skip_payload)
+                            else:
+                                skipped_task = AnalysisTask(
+                                    task_name=plugin_name,
+                                    document_id=document_id,
+                                    status=TaskStatus.COMPLETED,
+                                    plugin_version=current_version,
+                                    result_data=json.dumps(skip_payload),
+                                )
+                                session.add(skipped_task)
+                                existing_tasks[plugin_name] = skipped_task
+
+                            await session.commit()
+                            failed_plugins.add(plugin_name)
+                            all_success = False
+                            continue
 
                         # Check if we can skip this task
                         if (
