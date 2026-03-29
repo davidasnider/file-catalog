@@ -1,6 +1,20 @@
+import sys
+import types
 import zipfile
 import tarfile
 from src.scripts.extract_and_cleanup_archives import extract_archive, process_directory
+
+try:
+    import py7zr
+except ImportError:
+    # Provide a dummy py7zr module so tests can patch it even if py7zr isn't installed.
+    py7zr = types.ModuleType("py7zr")
+    sys.modules["py7zr"] = py7zr
+
+    class SevenZipFile:
+        pass
+
+    py7zr.SevenZipFile = SevenZipFile  # type: ignore
 
 
 def test_extract_zip(tmp_path):
