@@ -147,13 +147,17 @@ class TaskEngine:
 
                         # Check dependencies
                         plugin_deps = set(getattr(plugin_class, "_depends_on", []))
-                        if plugin_deps.intersection(failed_plugins):
+                        dep_failures = plugin_deps.intersection(failed_plugins)
+
+                        # We treat depends_on as an ordering hint by default,
+                        # but some plugins might be marked as strict. For now, we continue
+                        # and let the plugins handle partial context (soft dependency).
+                        # Exception: If we wanted to skip, we would record it here.
+                        if dep_failures:
                             logger.info(
-                                f"Skipping {plugin_name} for doc {document_id} because dependencies failed: {plugin_deps.intersection(failed_plugins)}"
+                                f"Dependencies {dep_failures} for {plugin_name} on doc {document_id} have failed; "
+                                "continuing with analyzer execution due to soft dependency semantics."
                             )
-                            failed_plugins.add(plugin_name)
-                            all_success = False
-                            continue
 
                         # Check if we can skip this task
                         if (

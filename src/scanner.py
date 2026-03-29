@@ -439,6 +439,7 @@ async def run_scanner(
         return Panel(group, title="Scanner Intel", border_style="green")
 
     with Live(layout, console=console, refresh_per_second=4):
+        progress.start()
         ingest_task = progress.add_task("[yellow]Ingesting files...", total=None)
 
         async with async_session_maker() as session:
@@ -616,6 +617,7 @@ async def run_scanner(
         try:
             await asyncio.gather(*tasks)
         finally:
+            progress.stop()
             ui_update_task.cancel()
             try:
                 await ui_update_task
