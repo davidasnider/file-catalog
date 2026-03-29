@@ -5,6 +5,9 @@ from typing import Dict, Any
 import pdfplumber
 import pytesseract
 from PIL import Image
+import xlrd
+from hachoir.parser import createParser
+from hachoir.metadata import extractMetadata
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
 from src.core.config import config
@@ -169,6 +172,110 @@ class TextExtractorPlugin(AnalyzerBase):
                     logger.warning(
                         f"Skipping {file_path}: 'antiword' is not installed. "
                         "Please install 'antiword' and ensure it is on your PATH for legacy .doc support."
+                    )
+                    extracted_text = ""
+            elif mime_type == "application/vnd.ms-excel":
+                try:
+                    workbook = xlrd.open_workbook(file_path)
+                    all_text = []
+                    for sheet in workbook.sheets():
+                        all_text.append(f"Sheet: {sheet.name}")
+                        for row_idx in range(sheet.nrows):
+                            row_values = [
+                                str(val)
+                                for val in sheet.row_values(row_idx)
+                                if val is not None
+                            ]
+                            all_text.append(" ".join(row_values))
+                    extracted_text = "\n".join(all_text)
+                except Exception as e:
+                    logger.error(f"xlrd failed for {file_path}: {e}")
+                    extracted_text = ""
+            elif mime_type in (
+                "application/vnd.ms-powerpoint",
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            ):
+                try:
+                    if (
+                        mime_type
+                        == "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                    ):
+                        from pptx import Presentation
+
+                        prs = Presentation(file_path)
+                        full_text = []
+                        for slide in prs.slides:
+                            for shape in slide.shapes:
+                                if hasattr(shape, "text"):
+                                    full_text.append(shape.text)
+                        extracted_text = "\n".join(full_text)
+                    else:
+                        parser = createParser(file_path)
+                        if parser:
+                            with parser:
+                                metadata = extractMetadata(parser)
+                                if metadata:
+                                    plaintext = metadata.exportPlaintext()
+                                    if isinstance(plaintext, str):
+                                        extracted_text = plaintext
+                                    else:
+                                        try:
+                                            extracted_text = "\n".join(plaintext)
+                                        except TypeError:
+                                            extracted_text = str(plaintext)
+                                else:
+                                    logger.warning(f"No metadata found for {file_path}")
+                                    extracted_text = ""
+                        else:
+                            logger.warning(f"Hachoir could not parse {file_path}")
+                            extracted_text = ""
+                except Exception as e:
+                    logger.error(f"PowerPoint extraction failed for {file_path}: {e}")
+                    extracted_text = ""
+            elif mime_type == "message/rfc822":
+                import email
+                from email import policy
+
+                try:
+                    with open(file_path, "rb") as f:
+                        msg = email.message_from_binary_file(f, policy=policy.default)
+                        subject = msg.get("subject", "")
+                        from_addr = msg.get("from", "")
+                        to_addr = msg.get("to", "")
+                        date = msg.get("date", "")
+
+                        body = ""
+                        if msg.is_multipart():
+                            for part in msg.walk():
+                                if part.get_content_type() == "text/plain":
+                                    body = part.get_content()
+                                    break
+                        else:
+                            body = msg.get_content()
+
+                        extracted_text = f"Subject: {subject}\nFrom: {from_addr}\nTo: {to_addr}\nDate: {date}\n\n{body}"
+                except Exception as e:
+                    logger.error(f"Email parsing failed for {file_path}: {e}")
+                    extracted_text = ""
+            elif mime_type == "application/vnd.wordperfect":
+                import re
+
+                try:
+                    # Legacy WordPerfect files are complex; without wpd2text,
+                    # we perform a robust string extraction as a fallback.
+                    with open(file_path, "rb") as f:
+                        content = f.read()
+                    # Extract printable sequences of 4+ characters
+                    strings = re.findall(b"[\x20-\x7e]{4,}", content)
+                    extracted_text = "\n".join(
+                        [s.decode("ascii", errors="ignore") for s in strings]
+                    )
+                    logger.info(
+                        f"Extracted {len(strings)} strings from WordPerfect file"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"WordPerfect raw extraction failed for {file_path}: {e}"
                     )
                     extracted_text = ""
             else:
