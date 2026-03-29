@@ -138,6 +138,14 @@ def main():
             help="Search extracted text, summaries, and transcripts using SQLite FTS5",
         )
 
+        st.divider()
+        st.subheader("💡 Smart Filters")
+        smart_filters = st.multiselect(
+            "Quick Filters",
+            ["Estate Documents", "NSFW Content", "Contains Passwords"],
+            default=[],
+        )
+
     # Apply filters
     filtered_docs = []
     for doc in documents:
@@ -147,6 +155,84 @@ def main():
             continue
 
         doc_tasks = tasks_by_doc.get(doc.id, [])
+
+        # Smart Filter Logic
+        if smart_filters:
+            match_smart = True
+            for f in smart_filters:
+                if f == "Estate Documents":
+                    # Check EstateAnalyzer
+                    estate_task = next(
+                        (t for t in doc_tasks if t.task_name == "EstateAnalyzer"), None
+                    )
+                    is_estate = False
+                    if estate_task and estate_task.result_data:
+                        try:
+                            res = json.loads(estate_task.result_data)
+                            is_estate = res.get("is_estate_document", False)
+                        except Exception:
+                            pass
+                    if not is_estate:
+                        match_smart = False
+
+                elif f == "NSFW Content":
+                    # Check vision_analyzer or video_analyzer
+                    nsfw_task = next(
+                        (
+                            t
+                            for t in doc_tasks
+                            if t.task_name in ["vision_analyzer", "video_analyzer"]
+                        ),
+                        None,
+                    )
+                    is_nsfw = False
+                    if nsfw_task and nsfw_task.result_data:
+                        try:
+                            res = json.loads(nsfw_task.result_data)
+                            # is_sfw is True if safe, False if NSFW
+                            if "is_sfw" in res:
+                                is_nsfw = not res.get("is_sfw", True)
+                        except Exception:
+                            pass
+                    if not is_nsfw:
+                        match_smart = False
+
+                elif f == "Contains Passwords":
+                    # Check PasswordExtractor for 'passwords'
+                    pw_task = next(
+                        (t for t in doc_tasks if t.task_name == "PasswordExtractor"),
+                        None,
+                    )
+                    has_passwords = False
+                    if pw_task and pw_task.result_data:
+                        try:
+                            res = json.loads(pw_task.result_data)
+                            if res.get("passwords"):
+                                has_passwords = True
+                        except Exception:
+                            pass
+
+                    # Fallback to legacy PIIHarvester
+                    if not has_passwords:
+                        pii_task = next(
+                            (t for t in doc_tasks if t.task_name == "PIIHarvester"),
+                            None,
+                        )
+                        if pii_task and pii_task.result_data:
+                            try:
+                                res = json.loads(pii_task.result_data)
+                                pii_data = res.get("pii", {})
+                                if pii_data.get("passwords") or pii_data.get("secrets"):
+                                    has_passwords = True
+                            except Exception:
+                                pass
+
+                    if not has_passwords:
+                        match_smart = False
+
+            if not match_smart:
+                continue
+
         if selected_task_statuses != unique_task_statuses:
             if not doc_tasks:
                 continue
@@ -252,11 +338,32 @@ def main():
             raw_tasks = tasks_by_doc.get(doc_id, [])
 
             # Separate out the Summarizer
-            summarizer_task = next(
-                (t for t in raw_tasks if "summarizer" in t.task_name.lower()), None
+            # Prioritize DeepSummarizer for large documents
+            deep_summarizer_task = next(
+                (t for t in raw_tasks if t.task_name == "DeepSummarizer"), None
             )
+            standard_summarizer_task = next(
+                (t for t in raw_tasks if t.task_name == "Summarizer"), None
+            )
+
+            summarizer_task = deep_summarizer_task or standard_summarizer_task
+
+            # If DeepSummarizer exists but skipped/failed, try standard one
+            if deep_summarizer_task:
+                try:
+                    ds_data = json.loads(deep_summarizer_task.result_data)
+                    if (
+                        ds_data.get("skipped")
+                        or deep_summarizer_task.status.name == "FAILED"
+                    ):
+                        summarizer_task = standard_summarizer_task
+                except (json.JSONDecodeError, TypeError):
+                    summarizer_task = standard_summarizer_task
+
             main_tasks = [
-                t for t in raw_tasks if "summarizer" not in t.task_name.lower()
+                t
+                for t in raw_tasks
+                if t.task_name not in ["Summarizer", "DeepSummarizer"]
             ]
 
             # 1. AI Summary Section (Top)
@@ -269,10 +376,16 @@ def main():
                     data = json.loads(summarizer_task.result_data)
                     if not data.get("skipped"):
                         st.subheader("AI Summary")
-                        st.info(data.get("summary", ""))
-                        st.caption(f"Generated by: {data.get('model', 'Unknown')}")
+                        # Use extensive_summary if available (from DeepSummarizer)
+                        summary_content = data.get("extensive_summary") or data.get(
+                            "summary", ""
+                        )
+                        st.info(summary_content)
+                        st.caption(
+                            f"Generated by: {summarizer_task.task_name} ({data.get('model', 'Unknown')})"
+                        )
                         st.divider()
-                except json.JSONDecodeError:
+                except (json.JSONDecodeError, TypeError):
                     pass
 
             # 2. Image Viewer Section (Middle)
@@ -294,8 +407,12 @@ def main():
                     order = 0
                 elif t.task_name == "TextExtractor":
                     order = 1
-                else:
+                elif t.task_name == "PasswordExtractor":
+                    order = 2
+                elif t.task_name == "PIIHarvester":
                     order = 3
+                else:
+                    order = 4
                 return (1 if is_skipped else 0, order, t.task_name)
 
             tasks = sorted(main_tasks, key=task_sort_key)

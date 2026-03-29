@@ -107,13 +107,16 @@ class TaskEngine:
 
     async def process_document(self, document_id: int):
         """Process a document through all registered plugins using a bounded semaphore."""
-        self._trigger("doc_start", document_id)
         async with self.semaphore:
             async with self.async_session_maker() as session:
                 doc = await session.get(Document, document_id)
                 if not doc:
                     logger.error(f"Document {document_id} not found")
                     return
+
+                self._trigger(
+                    "doc_start", document_id, path=doc.path, mime_type=doc.mime_type
+                )
 
                 try:
                     doc.status = DocumentStatus.ANALYZING
@@ -135,8 +138,9 @@ class TaskEngine:
                     }
 
                     all_success = True
+                    all_analyzers = get_ordered_analyzers()
 
-                    for plugin_name, plugin_class in get_ordered_analyzers():
+                    for i, (plugin_name, plugin_class) in enumerate(all_analyzers):
                         current_version = plugin_class._analyzer_version
                         existing_task = existing_tasks.get(plugin_name)
 
@@ -191,7 +195,13 @@ class TaskEngine:
                         await session.commit()
                         await session.refresh(task)
 
-                        self._trigger("plugin_start", document_id, plugin_name)
+                        self._trigger(
+                            "plugin_start",
+                            document_id,
+                            plugin_name,
+                            path=doc.path,
+                            mime_type=doc.mime_type,
+                        )
 
                         success, err, result = await self.execute_plugin(
                             task_name=plugin_name,
@@ -206,7 +216,26 @@ class TaskEngine:
                             context[plugin_name] = result
                         else:
                             all_success = False
-                            break  # Stop pipeline for this doc on first failure
+
+                            # Check if any REMAINING plugin depends on this failed one
+                            dependent_plugins = []
+                            for future_name, future_cls in all_analyzers[i + 1 :]:
+                                if plugin_name in getattr(
+                                    future_cls, "_depends_on", []
+                                ):
+                                    dependent_plugins.append(future_name)
+
+                            if dependent_plugins:
+                                logger.warning(
+                                    f"Plugin {plugin_name} failed. Stopping pipeline for doc {document_id} "
+                                    f"because the following plugins depend on it: {', '.join(dependent_plugins)}"
+                                )
+                                break
+                            else:
+                                logger.info(
+                                    f"Plugin {plugin_name} failed, but continuing pipeline for doc {document_id} "
+                                    "as no remaining plugins depend on it."
+                                )
 
                     doc = await session.get(Document, document_id)
                     if all_success:

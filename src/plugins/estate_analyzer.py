@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 @register_analyzer(
-    name="EstateAnalyzer", depends_on=["TextExtractor", "Router"], version="1.4"
+    name="EstateAnalyzer", depends_on=["TextExtractor", "Router"], version="1.8"
 )
 class EstateAnalyzerPlugin(AnalyzerBase):
     """
@@ -22,8 +22,8 @@ class EstateAnalyzerPlugin(AnalyzerBase):
     ) -> bool:
         router_data = context.get("Router", {})
         category = router_data.get("category", "")
-        # Only explicitly run the heavy Estate modeling if the Router flagged it
-        return category == "Legal/Estate"
+        # Run for Legal/Estate or Financial documents as both are critical for estate archives
+        return category in ["Legal/Estate", "Financial"]
 
     async def analyze(
         self, file_path: str, mime_type: str, context: Dict[str, Any]
@@ -96,8 +96,16 @@ class EstateAnalyzerPlugin(AnalyzerBase):
             }
 
         prompt = f"""
-You are a legal AI checking file contents for an estate planning system.
-Read the text below and determine if this file is critical for an estate plan, financial archive, or legal records (e.g., Will, Trust, Deed, Bank Statement, Tax Return, Life Insurance).
+You are a legal and financial forensic AI. Your ONLY job is to identify documents that are critical for an estate plan, financial archive, or legal record.
+
+MANDATORY RULE: Any document that identifies a financial asset, bank account, certificate account, investment, or legal interest is CRITICAL for estate planning because it identifies the property that must be managed or distributed.
+
+Is this file essential for identifying assets, liabilities, or legal rights?
+
+CRITICAL: The following are ALWAYS TRUE:
+- Legal: Wills, Trusts, Deeds, Power of Attorney, Health Directives.
+- Financial: Bank Statements, Certificate Accounts (CDs), Life Insurance, Investment records, Stock certificates, Pension/401k.
+- Tax/Real Estate: Tax Returns, Property tax assessments, Mortgage docs.
 
 Respond ONLY with valid JSON with exactly two fields:
 "is_estate_document": true or false
@@ -106,7 +114,7 @@ Respond ONLY with valid JSON with exactly two fields:
 Desired Output Format (Valid JSON ONLY):
 {{
   "is_estate_document": true,
-  "reasoning": "This document appears to be a Last Will and Testament."
+  "reasoning": "This is a Certificate Account statement identifying a financial asset of the estate."
 }}
 
 Text:
