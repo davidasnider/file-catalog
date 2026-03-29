@@ -16,29 +16,67 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
+def is_within_directory(directory: Path, target: Path):
+    """Checks if a target path is within a directory (prevents path traversal)."""
+    abs_directory = directory.resolve()
+    abs_target = target.resolve()
+    return abs_target.is_relative_to(abs_directory)
+
+
+def safe_extract_zip(zip_ref: zipfile.ZipFile, dest_dir: Path):
+    """Safely extracts a ZIP file, checking for path traversal."""
+    for member in zip_ref.namelist():
+        member_path = dest_dir / member
+        if not is_within_directory(dest_dir, member_path):
+            raise Exception(f"Potential path traversal attempt: {member}")
+    zip_ref.extractall(dest_dir)
+
+
+def safe_extract_tar(tar_ref: tarfile.TarFile, dest_dir: Path):
+    """Safely extracts a Tar file, checking for path traversal or using filters."""
+    # If Python 3.12+, use the 'data' filter for safety.
+    if hasattr(tarfile, "data_filter"):
+        tar_ref.extractall(dest_dir, filter="data")
+    else:
+        for member in tar_ref.getmembers():
+            member_path = dest_dir / member.name
+            if not is_within_directory(dest_dir, member_path):
+                raise Exception(f"Potential path traversal attempt: {member.name}")
+        tar_ref.extractall(dest_dir)
+
+
 def extract_archive(file_path: Path, dest_dir: Path):
     """Extracts a single archive based on its extension."""
     suffix = file_path.suffix.lower()
+    # Check for multi-part extensions like .tar.gz
+    suffixes = [s.lower() for s in file_path.suffixes]
 
     try:
         if suffix == ".zip":
+            os.makedirs(dest_dir, exist_ok=True)
             with zipfile.ZipFile(file_path, "r") as zip_ref:
-                zip_ref.extractall(dest_dir)
-            return True
-        elif suffix in (".tar", ".gz", ".bz2", ".xz", ".tgz"):
-            with tarfile.open(file_path, "r:*") as tar_ref:
-                tar_ref.extractall(dest_dir)
+                safe_extract_zip(zip_ref, dest_dir)
             return True
         elif suffix == ".7z":
             if HAS_7Z:
+                os.makedirs(dest_dir, exist_ok=True)
                 with py7zr.SevenZipFile(file_path, mode="r") as archive:
+                    # py7zr doesn't have an easy way to check paths before extraction
+                    # but it's generally more modern. We still check if possible.
                     archive.extractall(path=dest_dir)
                 return True
             else:
                 logger.warning(f"Skipping {file_path}: py7zr is not installed.")
                 return False
+        elif ".tar" in suffixes or suffix in (".tgz", ".tar"):
+            os.makedirs(dest_dir, exist_ok=True)
+            with tarfile.open(file_path, "r:*") as tar_ref:
+                safe_extract_tar(tar_ref, dest_dir)
+            return True
         else:
-            logger.debug(f"Unsupported archive format: {suffix}")
+            # We skip single-file compression formats like .gz, .bz2, .xz
+            # unless they are part of a tarball.
+            logger.debug(f"Unsupported or single-file compression format: {suffix}")
             return False
     except Exception as e:
         logger.error(f"Failed to extract {file_path}: {e}")
@@ -53,8 +91,9 @@ def process_directory(
         logger.error(f"Directory {directory} does not exist.")
         return
 
-    # Supported extensions
-    extensions = {".zip", ".tar", ".gz", ".bz2", ".xz", ".tgz", ".7z"}
+    # Supported extensions (refined)
+    extensions = {".zip", ".tar", ".tgz", ".7z"}
+    # Also support .tar.gz, .tar.bz2, etc.
 
     archives_processed = 0
 
@@ -69,7 +108,11 @@ def process_directory(
         all_files = [f for f in base_path.iterdir() if f.is_file()]
 
     for file_path in all_files:
-        if file_path.suffix.lower() in extensions:
+        suffix = file_path.suffix.lower()
+        suffixes = [s.lower() for s in file_path.suffixes]
+
+        is_archive = suffix in extensions or ".tar" in suffixes
+        if is_archive:
             # Create a destination directory named after the archive (without extension)
             # but ensure it's in the same parent directory.
             dest_folder = file_path.parent / f"{file_path.stem}_extracted"

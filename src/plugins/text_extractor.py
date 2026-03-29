@@ -198,7 +198,14 @@ class TextExtractorPlugin(AnalyzerBase):
                         with parser:
                             metadata = extractMetadata(parser)
                             if metadata:
-                                extracted_text = metadata.exportPlaintext()
+                                plaintext = metadata.exportPlaintext()
+                                if isinstance(plaintext, str):
+                                    extracted_text = plaintext
+                                else:
+                                    try:
+                                        extracted_text = "\n".join(plaintext)
+                                    except TypeError:
+                                        extracted_text = str(plaintext)
                             else:
                                 logger.warning(f"No metadata found for {file_path}")
                                 extracted_text = ""
