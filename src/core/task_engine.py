@@ -139,10 +139,21 @@ class TaskEngine:
 
                     all_success = True
                     all_analyzers = get_ordered_analyzers()
+                    failed_plugins = set()
 
                     for i, (plugin_name, plugin_class) in enumerate(all_analyzers):
                         current_version = plugin_class._analyzer_version
                         existing_task = existing_tasks.get(plugin_name)
+
+                        # Check dependencies
+                        plugin_deps = set(getattr(plugin_class, "_depends_on", []))
+                        if plugin_deps.intersection(failed_plugins):
+                            logger.info(
+                                f"Skipping {plugin_name} for doc {document_id} because dependencies failed: {plugin_deps.intersection(failed_plugins)}"
+                            )
+                            failed_plugins.add(plugin_name)
+                            all_success = False
+                            continue
 
                         # Check if we can skip this task
                         if (
@@ -216,26 +227,10 @@ class TaskEngine:
                             context[plugin_name] = result
                         else:
                             all_success = False
-
-                            # Check if any REMAINING plugin depends on this failed one
-                            dependent_plugins = []
-                            for future_name, future_cls in all_analyzers[i + 1 :]:
-                                if plugin_name in getattr(
-                                    future_cls, "_depends_on", []
-                                ):
-                                    dependent_plugins.append(future_name)
-
-                            if dependent_plugins:
-                                logger.warning(
-                                    f"Plugin {plugin_name} failed. Stopping pipeline for doc {document_id} "
-                                    f"because the following plugins depend on it: {', '.join(dependent_plugins)}"
-                                )
-                                break
-                            else:
-                                logger.info(
-                                    f"Plugin {plugin_name} failed, but continuing pipeline for doc {document_id} "
-                                    "as no remaining plugins depend on it."
-                                )
+                            failed_plugins.add(plugin_name)
+                            logger.warning(
+                                f"Plugin {plugin_name} failed. Dependent plugins will be skipped for doc {document_id}."
+                            )
 
                     doc = await session.get(Document, document_id)
                     if all_success:

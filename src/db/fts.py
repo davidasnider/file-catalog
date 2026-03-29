@@ -55,40 +55,56 @@ async def sync_document_to_fts(session: AsyncSession, document_id: int):
             except json.JSONDecodeError:
                 continue
 
+            normalized_task_name = task_name.lower()
+
             # Extract textual content based on the task type
-            if task_name == "TextExtractor":
+            if task_name == "TextExtractor" or normalized_task_name == "text_extractor":
                 if text_content := data.get("text"):
                     content_parts.append(text_content)
 
-            elif task_name == "DocumentAIExtractor":
+            elif (
+                task_name == "DocumentAIExtractor"
+                or normalized_task_name == "document_ai_extractor"
+            ):
                 if text_content := data.get("text"):
                     content_parts.append(text_content)
 
-            elif task_name == "AudioTranscriber":
+            elif (
+                task_name == "AudioTranscriber"
+                or normalized_task_name == "audio_transcriber"
+            ):
                 if text_content := data.get("text"):
                     content_parts.append(text_content)
 
-            elif task_name == "VisionAnalyzer":
+            elif (
+                task_name == "VisionAnalyzer"
+                or normalized_task_name == "vision_analyzer"
+            ):
                 if description := data.get("description"):
                     content_parts.append(description)
 
-            elif task_name == "VideoAnalyzer":
+            elif (
+                task_name == "VideoAnalyzer" or normalized_task_name == "video_analyzer"
+            ):
                 if description := data.get("visual_description"):
                     content_parts.append(description)
 
-            elif task_name == "EmailParser":
+            elif task_name == "EmailParser" or normalized_task_name == "email_parser":
                 if subject := data.get("subject"):
                     content_parts.append(f"Subject: {subject}")
                 if text_content := data.get("text_body"):
                     content_parts.append(text_content)
 
-            elif task_name == "SpreadsheetAnalyzer":
+            elif (
+                task_name == "SpreadsheetAnalyzer"
+                or normalized_task_name == "spreadsheet_analyzer"
+            ):
                 if text_content := data.get("raw_text_content"):
                     content_parts.append(text_content)
                 elif summary := data.get("summary"):
                     content_parts.append(summary)
 
-            elif task_name == "Summarizer":
+            elif task_name == "Summarizer" or normalized_task_name == "summarizer":
                 if summary := data.get("summary"):
                     summary_text = summary
 
@@ -143,7 +159,7 @@ async def search_fts(session: AsyncSession, query: str, limit: int = 50):
 
     # SQLite FTS syntax: wrap queries in quotes to do phrase search and avoid syntax errors
     # on punctuation. We escape internal double quotes by doubling them.
-    safe_query = f'"{query.replace(chr(34), chr(34)*2)}"'
+    safe_query = f'"{query.replace(chr(34), chr(34) * 2)}"'
 
     try:
         result = await session.execute(

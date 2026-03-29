@@ -258,29 +258,80 @@ async def run_scanner(
         if not os.path.exists(LOG_FILE):
             return ""
         try:
-            with open(LOG_FILE, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-                return "".join(lines[-n:])
+            # Efficiently read only the last n lines of the log file without
+            # loading the entire file into memory on each UI refresh.
+            block_size = 1024
+            newline = b"\n"
+            with open(LOG_FILE, "rb") as f:
+                f.seek(0, os.SEEK_END)
+                file_size = f.tell()
+                if file_size == 0:
+                    return ""
+
+                data = b""
+                lines_found = 0
+                # Read backwards in chunks until we have enough newlines or hit BOF.
+                while file_size > 0 and lines_found <= n:
+                    read_size = min(block_size, file_size)
+                    file_size -= read_size
+                    f.seek(file_size)
+                    chunk = f.read(read_size)
+                    if not chunk:
+                        break
+                    data = chunk + data
+                    lines_found = data.count(newline)
+                    if file_size == 0:
+                        break
+
+                # Split into lines and take the last n.
+                tail_lines = data.splitlines()[-n:]
+                return "\n".join(
+                    line.decode("utf-8", errors="replace") for line in tail_lines
+                )
         except Exception:
             return "Error reading log file."
 
     async def get_stats():
         import json
+        from sqlalchemy import func
 
         stats_text = Text()
         async with async_session_maker() as session:
-            # Query all tasks and documents
-            task_result = await session.execute(select(AnalysisTask))
-            all_tasks = task_result.scalars().all()
+            # Query document counts with aggregate functions
+            total_docs = await session.scalar(select(func.count(Document.id))) or 0
+            completed_docs = (
+                await session.scalar(
+                    select(func.count(Document.id)).where(
+                        Document.status == DocumentStatus.COMPLETED
+                    )
+                )
+                or 0
+            )
 
-            doc_result = await session.execute(select(Document))
-            all_docs = doc_result.scalars().all()
+            # Query only necessary columns for tasks
+            task_result = await session.execute(
+                select(
+                    AnalysisTask.task_name,
+                    AnalysisTask.status,
+                    AnalysisTask.error_message,
+                    AnalysisTask.result_data,
+                )
+            )
+            all_tasks = task_result.all()
 
-            total_docs = len(all_docs)
-            completed_docs = sum(1 for d in all_docs if d.status == "COMPLETED")
             total_tasks = len(all_tasks)
-            completed_tasks = sum(1 for t in all_tasks if t.status == "COMPLETED")
-            failed_tasks = sum(1 for t in all_tasks if t.status == "FAILED")
+            completed_tasks = sum(
+                1
+                for t in all_tasks
+                if (t.status.name if hasattr(t.status, "name") else str(t.status))
+                == "COMPLETED"
+            )
+            failed_tasks = sum(
+                1
+                for t in all_tasks
+                if (t.status.name if hasattr(t.status, "name") else str(t.status))
+                == "FAILED"
+            )
 
             stats_text.append("📊 Global Status\n", style="bold white underline")
             stats_text.append(f"  Docs:  {completed_docs}/{total_docs}\n", style="cyan")
@@ -566,6 +617,10 @@ async def run_scanner(
             await asyncio.gather(*tasks)
         finally:
             ui_update_task.cancel()
+            try:
+                await ui_update_task
+            except asyncio.CancelledError:
+                pass
 
     # Let background tasks (like our check_doc_errors quick checks) settle
     await asyncio.sleep(0.1)

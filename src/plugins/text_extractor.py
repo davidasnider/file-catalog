@@ -309,7 +309,8 @@ class TextExtractorPlugin(AnalyzerBase):
                     )
                     extracted_text = ""
             else:
-                # We skip non-textual types or types we don't support yet, returning empty text.
+                # We log the unsupported type. The extraction will be empty,
+                # causing the ValueError below to mark the task as FAILED.
                 logger.debug(
                     f"Skipping text extraction for unsupported mime type: {mime_type}"
                 )
