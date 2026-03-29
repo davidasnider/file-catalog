@@ -145,3 +145,30 @@ async def test_text_extractor_powerpoint_mocked(tmp_path, mocker):
 
     assert result["extracted"] is True
     assert "Mocked PPT metadata text." in result["text"]
+
+
+@pytest.mark.asyncio
+async def test_text_extractor_pptx_mocked(tmp_path, mocker):
+    plugin = TextExtractorPlugin()
+
+    test_file = tmp_path / "test.pptx"
+    test_file.write_text("dummy")
+
+    # Mock Presentation
+    mock_prs = mocker.Mock()
+    mock_slide = mocker.Mock()
+    mock_shape = mocker.Mock()
+    mock_shape.text = "Slide Text"
+    mock_slide.shapes = [mock_shape]
+    mock_prs.slides = [mock_slide]
+
+    mocker.patch("pptx.Presentation", return_value=mock_prs)
+
+    result = await plugin.analyze(
+        str(test_file),
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        {},
+    )
+
+    assert result["extracted"] is True
+    assert "Slide Text" in result["text"]

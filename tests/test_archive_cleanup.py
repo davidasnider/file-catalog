@@ -66,3 +66,38 @@ def test_process_directory_remove(tmp_path):
 
     assert (tmp_path / "test_extracted" / "file1.txt").exists()
     assert not zip_path.exists()  # Removed because keep=False
+
+
+def test_process_directory_naming_tar_gz(tmp_path):
+    # Create a .tar.gz file
+    tar_path = tmp_path / "my_archive.tar.gz"
+    with tarfile.open(tar_path, "w:gz") as tar:
+        f1 = tmp_path / "f1.txt"
+        f1.write_text("c1")
+        tar.add(f1, arcname="f1.txt")
+
+    process_directory(str(tmp_path), recursive=False, dry_run=False, keep=True)
+    # Should be my_archive_extracted, NOT my_archive.tar_extracted
+    assert (tmp_path / "my_archive_extracted").exists()
+    assert (tmp_path / "my_archive_extracted" / "f1.txt").exists()
+
+
+def test_path_traversal_7z_mocked(tmp_path, mocker):
+    # Mock py7zr to simulate a malicious entry
+    mock_7z = mocker.Mock()
+    mock_file = mocker.Mock()
+    mock_file.filename = "../malicious.txt"
+    mock_7z.get_files.return_value = [mock_file]
+
+    mocker.patch(
+        "py7zr.SevenZipFile",
+        return_value=mocker.MagicMock(
+            __enter__=lambda x: mock_7z, __exit__=lambda x, *args: None
+        ),
+    )
+    mocker.patch("src.scripts.extract_and_cleanup_archives.HAS_7Z", True)
+
+    archive_path = tmp_path / "test.7z"
+    archive_path.write_text("dummy")
+
+    assert extract_archive(archive_path, tmp_path / "out") is False

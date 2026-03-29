@@ -24,12 +24,25 @@ def is_within_directory(directory: Path, target: Path):
 
 
 def safe_extract_zip(zip_ref: zipfile.ZipFile, dest_dir: Path):
-    """Safely extracts a ZIP file, checking for path traversal."""
-    for member in zip_ref.namelist():
-        member_path = dest_dir / member
+    """Safely extracts a ZIP file, checking for path traversal and symlinks."""
+    for member in zip_ref.infolist():
+        # Check for path traversal in the filename itself
+        target_path = (dest_dir / member.filename).resolve()
+        if not is_within_directory(dest_dir, target_path):
+            raise Exception(f"Potential path traversal attempt: {member.filename}")
+
+        # ZIP files can contain symlinks. We extract member-by-member to ensure
+        # that even if a symlink is created, we don't follow it for subsequent members.
+        zip_ref.extract(member, dest_dir)
+
+
+def safe_extract_7z(archive: "py7zr.SevenZipFile", dest_dir: Path):
+    """Safely extracts a 7z file, checking for path traversal."""
+    for member in archive.get_files():
+        member_path = (dest_dir / member.filename).resolve()
         if not is_within_directory(dest_dir, member_path):
-            raise Exception(f"Potential path traversal attempt: {member}")
-    zip_ref.extractall(dest_dir)
+            raise Exception(f"Potential path traversal attempt: {member.filename}")
+    archive.extractall(path=dest_dir)
 
 
 def safe_extract_tar(tar_ref: tarfile.TarFile, dest_dir: Path):
@@ -39,7 +52,7 @@ def safe_extract_tar(tar_ref: tarfile.TarFile, dest_dir: Path):
         tar_ref.extractall(dest_dir, filter="data")
     else:
         for member in tar_ref.getmembers():
-            member_path = dest_dir / member.name
+            member_path = (dest_dir / member.name).resolve()
             if not is_within_directory(dest_dir, member_path):
                 raise Exception(f"Potential path traversal attempt: {member.name}")
         tar_ref.extractall(dest_dir)
@@ -61,9 +74,7 @@ def extract_archive(file_path: Path, dest_dir: Path):
             if HAS_7Z:
                 os.makedirs(dest_dir, exist_ok=True)
                 with py7zr.SevenZipFile(file_path, mode="r") as archive:
-                    # py7zr doesn't have an easy way to check paths before extraction
-                    # but it's generally more modern. We still check if possible.
-                    archive.extractall(path=dest_dir)
+                    safe_extract_7z(archive, dest_dir)
                 return True
             else:
                 logger.warning(f"Skipping {file_path}: py7zr is not installed.")
@@ -113,9 +124,28 @@ def process_directory(
 
         is_archive = suffix in extensions or ".tar" in suffixes
         if is_archive:
-            # Create a destination directory named after the archive (without extension)
-            # but ensure it's in the same parent directory.
-            dest_folder = file_path.parent / f"{file_path.stem}_extracted"
+            # Create a destination directory named after the archive (without extension).
+            # For multi-suffix archives like *.tar.gz, strip all archive-related suffixes
+            # so "archive.tar.gz" becomes "archive_extracted" instead of "archive.tar_extracted".
+            archive_suffixes = [
+                ".tar.gz",
+                ".tar.bz2",
+                ".tar.xz",
+                ".tgz",
+                ".zip",
+                ".tar",
+                ".7z",
+            ]
+            filename_lower = file_path.name.lower()
+            base_name = file_path.name
+            for sfx in archive_suffixes:
+                if filename_lower.endswith(sfx):
+                    base_name = file_path.name[: -len(sfx)]
+                    break
+            if not base_name:
+                # Fallback to stem in the unlikely event the name is fully stripped.
+                base_name = file_path.stem
+            dest_folder = file_path.parent / f"{base_name}_extracted"
 
             # If folder exists, we might want to avoid overwriting or add a suffix
             counter = 1

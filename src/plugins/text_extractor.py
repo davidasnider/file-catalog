@@ -191,29 +191,46 @@ class TextExtractorPlugin(AnalyzerBase):
                 except Exception as e:
                     logger.error(f"xlrd failed for {file_path}: {e}")
                     extracted_text = ""
-            elif mime_type == "application/vnd.ms-powerpoint":
+            elif mime_type in (
+                "application/vnd.ms-powerpoint",
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            ):
                 try:
-                    parser = createParser(file_path)
-                    if parser:
-                        with parser:
-                            metadata = extractMetadata(parser)
-                            if metadata:
-                                plaintext = metadata.exportPlaintext()
-                                if isinstance(plaintext, str):
-                                    extracted_text = plaintext
-                                else:
-                                    try:
-                                        extracted_text = "\n".join(plaintext)
-                                    except TypeError:
-                                        extracted_text = str(plaintext)
-                            else:
-                                logger.warning(f"No metadata found for {file_path}")
-                                extracted_text = ""
+                    if (
+                        mime_type
+                        == "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                    ):
+                        from pptx import Presentation
+
+                        prs = Presentation(file_path)
+                        full_text = []
+                        for slide in prs.slides:
+                            for shape in slide.shapes:
+                                if hasattr(shape, "text"):
+                                    full_text.append(shape.text)
+                        extracted_text = "\n".join(full_text)
                     else:
-                        logger.warning(f"Hachoir could not parse {file_path}")
-                        extracted_text = ""
+                        parser = createParser(file_path)
+                        if parser:
+                            with parser:
+                                metadata = extractMetadata(parser)
+                                if metadata:
+                                    plaintext = metadata.exportPlaintext()
+                                    if isinstance(plaintext, str):
+                                        extracted_text = plaintext
+                                    else:
+                                        try:
+                                            extracted_text = "\n".join(plaintext)
+                                        except TypeError:
+                                            extracted_text = str(plaintext)
+                                else:
+                                    logger.warning(f"No metadata found for {file_path}")
+                                    extracted_text = ""
+                        else:
+                            logger.warning(f"Hachoir could not parse {file_path}")
+                            extracted_text = ""
                 except Exception as e:
-                    logger.error(f"Hachoir failed for {file_path}: {e}")
+                    logger.error(f"PowerPoint extraction failed for {file_path}: {e}")
                     extracted_text = ""
             elif mime_type == "message/rfc822":
                 import email
