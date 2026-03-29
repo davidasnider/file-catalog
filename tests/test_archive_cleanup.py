@@ -1,5 +1,10 @@
 import zipfile
 import tarfile
+
+try:
+    import py7zr
+except ImportError:
+    py7zr = None
 from src.scripts.extract_and_cleanup_archives import extract_archive, process_directory
 
 
