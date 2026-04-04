@@ -7,6 +7,7 @@ from src.db.models import Document, AnalysisTask, DocumentStatus, TaskStatus
 from src.core.plugin_registry import ANALYZER_REGISTRY, get_ordered_analyzers
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import select
+from src.core.config import config
 
 logger = logging.getLogger(__name__)
 
@@ -50,60 +51,86 @@ class TaskEngine:
                 {},
             )
 
-        try:
-            # Rehydrate the task to update status
-            task = await session.get(AnalysisTask, task_id)
-            if not task:
-                return False, f"Task {task_id} not found in DB", {}
+        retry_count = 0
+        max_retries = config.max_retries
 
-            task.status = TaskStatus.IN_PROGRESS
-            task.plugin_version = plugin_class._analyzer_version
-            task.error_message = None
-            await session.commit()
+        while True:
+            try:
+                # Rehydrate the task to update status
+                task = await session.get(AnalysisTask, task_id)
+                if not task:
+                    return False, f"Task {task_id} not found in DB", {}
 
-            # Instantiate and check conditionally
-            analyzer = plugin_class()
-            if not analyzer.should_run(document_path, mime_type, context):
+                task.status = TaskStatus.IN_PROGRESS
+                task.plugin_version = plugin_class._analyzer_version
+                task.error_message = None
+                task.retry_count = retry_count
+                await session.commit()
+
+                # Instantiate and check conditionally
+                analyzer = plugin_class()
+                if not analyzer.should_run(document_path, mime_type, context):
+                    task = await session.get(AnalysisTask, task_id)
+                    task.status = TaskStatus.COMPLETED
+                    result = {
+                        "skipped": True,
+                        "reason": "Condition not met by should_run",
+                    }
+                    try:
+                        task.result_data = json.dumps(result)
+                    except TypeError:
+                        logger.warning(
+                            f"Could not serialize skip result for {task_name}, storing empty dict."
+                        )
+                        task.result_data = "{}"
+                    await session.commit()
+                    return True, "", result
+
+                # Run the plugin
+                result = await analyzer.analyze(document_path, mime_type, context)
+
+                # Successful completion
                 task = await session.get(AnalysisTask, task_id)
                 task.status = TaskStatus.COMPLETED
-                result = {"skipped": True, "reason": "Condition not met by should_run"}
                 try:
                     task.result_data = json.dumps(result)
                 except TypeError:
                     logger.warning(
-                        f"Could not serialize skip result for {task_name}, storing empty dict."
+                        f"Could not serialize result for {task_name}, storing empty dict."
                     )
                     task.result_data = "{}"
+
                 await session.commit()
                 return True, "", result
 
-            # Run the plugin
-            result = await analyzer.analyze(document_path, mime_type, context)
+            except Exception as e:
+                retry_count += 1
+                if retry_count <= max_retries:
+                    backoff = 2**retry_count
+                    logger.warning(
+                        f"Error executing plugin {task_name} on {document_path}: {e}. "
+                        f"Retrying in {backoff}s ({retry_count}/{max_retries})..."
+                    )
+                    task = await session.get(AnalysisTask, task_id)
+                    if task:
+                        task.status = TaskStatus.RETRIES
+                        task.error_message = str(e)
+                        task.retry_count = retry_count
+                        await session.commit()
+                    await asyncio.sleep(backoff)
+                    continue
 
-            # Successful completion
-            task = await session.get(AnalysisTask, task_id)
-            task.status = TaskStatus.COMPLETED
-            try:
-                task.result_data = json.dumps(result)
-            except TypeError:
-                logger.warning(
-                    f"Could not serialize result for {task_name}, storing empty dict."
+                logger.error(
+                    f"Plugin {task_name} failed after {max_retries} retries on {document_path}: {e}"
                 )
-                task.result_data = "{}"
-
-            await session.commit()
-
-            return True, "", result
-
-        except Exception as e:
-            logger.error(f"Error executing plugin {task_name} on {document_path}: {e}")
-            # Ensure task is marked as failed
-            task = await session.get(AnalysisTask, task_id)
-            if task:
-                task.status = TaskStatus.FAILED
-                task.error_message = str(e)
-                await session.commit()
-            return False, str(e), {}
+                # Ensure task is marked as failed
+                task = await session.get(AnalysisTask, task_id)
+                if task:
+                    task.status = TaskStatus.FAILED
+                    task.error_message = str(e)
+                    task.retry_count = retry_count
+                    await session.commit()
+                return False, str(e), {}
 
     async def process_document(self, document_id: int):
         """Process a document through all registered plugins using a bounded semaphore."""

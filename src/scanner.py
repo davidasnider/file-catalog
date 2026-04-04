@@ -50,17 +50,41 @@ load_plugins(plugin_dir)
 LOG_FILE = "scanner.log"
 
 
+class CustomJsonFormatter(logging.Formatter):
+    """Simple JSON formatter for structured logging."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        import json
+        from datetime import datetime
+
+        log_record = {
+            "timestamp": datetime.fromtimestamp(record.created).isoformat(),
+            "level": record.levelname,
+            "name": record.name,
+            "message": record.getMessage(),
+        }
+        if record.exc_info:
+            log_record["exception"] = self.formatException(record.exc_info)
+        return json.dumps(log_record)
+
+
 def setup_logging(debug: bool = False):
     level = logging.DEBUG if debug else logging.INFO
     # Set logger levels for src packages
     logging.getLogger("src").setLevel(level)
 
+    handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
+    if config.log_format == "json":
+        handler.setFormatter(CustomJsonFormatter())
+    else:
+        handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        )
+
     logging.basicConfig(
         level=level,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.FileHandler(LOG_FILE, encoding="utf-8"),
-        ],
+        handlers=[handler],
+        force=True,
     )
 
 
@@ -135,7 +159,7 @@ async def ingest_directory(
         )
 
     processed_doc_ids = []
-    batch_size = 100
+    batch_size = config.ingest_batch_size
     pending_updates = 0
 
     for file_path in files_on_disk:
@@ -770,6 +794,13 @@ def main():
         type=str,
         default=None,
         help="Filter ingestion to only documents matching this MIME type (e.g. 'image/jpeg' or 'image/').",
+    )
+    parser.add_argument(
+        "--log-format",
+        type=str,
+        default=config.log_format,
+        choices=["standard", "json"],
+        help="Format of the log output.",
     )
 
     args = parser.parse_args()

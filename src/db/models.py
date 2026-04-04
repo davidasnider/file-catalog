@@ -62,5 +62,8 @@ class AnalysisTask(SQLModel, table=True):
     result_data: Optional[str] = Field(
         default=None, description="JSON serialized results of the task execution"
     )
+    retry_count: int = Field(
+        default=0, description="Number of times this task has been retried"
+    )
 
     document: Document = Relationship(back_populates="tasks")
