@@ -34,11 +34,13 @@ async def init_db():
     logger.info("Initializing database...")
     async with engine.begin() as conn:
         try:
-            # Check if our new plugin_version column exists. If it fails, our schema is old.
+            # Check for our new columns to trigger a schema refresh if needed.
+            # We check both the latest Document columns and AnalysisTask column.
+            await conn.execute(text("SELECT file_size, mtime FROM document LIMIT 1"))
             await conn.execute(text("SELECT plugin_version FROM analysistask LIMIT 1"))
         except OperationalError:
             logger.info(
-                "Outdated schema detected, dropping all tables for migration..."
+                "Outdated schema detected (missing file_size, mtime, or plugin_version), dropping all tables for migration..."
             )
             await conn.execute(text("DROP TABLE IF EXISTS document_fts"))
             await conn.run_sync(SQLModel.metadata.drop_all)
