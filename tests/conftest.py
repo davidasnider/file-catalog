@@ -18,7 +18,14 @@ def event_loop():
 
 @pytest.fixture(scope="function")
 async def test_engine():
-    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+    from sqlalchemy.pool import StaticPool
+
+    engine = create_async_engine(
+        TEST_DATABASE_URL,
+        echo=False,
+        poolclass=StaticPool,
+        connect_args={"check_same_thread": False},
+    )
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
     yield engine
