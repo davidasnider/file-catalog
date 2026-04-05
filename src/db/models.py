@@ -31,6 +31,12 @@ class Document(SQLModel, table=True):
         index=True,
         description="Hash of the file contents to prevent duplicate processing",
     )
+    file_size: Optional[int] = Field(
+        default=None, description="Size of the file in bytes"
+    )
+    mtime: Optional[float] = Field(
+        default=None, description="Modification time of the file (POSIX timestamp)"
+    )
     status: DocumentStatus = Field(default=DocumentStatus.PENDING)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -55,6 +61,9 @@ class AnalysisTask(SQLModel, table=True):
     )
     result_data: Optional[str] = Field(
         default=None, description="JSON serialized results of the task execution"
+    )
+    retry_count: int = Field(
+        default=0, description="Number of times this task has been retried"
     )
 
     document: Document = Relationship(back_populates="tasks")

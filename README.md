@@ -39,5 +39,18 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
   - **Full-Text Search**: Search through extracted text, AI summaries, and Vision descriptions using SQLite FTS5.
   - **Interactive Detail View**: Drill down into document metadata, AI results, and visual previews.
 
+## Configuration & Production Usage
+
+The scanner can be configured via environment variables (in a `.env` file) or CLI arguments.
+
+### Key Configuration Options:
+- `MAX_CONCURRENT`: Number of documents to process in parallel (default: 4).
+- `INGEST_BATCH_SIZE`: Number of files to commit to the database in a single transaction (default: 100).
+- `MAX_RETRIES`: Number of times to retry a failed plugin task with exponential backoff (default: 3).
+- `LOG_FORMAT`: Set to `json` for structured logging or `standard` for human-readable logs.
+
+### Performance: Incremental Scanning
+The system implements a **Quick Skip** mechanism. It tracks the `file_size` and `mtime` of every ingested file. On subsequent runs, if a file's metadata hasn't changed and its status is `COMPLETED`, the scanner skips the entire analysis pipeline for that file, significantly reducing processing time for large, stable archives.
+
 ---
 *Built with Python, SQLite (SQLModel), Streamlit, and Llama.cpp.*
