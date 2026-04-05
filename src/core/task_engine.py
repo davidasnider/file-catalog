@@ -181,18 +181,11 @@ class TaskEngine:
                     limit = int(self.max_concurrent_tasks * self.mime_limit_ratio)
 
                     if not others_waiting or active_in_group < limit:
-                        logger.debug(
-                            f"Task {document_id} ({group}) taking slot. Active: {self._active_total}/{self.max_concurrent_tasks}, Group: {active_in_group}/{limit if others_waiting else 'unlimited'}"
-                        )
                         # Success: take the slot
                         self._queued_counts[group] -= 1
                         self._active_counts[group] += 1
                         self._active_total += 1
                         break
-                    else:
-                        logger.debug(
-                            f"Task {document_id} ({group}) waiting for MIME balance. Group active: {active_in_group}, limit: {limit}"
-                        )
 
                 # Wait for a notification that a slot has opened or queue state changed
                 await self._condition.wait()

@@ -733,7 +733,7 @@ def main():
     parser.add_argument(
         "--concurrency",
         type=int,
-        default=4,
+        default=config.max_concurrent,
         help="Maximum number of concurrent documents to process.",
     )
     parser.add_argument(
@@ -813,8 +813,6 @@ def main():
 
     args = parser.parse_args()
 
-    setup_logging(args.debug)
-
     # Update global config from CLI args before we run anything
     from src.core.config import update_config_from_cli
 
@@ -822,6 +820,8 @@ def main():
     args_dict = vars(args).copy()
     mime_type = args_dict.pop("mime_type", None)
     update_config_from_cli(**args_dict)
+
+    setup_logging(args.debug)
 
     asyncio.run(
         run_scanner(
