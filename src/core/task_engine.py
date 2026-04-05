@@ -118,6 +118,8 @@ class TaskEngine:
                 await session.commit()
                 return True, "", result
 
+            except asyncio.CancelledError:
+                raise
             except Exception as e:
                 retry_count += 1
                 if retry_count <= max_retries:
@@ -166,29 +168,34 @@ class TaskEngine:
             # Notify others that queue state has changed (others_waiting might be true now)
             self._condition.notify_all()
 
-            while True:
-                # Capacity check
-                if self._active_total < self.max_concurrent_tasks:
-                    active_in_group = self._active_counts[group]
-                    # Check if others are waiting for ANY slot
-                    others_waiting = any(
-                        count > 0
-                        for g, count in self._queued_counts.items()
-                        if g != group
-                    )
+            try:
+                while True:
+                    # Capacity check
+                    if self._active_total < self.max_concurrent_tasks:
+                        active_in_group = self._active_counts[group]
+                        # Check if others are waiting for ANY slot
+                        others_waiting = any(
+                            count > 0
+                            for g, count in self._queued_counts.items()
+                            if g != group
+                        )
 
-                    # MIME-aware limit: only 50% capacity for one group if others are waiting.
-                    limit = int(self.max_concurrent_tasks * self.mime_limit_ratio)
+                        # MIME-aware limit: only 50% capacity for one group if others are waiting.
+                        limit = int(self.max_concurrent_tasks * self.mime_limit_ratio)
 
-                    if not others_waiting or active_in_group < limit:
-                        # Success: take the slot
-                        self._queued_counts[group] -= 1
-                        self._active_counts[group] += 1
-                        self._active_total += 1
-                        break
+                        if not others_waiting or active_in_group < limit:
+                            # Success: take the slot
+                            self._queued_counts[group] -= 1
+                            self._active_counts[group] += 1
+                            self._active_total += 1
+                            break
 
-                # Wait for a notification that a slot has opened or queue state changed
-                await self._condition.wait()
+                    # Wait for a notification that a slot has opened or queue state changed
+                    await self._condition.wait()
+            except asyncio.CancelledError:
+                self._queued_counts[group] -= 1
+                self._condition.notify_all()
+                raise
 
         # 3. Execution phase
         try:
