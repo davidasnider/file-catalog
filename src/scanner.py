@@ -253,10 +253,11 @@ async def ingest_directory(
 
 async def run_scanner(
     directory: str,
-    max_concurrent: int = 5,
-    clean: bool = False,
-    limit: int = None,
-    mime_type_filter: str = None,
+    max_concurrent: int,
+    clean: bool,
+    limit: int | None,
+    mime_type_filter: str | None,
+    limit_ratio: float,
 ):
     """Main scanner logic."""
     if clean:
@@ -666,6 +667,7 @@ async def run_scanner(
         task_engine = TaskEngine(
             async_session_maker=async_session_maker,
             max_concurrent_tasks=max_concurrent,
+            mime_limit_ratio=limit_ratio,
             callbacks=callbacks,
         )
 
@@ -802,6 +804,12 @@ def main():
         choices=["standard", "json"],
         help="Format of the log output.",
     )
+    parser.add_argument(
+        "--concurrency-limit-ratio",
+        type=float,
+        default=config.concurrency_limit_ratio,
+        help="Max percentage (0.0-1.0) of concurrency slots a single MIME group can occupy if others are waiting.",
+    )
 
     args = parser.parse_args()
 
@@ -816,7 +824,14 @@ def main():
     update_config_from_cli(**args_dict)
 
     asyncio.run(
-        run_scanner(args.directory, args.concurrency, args.clean, args.limit, mime_type)
+        run_scanner(
+            args.directory,
+            args.concurrency,
+            args.clean,
+            args.limit,
+            mime_type,
+            args.concurrency_limit_ratio,
+        )
     )
 
 

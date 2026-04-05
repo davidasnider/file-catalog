@@ -1,8 +1,9 @@
 import asyncio
 import logging
-from typing import Dict, Any, Tuple
-from sqlalchemy.ext.asyncio import AsyncSession
+import collections
 import json
+from typing import Dict, Any, Tuple, Optional
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.models import Document, AnalysisTask, DocumentStatus, TaskStatus
 from src.core.plugin_registry import ANALYZER_REGISTRY, get_ordered_analyzers
 from sqlalchemy.orm import sessionmaker
@@ -17,11 +18,19 @@ class TaskEngine:
         self,
         async_session_maker: sessionmaker,
         max_concurrent_tasks: int = 5,
+        mime_limit_ratio: float = 0.5,
         callbacks: Dict[str, Any] = None,
     ):
-        self.semaphore = asyncio.Semaphore(max_concurrent_tasks)
+        self.max_concurrent_tasks = max_concurrent_tasks
+        self.mime_limit_ratio = mime_limit_ratio
         self.async_session_maker = async_session_maker
         self.callbacks = callbacks or {}
+
+        # Concurrency management via Condition for finer-grained control (MIME balancing)
+        self._condition = asyncio.Condition()
+        self._active_total = 0
+        self._active_counts = collections.defaultdict(int)
+        self._queued_counts = collections.defaultdict(int)
 
     def _trigger(self, event_name: str, *args, **kwargs):
         if event_name in self.callbacks:
@@ -29,6 +38,12 @@ class TaskEngine:
                 self.callbacks[event_name](*args, **kwargs)
             except Exception:
                 pass
+
+    def _get_mime_group(self, mime_type: Optional[str]) -> str:
+        """Group MIME types by prefix (e.g. image/jpeg -> image)."""
+        if not mime_type or "/" not in mime_type:
+            return "unknown"
+        return mime_type.split("/")[0]
 
     async def execute_plugin(
         self,
@@ -133,27 +148,69 @@ class TaskEngine:
                 return False, str(e), {}
 
     async def process_document(self, document_id: int):
-        """Process a document through all registered plugins using a bounded semaphore."""
-        async with self.semaphore:
+        """Process a document through all registered plugins using a MIME-aware scheduler."""
+        # 1. Fetch document metadata to determine MIME group
+        async with self.async_session_maker() as session:
+            doc = await session.get(Document, document_id)
+            if not doc:
+                logger.error(f"Document {document_id} not found")
+                return
+            mime_type = doc.mime_type
+            doc_path = doc.path
+
+        group = self._get_mime_group(mime_type)
+
+        # 2. Acquire "slot" with MIME balancing logic
+        async with self._condition:
+            self._queued_counts[group] += 1
+            # Notify others that queue state has changed (others_waiting might be true now)
+            self._condition.notify_all()
+
+            while True:
+                # Capacity check
+                if self._active_total < self.max_concurrent_tasks:
+                    active_in_group = self._active_counts[group]
+                    # Check if others are waiting for ANY slot
+                    others_waiting = any(
+                        count > 0
+                        for g, count in self._queued_counts.items()
+                        if g != group
+                    )
+
+                    # MIME-aware limit: only 50% capacity for one group if others are waiting.
+                    limit = int(self.max_concurrent_tasks * self.mime_limit_ratio)
+
+                    if not others_waiting or active_in_group < limit:
+                        logger.debug(
+                            f"Task {document_id} ({group}) taking slot. Active: {self._active_total}/{self.max_concurrent_tasks}, Group: {active_in_group}/{limit if others_waiting else 'unlimited'}"
+                        )
+                        # Success: take the slot
+                        self._queued_counts[group] -= 1
+                        self._active_counts[group] += 1
+                        self._active_total += 1
+                        break
+                    else:
+                        logger.debug(
+                            f"Task {document_id} ({group}) waiting for MIME balance. Group active: {active_in_group}, limit: {limit}"
+                        )
+
+                # Wait for a notification that a slot has opened or queue state changed
+                await self._condition.wait()
+
+        # 3. Execution phase
+        try:
+            self._trigger("doc_start", document_id, path=doc_path, mime_type=mime_type)
             async with self.async_session_maker() as session:
+                # Refresh doc in new session
                 doc = await session.get(Document, document_id)
                 if not doc:
-                    logger.error(f"Document {document_id} not found")
                     return
-
-                self._trigger(
-                    "doc_start", document_id, path=doc.path, mime_type=doc.mime_type
-                )
 
                 try:
                     doc.status = DocumentStatus.ANALYZING
                     await session.commit()
 
                     context: Dict[str, Any] = {}
-
-                    # Currently running all registered plugins sequentially for a single document
-                    # To support complex `depends_on` we would build a DAG and execute async task groups
-                    # For this V2 MVP we iterate through them.
                     all_success = True
 
                     # Query existing tasks to handle versioning and skips
@@ -164,7 +221,6 @@ class TaskEngine:
                         t.task_name: t for t in existing_tasks_result.scalars().all()
                     }
 
-                    all_success = True
                     all_analyzers = get_ordered_analyzers()
                     failed_plugins = set()
 
@@ -177,8 +233,6 @@ class TaskEngine:
                         dep_failures = plugin_deps.intersection(failed_plugins)
 
                         if dep_failures:
-                            # Some dependencies failed, but we treat depends_on as an ordering hint by default
-                            # and allow analyzers to handle partial/empty context themselves.
                             logger.info(
                                 f"Dependencies {dep_failures} for {plugin_name} on doc {document_id} have failed; "
                                 "continuing with analyzer execution due to soft dependency semantics."
@@ -200,8 +254,7 @@ class TaskEngine:
                                     )
                                 except json.JSONDecodeError as e:
                                     logger.warning(
-                                        "Failed to decode cached result_data for plugin %s on document %s; "
-                                        "using empty context instead. Error: %s",
+                                        "Failed to decode cached result_data for plugin %s on document %s; using empty context. Error: %s",
                                         plugin_name,
                                         document_id,
                                         e,
@@ -211,15 +264,12 @@ class TaskEngine:
                                 context[plugin_name] = {}
                             continue
 
-                        # We need to run or re-run the task
+                        # Run or re-run
                         if existing_task:
                             task = existing_task
                             task.status = TaskStatus.PENDING
                             task.error_message = None
                             task.plugin_version = current_version
-                            logger.info(
-                                f"Re-running {plugin_name} for {document_id} (Status: {existing_task.status}, Version: {existing_task.plugin_version} -> {current_version})"
-                            )
                         else:
                             task = AnalysisTask(
                                 document_id=doc.id,
@@ -228,9 +278,6 @@ class TaskEngine:
                                 plugin_version=current_version,
                             )
                             session.add(task)
-                            logger.info(
-                                f"Running new task {plugin_name} (v{current_version}) for {document_id}"
-                            )
 
                         await session.commit()
                         await session.refresh(task)
@@ -257,16 +304,13 @@ class TaskEngine:
                         else:
                             all_success = False
                             failed_plugins.add(plugin_name)
-                            logger.warning(
-                                f"Plugin {plugin_name} failed. Dependent plugins will be skipped for doc {document_id}."
-                            )
 
                     doc = await session.get(Document, document_id)
-                    if all_success:
-                        doc.status = DocumentStatus.COMPLETED
-                    else:
-                        doc.status = DocumentStatus.FAILED
-
+                    doc.status = (
+                        DocumentStatus.COMPLETED
+                        if all_success
+                        else DocumentStatus.FAILED
+                    )
                     await session.commit()
 
                 except asyncio.CancelledError:
@@ -284,5 +328,10 @@ class TaskEngine:
                     if doc:
                         doc.status = DocumentStatus.FAILED
                         await session.commit()
-
-        self._trigger("doc_end", document_id)
+        finally:
+            # 4. Release slot
+            async with self._condition:
+                self._active_counts[group] -= 1
+                self._active_total -= 1
+                self._condition.notify_all()
+            self._trigger("doc_end", document_id)
