@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     google_cloud_location: str | None = "global"
     document_ai_location: str = "us"
 
+    # Infrastructure & Reliability
+    max_concurrent: int = 4
+    ingest_batch_size: int = 100
+    max_retries: int = 3
+    log_format: str = "standard"  # "standard" or "json"
+    concurrency_limit_ratio: float = 0.5
+
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )

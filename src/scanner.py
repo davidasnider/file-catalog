@@ -4,9 +4,9 @@ import hashlib
 import logging
 import os
 from pathlib import Path
+from typing import Dict, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
-
 from rich.progress import (
     Progress,
     SpinnerColumn,
@@ -50,17 +50,41 @@ load_plugins(plugin_dir)
 LOG_FILE = "scanner.log"
 
 
+class CustomJsonFormatter(logging.Formatter):
+    """Simple JSON formatter for structured logging."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        import json
+        from datetime import datetime
+
+        log_record = {
+            "timestamp": datetime.fromtimestamp(record.created).isoformat(),
+            "level": record.levelname,
+            "name": record.name,
+            "message": record.getMessage(),
+        }
+        if record.exc_info:
+            log_record["exception"] = self.formatException(record.exc_info)
+        return json.dumps(log_record)
+
+
 def setup_logging(debug: bool = False):
     level = logging.DEBUG if debug else logging.INFO
     # Set logger levels for src packages
     logging.getLogger("src").setLevel(level)
 
+    handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
+    if config.log_format == "json":
+        handler.setFormatter(CustomJsonFormatter())
+    else:
+        handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        )
+
     logging.basicConfig(
         level=level,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.FileHandler(LOG_FILE, encoding="utf-8"),
-        ],
+        handlers=[handler],
+        force=True,
     )
 
 
@@ -83,7 +107,7 @@ async def ingest_directory(
     task_id=None,
     limit: int = None,
     mime_type_filter: str = None,
-) -> list[int]:
+) -> List[int]:
     """Walk directory, compute hashes, and insert/update documents."""
     base_path = Path(directory)
     if not base_path.exists() or not base_path.is_dir():
@@ -95,32 +119,72 @@ async def ingest_directory(
             logger.error(f"Directory {directory} does not exist or is not a directory.")
         return []
 
-    processed_doc_ids = []
+    # 1. Bulk load existing document metadata to avoid one-by-one queries
+    if progress and task_id is not None:
+        progress.update(
+            task_id, description="[yellow]Loading existing document metadata..."
+        )
 
-    files_to_process = []
-    for root, _, files in os.walk(base_path):
-        for filename in files:
-            if filename.startswith("."):
-                continue
+    result = await session.execute(select(Document))
+    existing_docs: Dict[str, Document] = {
+        doc.path: doc for doc in result.scalars().all()
+    }
 
-            # Ignore structural or developer noise files based on extension
-            _, ext = os.path.splitext(filename)
-            if ext.lower() in IGNORED_EXTENSIONS:
-                continue
+    # 2. Discover files
+    if progress and task_id is not None:
+        progress.update(task_id, description="[yellow]Discovering files...")
 
-            files_to_process.append(str((Path(root) / filename).resolve()))
+    files_on_disk = []
+
+    def walk_disk():
+        found = []
+        for root, _, files in os.walk(base_path):
+            for filename in files:
+                if filename.startswith("."):
+                    continue
+                _, ext = os.path.splitext(filename)
+                if ext.lower() in IGNORED_EXTENSIONS:
+                    continue
+                found.append(str((Path(root) / filename).resolve()))
+        return found
+
+    files_on_disk = await asyncio.to_thread(walk_disk)
 
     if progress and task_id is not None:
         total_files = (
-            len(files_to_process)
-            if limit is None
-            else min(limit, len(files_to_process))
+            len(files_on_disk) if limit is None else min(limit, len(files_on_disk))
         )
-        progress.update(task_id, total=total_files)
+        progress.update(
+            task_id, total=total_files, description="[yellow]Ingesting files..."
+        )
 
-    for file_path in files_to_process:
+    processed_doc_ids = []
+    batch_size = config.ingest_batch_size
+    pending_updates = 0
+
+    for file_path in files_on_disk:
         try:
-            mime_type = detect_file_type(file_path)
+            # 3. Quick Metadata Check
+            stat = await asyncio.to_thread(os.stat, file_path)
+            file_size = stat.st_size
+            mtime = stat.st_mtime
+
+            doc = existing_docs.get(file_path)
+
+            # Skip if metadata matches and status is COMPLETED
+            if (
+                doc
+                and doc.file_size == file_size
+                and doc.mtime == mtime
+                and doc.status == DocumentStatus.COMPLETED
+            ):
+                processed_doc_ids.append(doc.id)
+                if progress and task_id is not None:
+                    progress.advance(task_id)
+                continue
+
+            # 4. Content-based ingestion (only if needed)
+            mime_type = await asyncio.to_thread(detect_file_type, file_path)
 
             if mime_type_filter and not (
                 mime_type and mime_type.startswith(mime_type_filter)
@@ -129,39 +193,47 @@ async def ingest_directory(
                     progress.advance(task_id)
                 continue
 
-            file_hash = compute_file_hash(file_path)
-
-            # Check if document exists
-            result = await session.execute(
-                select(Document).where(Document.path == file_path)
-            )
-            doc = result.scalar_one_or_none()
+            file_hash = await asyncio.to_thread(compute_file_hash, file_path)
 
             if doc:
+                # Document exists, check if hash changed or we just need to update metadata
                 if doc.file_hash != file_hash:
-                    # File changed, delete old tasks and reset status using session to maintain SQLAlchemy cache consistency
+                    # Content changed: reset tasks and status
+                    from src.db.models import AnalysisTask
+
                     await session.execute(
                         AnalysisTask.__table__.delete().where(
                             AnalysisTask.document_id == doc.id
                         )
                     )
                     doc.file_hash = file_hash
-                    doc.mime_type = mime_type
                     doc.status = DocumentStatus.PENDING
-                    await session.commit()
-                    await session.refresh(doc)
+
+                doc.mime_type = mime_type
+                doc.file_size = file_size
+                doc.mtime = mtime
                 processed_doc_ids.append(doc.id)
             else:
+                # New document
                 new_doc = Document(
                     path=file_path,
                     mime_type=mime_type,
                     file_hash=file_hash,
+                    file_size=file_size,
+                    mtime=mtime,
                     status=DocumentStatus.PENDING,
                 )
                 session.add(new_doc)
-                await session.commit()
-                await session.refresh(new_doc)
+                # Flush the session to get the ID but don't commit yet to avoid overhead
+                await session.flush()
                 processed_doc_ids.append(new_doc.id)
+
+            pending_updates += 1
+
+            # Commit in batches to reduce SQLite locks and transaction overhead
+            if pending_updates >= batch_size:
+                await session.commit()
+                pending_updates = 0
 
         except Exception as e:
             logger.error(f"Error ingesting {file_path}: {e}")
@@ -172,15 +244,20 @@ async def ingest_directory(
         if limit is not None and len(processed_doc_ids) >= limit:
             break
 
+    # Final commit for the last batch
+    if pending_updates > 0:
+        await session.commit()
+
     return processed_doc_ids
 
 
 async def run_scanner(
     directory: str,
-    max_concurrent: int = 5,
-    clean: bool = False,
-    limit: int = None,
-    mime_type_filter: str = None,
+    max_concurrent: int,
+    clean: bool,
+    limit: int | None,
+    mime_type_filter: str | None,
+    limit_ratio: float,
 ):
     """Main scanner logic."""
     if clean:
@@ -590,6 +667,7 @@ async def run_scanner(
         task_engine = TaskEngine(
             async_session_maker=async_session_maker,
             max_concurrent_tasks=max_concurrent,
+            mime_limit_ratio=limit_ratio,
             callbacks=callbacks,
         )
 
@@ -655,7 +733,7 @@ def main():
     parser.add_argument(
         "--concurrency",
         type=int,
-        default=4,
+        default=config.max_concurrent,
         help="Maximum number of concurrent documents to process.",
     )
     parser.add_argument(
@@ -719,10 +797,21 @@ def main():
         default=None,
         help="Filter ingestion to only documents matching this MIME type (e.g. 'image/jpeg' or 'image/').",
     )
+    parser.add_argument(
+        "--log-format",
+        type=str,
+        default=config.log_format,
+        choices=["standard", "json"],
+        help="Format of the log output.",
+    )
+    parser.add_argument(
+        "--concurrency-limit-ratio",
+        type=float,
+        default=config.concurrency_limit_ratio,
+        help="Max percentage (0.0-1.0) of concurrency slots a single MIME group can occupy if others are waiting.",
+    )
 
     args = parser.parse_args()
-
-    setup_logging(args.debug)
 
     # Update global config from CLI args before we run anything
     from src.core.config import update_config_from_cli
@@ -732,8 +821,17 @@ def main():
     mime_type = args_dict.pop("mime_type", None)
     update_config_from_cli(**args_dict)
 
+    setup_logging(args.debug)
+
     asyncio.run(
-        run_scanner(args.directory, args.concurrency, args.clean, args.limit, mime_type)
+        run_scanner(
+            args.directory,
+            args.concurrency,
+            args.clean,
+            args.limit,
+            mime_type,
+            args.concurrency_limit_ratio,
+        )
     )
 
 
