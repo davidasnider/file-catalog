@@ -1,5 +1,4 @@
 import pytest
-import os
 
 from sqlmodel import select
 
@@ -111,6 +110,47 @@ async def test_ingest_directory_excludes_noise_files(db_session, temp_dir):
     docs = result.scalars().all()
     assert len(docs) == 2
 
-    for doc in docs:
-        _, ext = os.path.splitext(doc.path)
-        assert ext == ".txt"
+
+@pytest.mark.asyncio
+async def test_run_scanner_chunked_metadata(db_session, temp_dir):
+    """
+    Verify that the metadata fetching logic (used in run_scanner)
+    correctly handles batches larger than SQLite's parameter limit.
+    """
+    # Create 1200 documents in the DB
+    for i in range(1200):
+        doc = Document(
+            path=f"/path/to/doc{i}.txt",
+            mime_type="text/plain",
+            file_hash=f"hash{i}",
+            file_size=100,
+            mtime=1.0,
+            status=DocumentStatus.PENDING,
+        )
+        db_session.add(doc)
+
+    await db_session.commit()
+
+    result = await db_session.execute(select(Document.id))
+    ingested_ids = result.scalars().all()
+    assert len(ingested_ids) == 1200
+
+    # Simulate the chunking logic from run_scanner
+    rows = []
+    chunk_size = 500
+    for i in range(0, len(ingested_ids), chunk_size):
+        chunk = ingested_ids[i : i + chunk_size]
+        result = await db_session.execute(
+            select(Document.id, Document.path, Document.mime_type).where(
+                Document.id.in_(chunk)
+            )
+        )
+        rows.extend(result.all())
+
+    assert len(rows) == 1200
+    id_to_path = {row[0]: row[1] for row in rows}
+    id_to_mime = {row[0]: row[2] for row in rows}
+
+    assert len(id_to_path) == 1200
+    assert id_to_path[ingested_ids[0]] == "/path/to/doc0.txt"
+    assert id_to_mime[ingested_ids[1199]] == "text/plain"

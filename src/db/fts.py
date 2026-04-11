@@ -109,29 +109,33 @@ async def sync_document_to_fts(session: AsyncSession, document_id: int):
     # Combine all extracted content into a single searchable body
     full_content = "\n\n".join(content_parts)
 
-    # Execute the two statements (delete old, insert new) separately
+    # Use the global semaphore to ensure only one FTS write happens at a time.
+    # While the scanner manages this globally, keeping the lock here provides
+    # "safety by default" for other callers (like scripts or web UI updates).
+    async with fts_semaphore:
+        # Execute the two statements (delete old, insert new) separately
 
-    # 1. Delete existing entry if it exists
-    await session.execute(
-        text("DELETE FROM document_fts WHERE rowid = :doc_id"),
-        {"doc_id": document_id},
-    )
+        # 1. Delete existing entry if it exists
+        await session.execute(
+            text("DELETE FROM document_fts WHERE rowid = :doc_id"),
+            {"doc_id": document_id},
+        )
 
-    # 2. Insert new entry
-    await session.execute(
-        text(
-            "INSERT INTO document_fts(rowid, document_id, path, content, summary) "
-            "VALUES(:doc_id, :doc_id, :path, :content, :summary)"
-        ),
-        {
-            "doc_id": document_id,
-            "path": path,
-            "content": full_content,
-            "summary": summary_text,
-        },
-    )
+        # 2. Insert new entry
+        await session.execute(
+            text(
+                "INSERT INTO document_fts(rowid, document_id, path, content, summary) "
+                "VALUES(:doc_id, :doc_id, :path, :content, :summary)"
+            ),
+            {
+                "doc_id": document_id,
+                "path": path,
+                "content": full_content,
+                "summary": summary_text,
+            },
+        )
 
-    await session.commit()
+        await session.commit()
     logger.info(f"Synced document {document_id} to FTS")
 
 

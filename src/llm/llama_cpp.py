@@ -221,10 +221,10 @@ class LlamaCppProvider(LLMProvider):
                     max_pixels = config.vision_max_pixels
                     w, h = img.size
                     if w * h > max_pixels:
-                        # thumbnail keeps aspect ratio
+                        # thumbnail preserves aspect ratio while staying within pixel budget
                         scale = (max_pixels / (w * h)) ** 0.5
                         new_size = (int(w * scale), int(h * scale))
-                        img = img.resize(new_size, Image.Resampling.LANCZOS)
+                        img.thumbnail(new_size, Image.Resampling.LANCZOS)
                         logger.info(
                             f"Resized image for LlamaCpp vision: {w}x{h} -> {img.size} "
                             f"(Max allowed: {max_pixels} pixels)"

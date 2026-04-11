@@ -635,24 +635,24 @@ async def run_scanner(
                         except Exception as e:
                             logger.error(f"FTS sync failed for doc {doc_id}: {e}")
 
-                        result = await session.execute(
-                            select(AnalysisTask).where(
-                                AnalysisTask.document_id == doc_id
-                            )
-                        )
-                        import json
+                # After syncing to FTS, perform non-indexed reads to check for runtime errors
+                async with async_session_maker() as session:
+                    result = await session.execute(
+                        select(AnalysisTask).where(AnalysisTask.document_id == doc_id)
+                    )
+                    import json
 
-                        for t in result.scalars().all():
-                            if t.result_data:
-                                try:
-                                    data = json.loads(t.result_data)
-                                    err = data.get("error", "")
-                                    if "model not found" in err.lower():
-                                        missing_models.add(err)
-                                    elif "llama-cpp-python is not installed" in err:
-                                        missing_libraries.add(err)
-                                except Exception:
-                                    pass
+                    for t in result.scalars().all():
+                        if t.result_data:
+                            try:
+                                data = json.loads(t.result_data)
+                                err = data.get("error", "")
+                                if "model not found" in err.lower():
+                                    missing_models.add(err)
+                                elif "llama-cpp-python is not installed" in err:
+                                    missing_libraries.add(err)
+                            except Exception:
+                                pass
 
         def on_doc_end(doc_id):
             nonlocal completed_count

@@ -225,10 +225,10 @@ class MLXProvider(LLMProvider):
                         max_pixels = config.vision_max_pixels
                         w, h = image.size
                         if w * h > max_pixels:
-                            # Use thumbnail to preserves aspect ratio while staying within pixel budget
+                            # thumbnail preserves aspect ratio while staying within pixel budget
                             scale = (max_pixels / (w * h)) ** 0.5
                             new_size = (int(w * scale), int(h * scale))
-                            image = image.resize(new_size, Image.Resampling.LANCZOS)
+                            image.thumbnail(new_size, Image.Resampling.LANCZOS)
                             logger.info(
                                 f"Resized image for vision processing: {w}x{h} -> {image.size} "
                                 f"(Max allowed: {max_pixels} pixels)"

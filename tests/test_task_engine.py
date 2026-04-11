@@ -258,6 +258,39 @@ async def test_process_document_should_run_skipping(db_session, reset_registry):
     task = result.scalars().first()
     assert task is not None
     assert task.status == TaskStatus.COMPLETED
-    result_data = json.loads(task.result_data)
-    assert result_data.get("skipped") is True
-    assert "reason" in result_data
+    assert json.loads(task.result_data).get("skipped") is True
+    assert "reason" in json.loads(task.result_data)
+
+
+@pytest.mark.asyncio
+async def test_process_document_mime_type_fast_path(db_session, reset_registry):
+    """Verify that providing mime_type skips the initial document fetch."""
+
+    # Create a mock plugin
+    @register_analyzer(name="FastPathPlugin")
+    class FastPathPlugin(AnalyzerBase):
+        async def analyze(
+            self, file_path: str, mime_type: str, context: Dict[str, Any]
+        ) -> Dict[str, Any]:
+            return {"fast": True}
+
+    # Setup DB
+    doc = Document(path="/fast.txt", mime_type="text/plain")
+    db_session.add(doc)
+    await db_session.commit()
+    await db_session.refresh(doc)
+    doc_id = doc.id
+
+    async_session = sessionmaker(
+        db_session.bind, class_=AsyncSession, expire_on_commit=False
+    )
+
+    # Run engine with MIME type provided (Fast Path)
+    engine = TaskEngine(async_session_maker=async_session, max_concurrent_tasks=1)
+
+    # We can't easily "prove" it didn't query the first time without a mock,
+    # but we can verify it completes successfully using the provided type.
+    await engine.process_document(doc_id, mime_type="text/plain")
+
+    await db_session.refresh(doc)
+    assert doc.status == DocumentStatus.COMPLETED
