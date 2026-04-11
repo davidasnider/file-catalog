@@ -292,35 +292,35 @@ async def test_process_document_mime_type_fast_path(db_session, reset_registry):
 
     # Create a real session to wrap for the execution phase
     real_session = async_session()
+    try:
+        # Track calls to get()
+        original_get = real_session.get
+        mock_get = AsyncMock(side_effect=original_get)
+        real_session.get = mock_get
 
-    # Track calls to get()
-    original_get = real_session.get
-    mock_get = AsyncMock(side_effect=original_get)
-    real_session.get = mock_get
+        # Mock session maker context manager
+        mock_context = MagicMock()
+        mock_context.__aenter__.return_value = real_session
+        mock_context.__aexit__ = AsyncMock(return_value=None)
 
-    # Mock session maker to return our tracked session
-    mock_maker = MagicMock()
-    mock_maker.return_value.__aenter__.return_value = real_session
-    mock_maker.return_value.__aexit__.return_value = AsyncMock()
+        # Mock the maker itself
+        mock_maker = MagicMock(return_value=mock_context)
 
-    engine = TaskEngine(async_session_maker=mock_maker, max_concurrent_tasks=1)
+        engine = TaskEngine(async_session_maker=mock_maker, max_concurrent_tasks=1)
 
-    await engine.process_document(doc_id, mime_type="text/plain")
+        await engine.process_document(doc_id, mime_type="text/plain")
 
-    # Verify that get(Document, ...) was called exactly twice
-    # (once at line 206 to refresh, once at line 313 to finalize).
-    # The pre-fetch block (line 158) would have used a DIFFERENT session
-    # instance from the maker, so we check that the maker was only called ONCE
-    # for a session context.
-    assert mock_maker.call_count == 1
+        # Verify that the maker was only called ONCE (for the execution block)
+        # instead of TWICE (pre-fetch at line 157 + execution block at line 204).
+        assert mock_maker.call_count == 1
 
-    # And verify our session's get was called correctly for Document
-    doc_get_calls = [
-        call for call in mock_get.call_args_list if call.args[0] == Document
-    ]
-    assert len(doc_get_calls) == 2
+        # And verify our session's get was called correctly for Document (refresh + finalize)
+        doc_get_calls = [
+            call for call in mock_get.call_args_list if call.args[0] == Document
+        ]
+        assert len(doc_get_calls) == 2
 
-    await db_session.refresh(doc)
-    assert doc.status == DocumentStatus.COMPLETED
-
-    await real_session.close()
+        await db_session.refresh(doc)
+        assert doc.status == DocumentStatus.COMPLETED
+    finally:
+        await real_session.close()

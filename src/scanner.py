@@ -707,7 +707,13 @@ async def run_scanner(
         async def process_and_check(doc_id):
             mime_type = id_to_mime.get(doc_id)
             await task_engine.process_document(doc_id, mime_type=mime_type)
-            await check_doc_errors(doc_id)
+            try:
+                await check_doc_errors(doc_id)
+            except Exception:
+                logger.exception(
+                    "Post-processing check_doc_errors failed for document %s",
+                    doc_id,
+                )
 
         tasks = [process_and_check(doc_id) for doc_id in docs_to_process]
         try:
