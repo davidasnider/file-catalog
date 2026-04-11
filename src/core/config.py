@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     use_document_ai: bool = False
     llm_model_path: str = "mlx-community/Meta-Llama-3.1-8B-Instruct-4bit"
     vision_model_path: str = "mlx-community/Qwen3.5-397B-A17B-4bit"
+    vision_max_pixels: int = 1048576  # Default to ~1MP to prevent memory overflow
 
     @property
     def llm_display_name(self) -> str:

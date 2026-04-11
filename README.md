@@ -28,6 +28,7 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 ### 5. Rich Text & Metadata Extraction
 - **Broad File Support**: Extract metadata and content from PDFs (`pdfplumber`), Word Docs (`python-docx`), HTML web pages (`BeautifulSoup4`), and standard text/code files.
 - **Optical Character Recognition (OCR) & Vision Fallback**: Automatically detects images and extracts text using Tesseract OCR (`pytesseract`). For complex images or failed OCR, it utilizes a multimodal Vision LLM to describe the content.
+- **Vision Memory Safeguards**: Implements proactive image resizing (configurable via `VISION_MAX_PIXELS`) to prevent out-of-memory (OOM) crashes during local inference of high-resolution scans.
 
 ### 6. Interactive Visualization & Monitoring
 - **Real-time Scanner UI**: A rich, multi-pane terminal interface showing:
@@ -38,6 +39,7 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
   - **Smart Filters**: One-click filtering for "Estate Documents", "NSFW Content", and "Contains Passwords".
   - **Full-Text Search**: Search through extracted text, AI summaries, and Vision descriptions using SQLite FTS5.
   - **Interactive Detail View**: Drill down into document metadata, AI results, and visual previews.
+- **SQLite Concurrency Management**: Uses semantic locking and FTS-specific semaphores to prevent "database is locked" errors during high-concurrency ingestion and indexing.
 
 ## Configuration & Production Usage
 
@@ -47,6 +49,7 @@ The scanner can be configured via environment variables (in a `.env` file) or CL
 - `MAX_CONCURRENT`: Number of documents to process in parallel (default: 4).
 - `INGEST_BATCH_SIZE`: Number of files to commit to the database in a single transaction (default: 100).
 - `MAX_RETRIES`: Number of times to retry a failed plugin task with exponential backoff (default: 3).
+- `VISION_MAX_PIXELS`: Maximum total pixels for vision LLM inputs (default: 1048576). Prevents OOM on high-res scans.
 - `LOG_FORMAT`: Set to `json` for structured logging or `standard` for human-readable logs.
 
 ### Performance: Incremental Scanning

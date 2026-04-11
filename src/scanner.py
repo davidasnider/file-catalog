@@ -537,11 +537,19 @@ async def run_scanner(
             if not ingested_ids:
                 return
 
-            # Fetch paths for all ingested IDs to show "waiting" status
-            result = await session.execute(
-                select(Document.id, Document.path).where(Document.id.in_(ingested_ids))
-            )
-            id_to_path = {row[0]: row[1] for row in result.all()}
+            # Fetch metadata in chunks to avoid SQLite's parameter limit (SQLITE_MAX_VARIABLE_NUMBER)
+            rows = []
+            chunk_size = 500
+            for i in range(0, len(ingested_ids), chunk_size):
+                chunk = ingested_ids[i : i + chunk_size]
+                result = await session.execute(
+                    select(Document.id, Document.path, Document.mime_type).where(
+                        Document.id.in_(chunk)
+                    )
+                )
+                rows.extend(result.all())
+            id_to_path = {row[0]: row[1] for row in rows}
+            id_to_mime = {row[0]: row[2] for row in rows}
             docs_to_process = ingested_ids
 
         if not docs_to_process:
@@ -608,6 +616,44 @@ async def run_scanner(
                     description=f"  [magenta]{filename}:[/magenta] {plugin_name}",
                 )
 
+        from src.db.fts import fts_semaphore
+
+        post_process_semaphore = asyncio.Semaphore(max_concurrent + 1)
+
+        async def check_doc_errors(doc_id):
+            """Sync to FTS and check for specific runtime errors (like missing models)."""
+            from src.db.fts import sync_document_to_fts
+
+            async with post_process_semaphore:
+                # Wait for the global FTS write lock BEFORE opening a database session.
+                # This prevents holding onto a connection while waiting for another task to finish FTS sync.
+                async with fts_semaphore:
+                    async with async_session_maker() as session:
+                        # Sync to FTS index
+                        try:
+                            await sync_document_to_fts(session, doc_id)
+                        except Exception as e:
+                            logger.error(f"FTS sync failed for doc {doc_id}: {e}")
+
+                        result = await session.execute(
+                            select(AnalysisTask).where(
+                                AnalysisTask.document_id == doc_id
+                            )
+                        )
+                        import json
+
+                        for t in result.scalars().all():
+                            if t.result_data:
+                                try:
+                                    data = json.loads(t.result_data)
+                                    err = data.get("error", "")
+                                    if "model not found" in err.lower():
+                                        missing_models.add(err)
+                                    elif "llama-cpp-python is not installed" in err:
+                                        missing_libraries.add(err)
+                                except Exception:
+                                    pass
+
         def on_doc_end(doc_id):
             nonlocal completed_count
             task_id = active_tasks.get(doc_id)
@@ -625,38 +671,6 @@ async def run_scanner(
                 completed=completed_count,
             )
             update_waiting()
-
-            # Briefly check the DB to see if any tasks on this doc failed due to missing LLM dependencies
-            # We do this quickly to aggregate the end-of-run warning
-            async def check_doc_errors():
-                from src.db.fts import sync_document_to_fts
-
-                async with async_session_maker() as session:
-                    # Sync to FTS index
-                    try:
-                        await sync_document_to_fts(session, doc_id)
-                    except Exception as e:
-                        logger.error(f"FTS sync failed for doc {doc_id}: {e}")
-
-                    result = await session.execute(
-                        select(AnalysisTask).where(AnalysisTask.document_id == doc_id)
-                    )
-                    import json
-
-                    for t in result.scalars().all():
-                        if t.result_data:
-                            try:
-                                data = json.loads(t.result_data)
-                                err = data.get("error", "")
-                                if "model not found" in err.lower():
-                                    missing_models.add(err)
-                                elif "llama-cpp-python is not installed" in err:
-                                    missing_libraries.add(err)
-                            except Exception:
-                                pass
-
-            # Fire-and-forget the check
-            asyncio.create_task(check_doc_errors())
 
         callbacks = {
             "doc_start": on_doc_start,
@@ -695,7 +709,12 @@ async def run_scanner(
 
         ui_update_task = asyncio.create_task(update_ui_panes())
 
-        tasks = [task_engine.process_document(doc_id) for doc_id in docs_to_process]
+        async def process_and_check(doc_id):
+            mime_type = id_to_mime.get(doc_id)
+            await task_engine.process_document(doc_id, mime_type=mime_type)
+            await check_doc_errors(doc_id)
+
+        tasks = [process_and_check(doc_id) for doc_id in docs_to_process]
         try:
             await asyncio.gather(*tasks)
         finally:

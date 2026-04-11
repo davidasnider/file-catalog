@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import os
 import weakref
 from typing import AsyncGenerator
 
@@ -208,9 +209,33 @@ class MLXProvider(LLMProvider):
                 import torch
                 from PIL import Image
                 from mlx_vlm.models import cache as vlm_cache
+                from src.core.config import config
 
-                with Image.open(image_path) as img:
-                    image = img.convert("RGB")
+                if not os.path.exists(image_path):
+                    raise FileNotFoundError(f"Image not found at {image_path}")
+
+                try:
+                    with Image.open(image_path) as img:
+                        # Convert to RGB (standard for most VLMs)
+                        image = img.convert("RGB")
+
+                        # Prevent memory explosion by ensuring image isn't too large for the VLM sequence.
+                        # Sequence length scales linearly with pixels (e.g., Qwen2-VL), but
+                        # attention buffers and masks scale O(N^2), leading to OOM on high-res.
+                        max_pixels = config.vision_max_pixels
+                        w, h = image.size
+                        if w * h > max_pixels:
+                            # Use thumbnail to preserves aspect ratio while staying within pixel budget
+                            scale = (max_pixels / (w * h)) ** 0.5
+                            new_size = (int(w * scale), int(h * scale))
+                            image = image.resize(new_size, Image.Resampling.LANCZOS)
+                            logger.info(
+                                f"Resized image for vision processing: {w}x{h} -> {image.size} "
+                                f"(Max allowed: {max_pixels} pixels)"
+                            )
+                except Exception as e:
+                    logger.error(f"Failed to open/process image {image_path}: {e}")
+                    raise ValueError(f"Invalid or corrupt image: {e}")
 
                 # Build the prompt with image placeholder
                 if hasattr(self.processor, "apply_chat_template"):
