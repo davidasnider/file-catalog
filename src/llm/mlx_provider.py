@@ -227,7 +227,7 @@ class MLXProvider(LLMProvider):
                         if w * h > max_pixels:
                             # thumbnail preserves aspect ratio while staying within pixel budget
                             scale = (max_pixels / (w * h)) ** 0.5
-                            new_size = (int(w * scale), int(h * scale))
+                            new_size = (max(1, int(w * scale)), max(1, int(h * scale)))
                             image.thumbnail(new_size, Image.Resampling.LANCZOS)
                             logger.info(
                                 f"Resized image for vision processing: {w}x{h} -> {image.size} "
@@ -235,7 +235,7 @@ class MLXProvider(LLMProvider):
                             )
                 except Exception as e:
                     logger.error(f"Failed to open/process image {image_path}: {e}")
-                    raise ValueError(f"Invalid or corrupt image: {e}")
+                    raise ValueError(f"Invalid or corrupt image: {e}") from e
 
                 # Build the prompt with image placeholder
                 if hasattr(self.processor, "apply_chat_template"):

@@ -109,6 +109,12 @@ async def test_ingest_directory_excludes_noise_files(db_session, temp_dir):
     result = await db_session.execute(select(Document))
     docs = result.scalars().all()
     assert len(docs) == 2
+    for doc in docs:
+        # Explicitly verify we didn't ingest any of the noise files
+        assert "script.js" not in doc.path
+        assert "module.py" not in doc.path
+        assert "styles.css" not in doc.path
+        assert doc.path.endswith(".txt")
 
 
 @pytest.mark.asyncio

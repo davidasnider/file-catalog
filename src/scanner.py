@@ -616,8 +616,6 @@ async def run_scanner(
                     description=f"  [magenta]{filename}:[/magenta] {plugin_name}",
                 )
 
-        from src.db.fts import fts_semaphore
-
         post_process_semaphore = asyncio.Semaphore(max_concurrent + 1)
 
         async def check_doc_errors(doc_id):
@@ -625,15 +623,12 @@ async def run_scanner(
             from src.db.fts import sync_document_to_fts
 
             async with post_process_semaphore:
-                # Wait for the global FTS write lock BEFORE opening a database session.
-                # This prevents holding onto a connection while waiting for another task to finish FTS sync.
-                async with fts_semaphore:
-                    async with async_session_maker() as session:
-                        # Sync to FTS index
-                        try:
-                            await sync_document_to_fts(session, doc_id)
-                        except Exception as e:
-                            logger.error(f"FTS sync failed for doc {doc_id}: {e}")
+                async with async_session_maker() as session:
+                    # Sync to FTS index
+                    try:
+                        await sync_document_to_fts(session, doc_id)
+                    except Exception as e:
+                        logger.error(f"FTS sync failed for doc {doc_id}: {e}")
 
                 # After syncing to FTS, perform non-indexed reads to check for runtime errors
                 async with async_session_maker() as session:

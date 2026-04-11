@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 async def backfill():
     await init_db()
-    from src.db.fts import sync_document_to_fts, fts_semaphore
+    from src.db.fts import sync_document_to_fts
 
     async with async_session_maker() as session:
         result = await session.execute(
@@ -20,8 +20,7 @@ async def backfill():
         logger.info(f"Found {len(docs)} completed documents to sync to FTS.")
 
         for doc in docs:
-            async with fts_semaphore:
-                await sync_document_to_fts(session, doc.id)
+            await sync_document_to_fts(session, doc.id)
 
         logger.info("FTS Sync complete.")
 
