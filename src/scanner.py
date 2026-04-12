@@ -386,6 +386,15 @@ async def run_scanner(
                 )
                 or 0
             )
+            failed_docs = (
+                await session.scalar(
+                    select(func.count(Document.id)).where(
+                        Document.status == DocumentStatus.FAILED
+                    )
+                )
+                or 0
+            )
+            finished_docs = completed_docs + failed_docs
 
             # Query aggregated task counts by status
             task_counts_result = await session.execute(
@@ -406,10 +415,10 @@ async def run_scanner(
             failed_tasks = status_counts.get("FAILED", 0)
 
             elapsed = time.time() - start_time
-            if elapsed > 0 and completed_docs > 0:
-                speed = completed_docs / elapsed
+            if elapsed > 0 and finished_docs > 0:
+                speed = finished_docs / elapsed
                 speed_str = f"({speed:.1f} docs/sec)"
-                remaining_docs = total_docs - completed_docs
+                remaining_docs = total_docs - finished_docs
                 if remaining_docs > 0 and speed > 0:
                     eta_seconds = remaining_docs / speed
                     if eta_seconds > 86400:
@@ -423,7 +432,7 @@ async def run_scanner(
                         hours, rem = divmod(eta_seconds, 3600)
                         minutes, seconds = divmod(rem, 60)
                         eta_str = f"ETA: {int(hours):02}:{int(minutes):02}:{int(seconds):02}   {speed_str}"
-                elif remaining_docs == 0:
+                elif remaining_docs <= 0:
                     eta_str = "Status: Finishing..."
                 else:
                     eta_str = "ETA: N/A"
@@ -431,9 +440,7 @@ async def run_scanner(
                 eta_str = "ETA: Calculating..."
 
             stats_text.append("📊 Global Status\n", style="bold white underline")
-            stats_text.append(
-                f"  Docs:   {completed_docs}/{total_docs}\n", style="cyan"
-            )
+            stats_text.append(f"  Docs:   {finished_docs}/{total_docs}\n", style="cyan")
             stats_text.append(
                 f"  Tasks:  {completed_tasks}/{total_tasks} ", style="blue"
             )
