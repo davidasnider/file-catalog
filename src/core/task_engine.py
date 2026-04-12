@@ -41,6 +41,16 @@ class TaskEngine:
             except Exception:
                 pass
 
+    def request_abort(self):
+        """Signal the engine to abort processing."""
+        if self.abort_event:
+            self.abort_event.set()
+
+    async def notify_all(self):
+        """Wake up all waiting tasks."""
+        async with self._condition:
+            self._condition.notify_all()
+
     def _get_mime_group(self, mime_type: Optional[str]) -> str:
         """Group MIME types by prefix (e.g. image/jpeg -> image)."""
         if not mime_type or "/" not in mime_type:
@@ -197,7 +207,7 @@ class TaskEngine:
                     if self.abort_event and self.abort_event.is_set():
                         self._queued_counts[group] -= 1
                         self._condition.notify_all()
-                        return
+                        return False
 
                     # Wait for a notification that a slot has opened or queue state changed
                     await self._condition.wait()
@@ -212,7 +222,7 @@ class TaskEngine:
                 # Refresh doc in new session
                 doc = await session.get(Document, document_id)
                 if not doc:
-                    return
+                    return False
                 doc_path = doc.path
                 self._trigger(
                     "doc_start", document_id, path=doc_path, mime_type=mime_type
@@ -324,6 +334,7 @@ class TaskEngine:
                         else DocumentStatus.FAILED
                     )
                     await session.commit()
+                    return True
 
                 except asyncio.CancelledError:
                     logger.warning(f"Processing cancelled for document {document_id}")
@@ -340,6 +351,7 @@ class TaskEngine:
                     if doc:
                         doc.status = DocumentStatus.FAILED
                         await session.commit()
+                    return False
         finally:
             # 4. Release slot
             async with self._condition:

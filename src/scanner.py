@@ -15,12 +15,13 @@ from rich.progress import (
     TaskProgressColumn,
     TimeElapsedColumn,
 )
-from rich.console import Console
+from rich.console import Console, Group
 from rich.layout import Layout
 from rich.live import Live
 from rich.panel import Panel
 from rich.text import Text
 from rich.table import Table
+from rich.columns import Columns
 
 from src.db.engine import init_db, async_session_maker
 from src.db.models import Document, DocumentStatus, AnalysisTask
@@ -542,15 +543,10 @@ async def run_scanner(
                     )
                 return tbl
 
-            from rich.columns import Columns
-
             plugins_columns = Columns(
                 [create_stats_table(left_plugins), create_stats_table(right_plugins)],
                 expand=True,
             )
-
-            from rich.console import Group
-            from rich.columns import Columns
 
             error_summary = Text()
             if error_counts:
@@ -744,22 +740,24 @@ async def run_scanner(
             nonlocal stop_requested
             if stop_requested:
                 console.print("\n[bold red]Forcing quit...[/bold red]")
-                import sys
+                task_engine.request_abort()
 
-                sys.exit(1)
+                async def _force_quit():
+                    await task_engine.notify_all()
+                    current = asyncio.current_task()
+                    for task in asyncio.all_tasks():
+                        if task is not current and not task.done():
+                            # We don't want to cancel the main task that is handling the shutdown
+                            task.cancel()
+
+                asyncio.create_task(_force_quit())
             else:
                 stop_requested = True
-                abort_event.set()
+                task_engine.request_abort()
                 console.print(
                     "\n[bold yellow]Stop requested! Allowing active tasks to finish... Press Ctrl+C again to force quit.[/bold yellow]"
                 )
-
-                # Wake up all waiting tasks in TaskEngine so they can abort cleanly
-                async def _wake_up():
-                    async with task_engine._condition:
-                        task_engine._condition.notify_all()
-
-                asyncio.create_task(_wake_up())
+                asyncio.create_task(task_engine.notify_all())
 
         import signal
 
@@ -793,20 +791,18 @@ async def run_scanner(
         ui_update_task = asyncio.create_task(update_ui_panes())
 
         async def process_and_check(doc_id):
-            if abort_event.is_set():
+            if task_engine.abort_event and task_engine.abort_event.is_set():
                 return
             mime_type = id_to_mime.get(doc_id)
-            await task_engine.process_document(doc_id, mime_type=mime_type)
-            try:
-                # If we aborted but the document had already finished, we still sync it.
-                # But if we aborted before it could process, sync_document_to_fts does nothing useful.
-                if not abort_event.is_set():
+            processed = await task_engine.process_document(doc_id, mime_type=mime_type)
+            if processed:
+                try:
                     await check_doc_errors(doc_id)
-            except Exception:
-                logger.exception(
-                    "Post-processing check_doc_errors failed for document %s",
-                    doc_id,
-                )
+                except Exception:
+                    logger.exception(
+                        "Post-processing check_doc_errors failed for document %s",
+                        doc_id,
+                    )
 
         tasks = [process_and_check(doc_id) for doc_id in docs_to_process]
         try:

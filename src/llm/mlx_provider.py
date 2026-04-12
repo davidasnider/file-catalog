@@ -366,3 +366,8 @@ class MLXModelManager:
         provider = MLXProvider(model_path, is_vision=is_vision, **kwargs)
         cls._cache[cache_key] = provider
         return provider
+
+    @classmethod
+    def clear_cache(cls):
+        """Clear the process-global model cache."""
+        cls._cache.clear()
