@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import patch
 from src.llm.factory import get_llm_provider
 from src.core.config import config
+from src.llm.mlx_provider import MLXModelManager
 
 
 @pytest.fixture
@@ -16,11 +17,19 @@ def mock_config():
     config.use_cloud_fallback = original_fallback
 
 
+@pytest.fixture(autouse=True)
+def clear_mlx_cache():
+    """Clear MLX cache before each test to ensure predictable behavior."""
+    MLXModelManager.clear_cache()
+    yield
+    MLXModelManager.clear_cache()
+
+
 def test_get_llm_provider_mlx(mock_config):
     config.llm_provider = "mlx"
-    with patch("src.llm.mlx_provider.MLXProvider") as mock_mlx:
+    with patch("src.llm.mlx_provider.MLXModelManager.get_provider") as mock_get:
         get_llm_provider(is_vision=False)
-        mock_mlx.assert_called_once()
+        mock_get.assert_called_once()
 
 
 def test_get_llm_provider_gemini(mock_config):
@@ -35,7 +44,10 @@ def test_get_llm_provider_fallback(mock_config):
     config.use_cloud_fallback = True
 
     # Simulate MLX initialization failure
-    with patch("src.llm.mlx_provider.MLXProvider", side_effect=Exception("MLX fail")):
+    with patch(
+        "src.llm.mlx_provider.MLXModelManager.get_provider",
+        side_effect=Exception("MLX fail"),
+    ):
         with patch("src.llm.gemini.GeminiProvider") as mock_gemini:
             get_llm_provider(is_vision=False)
             # Should fall back to Gemini
@@ -47,7 +59,10 @@ def test_get_llm_provider_no_fallback(mock_config):
     config.use_cloud_fallback = False
 
     # Simulate MLX initialization failure
-    with patch("src.llm.mlx_provider.MLXProvider", side_effect=Exception("MLX fail")):
+    with patch(
+        "src.llm.mlx_provider.MLXModelManager.get_provider",
+        side_effect=Exception("MLX fail"),
+    ):
         with patch("src.llm.gemini.GeminiProvider") as mock_gemini:
             result = get_llm_provider(is_vision=False)
             # Should NOT fall back to Gemini
