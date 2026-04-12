@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     document_ai_location: str = "us"
 
     # Infrastructure & Reliability
-    max_concurrent: int = 4
+    max_concurrent: int = 5
     ingest_batch_size: int = 100
     max_retries: int = 3
     log_format: str = "standard"  # "standard" or "json"

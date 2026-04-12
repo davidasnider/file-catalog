@@ -10,12 +10,19 @@ logger = logging.getLogger(__name__)
 # Fallback on "base" model for speed on standard hardware
 MODEL_SIZE = "base"
 model = None
-model_lock = asyncio.Lock()
+_model_lock = None
+
+
+def get_model_lock():
+    global _model_lock
+    if _model_lock is None:
+        _model_lock = asyncio.Lock()
+    return _model_lock
 
 
 async def get_whisper_model():
     global model
-    async with model_lock:
+    async with get_model_lock():
         if model is None:
             logger.info(f"Loading faster-whisper model ({MODEL_SIZE})...")
             # auto chooses GPU or CPU

@@ -20,11 +20,13 @@ class TaskEngine:
         max_concurrent_tasks: int = 5,
         mime_limit_ratio: float = 0.5,
         callbacks: Dict[str, Any] = None,
+        abort_event: Optional[asyncio.Event] = None,
     ):
         self.max_concurrent_tasks = max_concurrent_tasks
         self.mime_limit_ratio = mime_limit_ratio
         self.async_session_maker = async_session_maker
         self.callbacks = callbacks or {}
+        self.abort_event = abort_event
 
         # Concurrency management via Condition for finer-grained control (MIME balancing)
         self._condition = asyncio.Condition()
@@ -191,6 +193,11 @@ class TaskEngine:
                             self._active_counts[group] += 1
                             self._active_total += 1
                             break
+
+                    if self.abort_event and self.abort_event.is_set():
+                        self._queued_counts[group] -= 1
+                        self._condition.notify_all()
+                        return
 
                     # Wait for a notification that a slot has opened or queue state changed
                     await self._condition.wait()

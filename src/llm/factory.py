@@ -60,9 +60,9 @@ def _instantiate_provider(
             return "PROVIDER_INIT_FAILED"
     elif provider_type == "mlx":
         try:
-            from src.llm.mlx_provider import MLXProvider
+            from src.llm.mlx_provider import MLXModelManager
 
-            return MLXProvider(model_path, **kwargs)
+            return MLXModelManager.get_provider(model_path, **kwargs)
         except ImportError:
             return "MISSING_LIBRARY"
         except Exception as e:

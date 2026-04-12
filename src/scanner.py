@@ -260,6 +260,10 @@ async def run_scanner(
     limit_ratio: float,
 ):
     """Main scanner logic."""
+    import time
+
+    start_time = time.time()
+
     if clean:
         console = Console()
         console.print("[yellow]Cleaning database...[/yellow]")
@@ -309,12 +313,9 @@ async def run_scanner(
 
     layout = Layout()
     layout.split_column(
-        Layout(name="top", ratio=3),
-        Layout(name="bottom", ratio=2),
-    )
-    layout["top"].split_row(
-        Layout(name="main", ratio=2),
-        Layout(name="stats", ratio=1),
+        Layout(name="main", size=max_concurrent * 2 + 4),
+        Layout(name="stats", size=16),
+        Layout(name="bottom", size=10),
     )
     layout["bottom"].update(
         Panel(
@@ -403,15 +404,50 @@ async def run_scanner(
             completed_tasks = status_counts.get("COMPLETED", 0)
             failed_tasks = status_counts.get("FAILED", 0)
 
+            elapsed = time.time() - start_time
+            if elapsed > 0 and completed_docs > 0:
+                speed = completed_docs / elapsed
+                speed_str = f"({speed:.1f} docs/sec)"
+                remaining_docs = total_docs - completed_docs
+                if remaining_docs > 0 and speed > 0:
+                    eta_seconds = remaining_docs / speed
+                    if eta_seconds > 86400:
+                        from datetime import datetime, timedelta
+
+                        eta_date = datetime.now() + timedelta(seconds=eta_seconds)
+                        eta_str = (
+                            f"ETA: {eta_date.strftime('%Y-%m-%d %H:%M')} {speed_str}"
+                        )
+                    else:
+                        hours, rem = divmod(eta_seconds, 3600)
+                        minutes, seconds = divmod(rem, 60)
+                        eta_str = f"ETA: {int(hours):02}:{int(minutes):02}:{int(seconds):02}   {speed_str}"
+                elif remaining_docs == 0:
+                    eta_str = "Status: Finishing..."
+                else:
+                    eta_str = "ETA: N/A"
+            else:
+                eta_str = "ETA: Calculating..."
+
             stats_text.append("📊 Global Status\n", style="bold white underline")
-            stats_text.append(f"  Docs:  {completed_docs}/{total_docs}\n", style="cyan")
             stats_text.append(
-                f"  Tasks: {completed_tasks}/{total_tasks} ", style="blue"
+                f"  Docs:   {completed_docs}/{total_docs}\n", style="cyan"
             )
             stats_text.append(
-                f"({failed_tasks} failed)\n\n",
+                f"  Tasks:  {completed_tasks}/{total_tasks} ", style="blue"
+            )
+            stats_text.append(
+                f"({failed_tasks} failed)\n",
                 style="bold red" if failed_tasks > 0 else "dim",
             )
+
+            hours, rem = divmod(elapsed, 3600)
+            minutes, seconds = divmod(rem, 60)
+            stats_text.append(
+                f"  Uptime: {int(hours):02}:{int(minutes):02}:{int(seconds):02}   ",
+                style="dim",
+            )
+            stats_text.append(f"{eta_str}", style="yellow")
 
             # Query only necessary columns for the plugin table
             task_result = await session.execute(
@@ -446,13 +482,13 @@ async def run_scanner(
                     t.status.name if hasattr(t.status, "name") else str(t.status)
                 )
 
-                if status_str == "FAILED":
+                if status_str == "FAILED" or status_str.endswith(".FAILED"):
                     s["error"] += 1
                     if t.error_message:
                         # Truncate and clean up error message for aggregation
                         msg = t.error_message.split(":")[0][:50]
                         error_counts[msg] = error_counts.get(msg, 0) + 1
-                elif status_str == "COMPLETED":
+                elif status_str == "COMPLETED" or status_str.endswith(".COMPLETED"):
                     if t.result_data:
                         try:
                             data = json.loads(t.result_data)
@@ -472,50 +508,69 @@ async def run_scanner(
                     else:
                         s["success"] += 1
 
-            # Build Plugins Table
-            table = Table(
-                box=None,
-                header_style="bold white",
-                padding=(0, 1),
-                expand=True,
-                show_header=True,
-                border_style="dim",
-            )
-            table.add_column("Plugin", style="bold white", ratio=2)
-            table.add_column("Run", justify="right", style="dim", ratio=1)
-            table.add_column("Skp", justify="right", style="yellow", ratio=1)
-            table.add_column("Ok", justify="right", style="green", ratio=1)
-            table.add_column("Err", justify="right", style="red", ratio=1)
+            def plugin_sort_key(p):
+                return (-plugin_stats[p]["error"], -plugin_stats[p]["total"], p)
 
-            sorted_plugins = sorted(plugin_stats.keys())
-            for plugin in sorted_plugins:
-                s = plugin_stats[plugin]
-                table.add_row(
-                    plugin,
-                    str(s["total"]),
-                    str(s["skipped"]),
-                    str(s["success"]),
-                    str(s["error"]),
+            sorted_plugins = sorted(plugin_stats.keys(), key=plugin_sort_key)
+
+            mid = (len(sorted_plugins) + 1) // 2
+            left_plugins = sorted_plugins[:mid]
+            right_plugins = sorted_plugins[mid:]
+
+            def create_stats_table(plugins):
+                tbl = Table(
+                    box=None,
+                    header_style="bold cyan",
+                    padding=(0, 2),
+                    expand=True,
+                    show_header=True,
+                    border_style="dim",
                 )
+                tbl.add_column("🔌 Plugin", style="bold white", ratio=2)
+                tbl.add_column("Run", justify="right", style="dim", ratio=1)
+                tbl.add_column("Skp", justify="right", style="yellow", ratio=1)
+                tbl.add_column("Ok", justify="right", style="green", ratio=1)
+                tbl.add_column("Err", justify="right", style="red", ratio=1)
+                for plugin in plugins:
+                    s = plugin_stats[plugin]
+                    tbl.add_row(
+                        plugin,
+                        str(s["total"]),
+                        str(s["skipped"]),
+                        str(s["success"]),
+                        str(s["error"]),
+                    )
+                return tbl
 
-            # Re-assemble the text with the table in the middle
-            output_text = Text()
-            output_text.append(stats_text)
-            output_text.append("\n🔌 Plugins\n", style="bold white underline")
+            from rich.columns import Columns
 
-            # Combine everything into a Group or just use a Renderable list
+            plugins_columns = Columns(
+                [create_stats_table(left_plugins), create_stats_table(right_plugins)],
+                expand=True,
+            )
+
             from rich.console import Group
+            from rich.columns import Columns
 
             error_summary = Text()
             if error_counts:
-                error_summary.append("\n❌ Top Errors\n", style="bold red underline")
+                error_summary.append("❌ Top Errors\n", style="bold red underline")
                 sorted_errors = sorted(
                     error_counts.items(), key=lambda x: x[1], reverse=True
-                )[:3]
+                )[:5]
                 for msg, count in sorted_errors:
-                    error_summary.append(f"  {count}x: {msg[:30]}...\n", style="red")
+                    error_summary.append(f"  {count}x: {msg[:45]}...", style="red")
+                    if count != sorted_errors[-1][1] or msg != sorted_errors[-1][0]:
+                        error_summary.append("\n")
 
-            group = Group(stats_text, table, error_summary)
+            top_section = (
+                Columns([stats_text, error_summary], expand=True)
+                if error_counts
+                else stats_text
+            )
+            plugins_title = Text("\n")
+
+            group = Group(top_section, plugins_title, plugins_columns)
 
         return Panel(group, title="Scanner Intel", border_style="green")
 
@@ -673,21 +728,54 @@ async def run_scanner(
             "doc_end": on_doc_end,
         }
 
+        abort_event = asyncio.Event()
         task_engine = TaskEngine(
             async_session_maker=async_session_maker,
             max_concurrent_tasks=max_concurrent,
             mime_limit_ratio=limit_ratio,
             callbacks=callbacks,
+            abort_event=abort_event,
         )
+
+        loop = asyncio.get_running_loop()
+        stop_requested = False
+
+        def handle_sigint(*args):
+            nonlocal stop_requested
+            if stop_requested:
+                console.print("\n[bold red]Forcing quit...[/bold red]")
+                import sys
+
+                sys.exit(1)
+            else:
+                stop_requested = True
+                abort_event.set()
+                console.print(
+                    "\n[bold yellow]Stop requested! Allowing active tasks to finish... Press Ctrl+C again to force quit.[/bold yellow]"
+                )
+
+                # Wake up all waiting tasks in TaskEngine so they can abort cleanly
+                async def _wake_up():
+                    async with task_engine._condition:
+                        task_engine._condition.notify_all()
+
+                asyncio.create_task(_wake_up())
+
+        import signal
+
+        try:
+            loop.add_signal_handler(signal.SIGINT, handle_sigint)
+        except NotImplementedError:
+            signal.signal(signal.SIGINT, handle_sigint)
 
         # Background task to update the log pane and stats pane
         async def update_ui_panes():
             while True:
                 # Update Log
-                log_content = get_log_tail(12)
+                log_content = get_log_tail(8)
                 layout["bottom"].update(
                     Panel(
-                        Text.from_ansi(log_content),
+                        Text.from_ansi(log_content, no_wrap=True),
                         title="scanner.log (tail)",
                         border_style="blue",
                     )
@@ -705,10 +793,15 @@ async def run_scanner(
         ui_update_task = asyncio.create_task(update_ui_panes())
 
         async def process_and_check(doc_id):
+            if abort_event.is_set():
+                return
             mime_type = id_to_mime.get(doc_id)
             await task_engine.process_document(doc_id, mime_type=mime_type)
             try:
-                await check_doc_errors(doc_id)
+                # If we aborted but the document had already finished, we still sync it.
+                # But if we aborted before it could process, sync_document_to_fts does nothing useful.
+                if not abort_event.is_set():
+                    await check_doc_errors(doc_id)
             except Exception:
                 logger.exception(
                     "Post-processing check_doc_errors failed for document %s",
@@ -719,6 +812,13 @@ async def run_scanner(
         try:
             await asyncio.gather(*tasks)
         finally:
+            import signal
+
+            try:
+                loop.remove_signal_handler(signal.SIGINT)
+            except NotImplementedError:
+                signal.signal(signal.SIGINT, signal.default_int_handler)
+
             progress.stop()
             ui_update_task.cancel()
             try:
