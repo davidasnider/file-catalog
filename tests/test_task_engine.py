@@ -258,6 +258,69 @@ async def test_process_document_should_run_skipping(db_session, reset_registry):
     task = result.scalars().first()
     assert task is not None
     assert task.status == TaskStatus.COMPLETED
-    result_data = json.loads(task.result_data)
-    assert result_data.get("skipped") is True
-    assert "reason" in result_data
+    data = json.loads(task.result_data)
+    assert data.get("skipped") is True
+    assert "reason" in data
+
+
+@pytest.mark.asyncio
+async def test_process_document_mime_type_fast_path(db_session, reset_registry):
+    """Verify that providing mime_type skips the initial document fetch."""
+
+    # Create a mock plugin
+    @register_analyzer(name="FastPathPlugin")
+    class FastPathPlugin(AnalyzerBase):
+        async def analyze(
+            self, file_path: str, mime_type: str, context: Dict[str, Any]
+        ) -> Dict[str, Any]:
+            return {"fast": True}
+
+    # Setup DB
+    doc = Document(path="/fast.txt", mime_type="text/plain")
+    db_session.add(doc)
+    await db_session.commit()
+    await db_session.refresh(doc)
+    doc_id = doc.id
+
+    async_session = sessionmaker(
+        db_session.bind, class_=AsyncSession, expire_on_commit=False
+    )
+
+    # We use a mock session maker to verify that get(Document, ...) is NOT called
+    # in the initial fetch block (lines 156-163).
+    from unittest.mock import AsyncMock, MagicMock
+
+    # Create a real session to wrap for the execution phase
+    real_session = async_session()
+    try:
+        # Track calls to get()
+        original_get = real_session.get
+        mock_get = AsyncMock(side_effect=original_get)
+        real_session.get = mock_get
+
+        # Mock session maker context manager
+        mock_context = MagicMock()
+        mock_context.__aenter__.return_value = real_session
+        mock_context.__aexit__ = AsyncMock(return_value=None)
+
+        # Mock the maker itself
+        mock_maker = MagicMock(return_value=mock_context)
+
+        engine = TaskEngine(async_session_maker=mock_maker, max_concurrent_tasks=1)
+
+        await engine.process_document(doc_id, mime_type="text/plain")
+
+        # Verify that the maker was only called ONCE (for the execution block)
+        # instead of TWICE (pre-fetch at line 157 + execution block at line 204).
+        assert mock_maker.call_count == 1
+
+        # And verify our session's get was called correctly for Document (refresh + finalize)
+        doc_get_calls = [
+            call for call in mock_get.call_args_list if call.args[0] == Document
+        ]
+        assert len(doc_get_calls) == 2
+
+        await db_session.refresh(doc)
+        assert doc.status == DocumentStatus.COMPLETED
+    finally:
+        await real_session.close()

@@ -10,7 +10,13 @@ logger = logging.getLogger(__name__)
 DATABASE_URL = "sqlite+aiosqlite:///./file_catalog.db"
 
 # Create async engine
-engine = create_async_engine(DATABASE_URL, echo=False, future=True)
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=False,
+    future=True,
+    pool_size=20,
+    max_overflow=30,
+)
 
 
 @event.listens_for(engine.sync_engine, "connect")

@@ -7,7 +7,11 @@ from src.db.models import DocumentStatus, TaskStatus
 
 logger = logging.getLogger(__name__)
 
-# Global semaphore to serialize FTS writes and prevent "database is locked" errors
+# Global semaphore to serialize FTS writes and prevent "database is locked" errors.
+# SQLite allows multiple concurrent readers but only one writer.
+# Because FTS (Full Text Search) indexing is write-intensive and involves complex virtual tables,
+# we use this semaphore to ensure only one document is being synced to FTS at a time across
+# all concurrent analysis workers.
 fts_semaphore = asyncio.Semaphore(1)
 
 
@@ -16,101 +20,99 @@ async def sync_document_to_fts(session: AsyncSession, document_id: int):
     Sync a completed document and its analysis tasks into the FTS5 virtual table
     for full-text search.
     """
+    # Fetch the document to ensure it exists and get its path
+    result = await session.execute(
+        text("SELECT path, status FROM document WHERE id = :doc_id"),
+        {"doc_id": document_id},
+    )
+    doc = result.fetchone()
+
+    if not doc:
+        logger.warning(f"Cannot sync document {document_id} to FTS: not found")
+        return
+
+    path, status = doc
+
+    # We only want to index documents that have attempted processing
+    if status in (DocumentStatus.PENDING, DocumentStatus.EXTRACTING):
+        return
+
+    # Fetch all COMPLETED tasks for this document to build the FTS content
+    tasks_result = await session.execute(
+        text(
+            "SELECT task_name, result_data FROM analysistask WHERE document_id = :doc_id AND status = :status"
+        ),
+        {"doc_id": document_id, "status": TaskStatus.COMPLETED.value},
+    )
+    tasks = tasks_result.fetchall()
+
+    content_parts = []
+    summary_text = ""
+
+    for task_name, result_data_str in tasks:
+        if not result_data_str:
+            continue
+
+        try:
+            data = json.loads(result_data_str)
+        except json.JSONDecodeError:
+            continue
+
+        normalized_task_name = task_name.lower()
+
+        # Extract textual content based on the task type
+        if task_name == "TextExtractor" or normalized_task_name == "text_extractor":
+            if text_content := data.get("text"):
+                content_parts.append(text_content)
+
+        elif (
+            task_name == "DocumentAIExtractor"
+            or normalized_task_name == "document_ai_extractor"
+        ):
+            if text_content := data.get("text"):
+                content_parts.append(text_content)
+
+        elif (
+            task_name == "AudioTranscriber"
+            or normalized_task_name == "audio_transcriber"
+        ):
+            if text_content := data.get("text"):
+                content_parts.append(text_content)
+
+        elif task_name == "VisionAnalyzer" or normalized_task_name == "vision_analyzer":
+            if description := data.get("description"):
+                content_parts.append(description)
+
+        elif task_name == "VideoAnalyzer" or normalized_task_name == "video_analyzer":
+            if description := data.get("visual_description"):
+                content_parts.append(description)
+
+        elif task_name == "EmailParser" or normalized_task_name == "email_parser":
+            if subject := data.get("subject"):
+                content_parts.append(f"Subject: {subject}")
+            if text_content := data.get("text_body"):
+                content_parts.append(text_content)
+
+        elif (
+            task_name == "SpreadsheetAnalyzer"
+            or normalized_task_name == "spreadsheet_analyzer"
+        ):
+            if text_content := data.get("raw_text_content"):
+                content_parts.append(text_content)
+            elif summary := data.get("summary"):
+                content_parts.append(summary)
+
+        elif task_name == "Summarizer" or normalized_task_name == "summarizer":
+            if summary := data.get("summary"):
+                summary_text = summary
+
+    # Combine all extracted content into a single searchable body
+    full_content = "\n\n".join(content_parts)
+
+    # Use the global semaphore to ensure only one FTS write happens at a time.
+    # While the scanner manages this globally, keeping the lock here provides
+    # "safety by default" for other callers (like scripts or web UI updates).
     async with fts_semaphore:
-        # Fetch the document to ensure it exists and get its path
-        result = await session.execute(
-            text("SELECT path, status FROM document WHERE id = :doc_id"),
-            {"doc_id": document_id},
-        )
-        doc = result.fetchone()
-
-        if not doc:
-            logger.warning(f"Cannot sync document {document_id} to FTS: not found")
-            return
-
-        path, status = doc
-
-        # We only want to index documents that have attempted processing
-        if status in (DocumentStatus.PENDING, DocumentStatus.EXTRACTING):
-            return
-
-        # Fetch all COMPLETED tasks for this document to build the FTS content
-        tasks_result = await session.execute(
-            text(
-                "SELECT task_name, result_data FROM analysistask WHERE document_id = :doc_id AND status = :status"
-            ),
-            {"doc_id": document_id, "status": TaskStatus.COMPLETED.value},
-        )
-        tasks = tasks_result.fetchall()
-
-        content_parts = []
-        summary_text = ""
-
-        for task_name, result_data_str in tasks:
-            if not result_data_str:
-                continue
-
-            try:
-                data = json.loads(result_data_str)
-            except json.JSONDecodeError:
-                continue
-
-            normalized_task_name = task_name.lower()
-
-            # Extract textual content based on the task type
-            if task_name == "TextExtractor" or normalized_task_name == "text_extractor":
-                if text_content := data.get("text"):
-                    content_parts.append(text_content)
-
-            elif (
-                task_name == "DocumentAIExtractor"
-                or normalized_task_name == "document_ai_extractor"
-            ):
-                if text_content := data.get("text"):
-                    content_parts.append(text_content)
-
-            elif (
-                task_name == "AudioTranscriber"
-                or normalized_task_name == "audio_transcriber"
-            ):
-                if text_content := data.get("text"):
-                    content_parts.append(text_content)
-
-            elif (
-                task_name == "VisionAnalyzer"
-                or normalized_task_name == "vision_analyzer"
-            ):
-                if description := data.get("description"):
-                    content_parts.append(description)
-
-            elif (
-                task_name == "VideoAnalyzer" or normalized_task_name == "video_analyzer"
-            ):
-                if description := data.get("visual_description"):
-                    content_parts.append(description)
-
-            elif task_name == "EmailParser" or normalized_task_name == "email_parser":
-                if subject := data.get("subject"):
-                    content_parts.append(f"Subject: {subject}")
-                if text_content := data.get("text_body"):
-                    content_parts.append(text_content)
-
-            elif (
-                task_name == "SpreadsheetAnalyzer"
-                or normalized_task_name == "spreadsheet_analyzer"
-            ):
-                if text_content := data.get("raw_text_content"):
-                    content_parts.append(text_content)
-                elif summary := data.get("summary"):
-                    content_parts.append(summary)
-
-            elif task_name == "Summarizer" or normalized_task_name == "summarizer":
-                if summary := data.get("summary"):
-                    summary_text = summary
-
-        # Combine all extracted content into a single searchable body
-        full_content = "\n\n".join(content_parts)
-
         # Execute the two statements (delete old, insert new) separately
 
         # 1. Delete existing entry if it exists
@@ -134,7 +136,7 @@ async def sync_document_to_fts(session: AsyncSession, document_id: int):
         )
 
         await session.commit()
-        logger.info(f"Synced document {document_id} to FTS")
+    logger.info(f"Synced document {document_id} to FTS")
 
 
 async def search_fts(session: AsyncSession, query: str, limit: int = 50):

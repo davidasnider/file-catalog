@@ -204,15 +204,40 @@ class LlamaCppProvider(LLMProvider):
         def _run_sync():
             from PIL import Image
             import io
+            from src.core.config import config
 
-            with Image.open(image_path) as img:
-                # Convert to RGB if necessary (e.g. RGBA/PNG)
-                if img.mode != "RGB":
-                    img = img.convert("RGB")
+            if not os.path.exists(image_path):
+                raise FileNotFoundError(f"Image not found at {image_path}")
 
-                buffered = io.BytesIO()
-                img.save(buffered, format="JPEG")
-                encoded_string = base64.b64encode(buffered.getvalue()).decode("utf-8")
+            try:
+                with Image.open(image_path) as img:
+                    # Convert to RGB if necessary (e.g. RGBA/PNG)
+                    if img.mode != "RGB":
+                        img = img.convert("RGB")
+
+                    # Prevent extreme memory usage or base64 overhead for high-res images.
+                    # LlamaCpp often resizes internally, but resizing early saves memory
+                    # during the encoding and transmission phase.
+                    max_pixels = config.vision_max_pixels
+                    w, h = img.size
+                    if w * h > max_pixels:
+                        # thumbnail preserves aspect ratio while staying within pixel budget
+                        scale = (max_pixels / (w * h)) ** 0.5
+                        new_size = (max(1, int(w * scale)), max(1, int(h * scale)))
+                        img.thumbnail(new_size, Image.Resampling.LANCZOS)
+                        logger.info(
+                            f"Resized image for LlamaCpp vision: {w}x{h} -> {img.size} "
+                            f"(Max allowed: {max_pixels} pixels)"
+                        )
+
+                    buffered = io.BytesIO()
+                    img.save(buffered, format="JPEG")
+                    encoded_string = base64.b64encode(buffered.getvalue()).decode(
+                        "utf-8"
+                    )
+            except Exception as e:
+                logger.error(f"Failed to open/process image {image_path}: {e}")
+                raise ValueError(f"Invalid or corrupt image: {e}") from e
 
             image_url = f"data:image/jpeg;base64,{encoded_string}"
 

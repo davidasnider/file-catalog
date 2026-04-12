@@ -149,16 +149,18 @@ class TaskEngine:
                     await session.commit()
                 return False, str(e), {}
 
-    async def process_document(self, document_id: int):
+    async def process_document(self, document_id: int, mime_type: Optional[str] = None):
         """Process a document through all registered plugins using a MIME-aware scheduler."""
-        # 1. Fetch document metadata to determine MIME group
-        async with self.async_session_maker() as session:
-            doc = await session.get(Document, document_id)
-            if not doc:
-                logger.error(f"Document {document_id} not found")
-                return
-            mime_type = doc.mime_type
-            doc_path = doc.path
+        doc_path = None
+        # 1. Fetch document metadata to determine MIME group ONLY if mime_type is not provided.
+        if not mime_type:
+            async with self.async_session_maker() as session:
+                doc = await session.get(Document, document_id)
+                if not doc:
+                    logger.error(f"Document {document_id} not found")
+                    return
+                mime_type = doc.mime_type
+                doc_path = doc.path
 
         group = self._get_mime_group(mime_type)
 
@@ -199,12 +201,15 @@ class TaskEngine:
 
         # 3. Execution phase
         try:
-            self._trigger("doc_start", document_id, path=doc_path, mime_type=mime_type)
             async with self.async_session_maker() as session:
                 # Refresh doc in new session
                 doc = await session.get(Document, document_id)
                 if not doc:
                     return
+                doc_path = doc.path
+                self._trigger(
+                    "doc_start", document_id, path=doc_path, mime_type=mime_type
+                )
 
                 try:
                     doc.status = DocumentStatus.ANALYZING
