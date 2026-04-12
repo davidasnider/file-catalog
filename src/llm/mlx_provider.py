@@ -352,3 +352,22 @@ class MLXProvider(LLMProvider):
 
         async with get_mlx_gpu_lock():
             return await loop.run_in_executor(None, _run_sync)
+
+
+class MLXModelManager:
+    _cache = {}
+
+    @classmethod
+    def get_provider(cls, model_path: str, is_vision: bool = False, **kwargs):
+        cache_key = (model_path, is_vision)
+        if cache_key in cls._cache:
+            return cls._cache[cache_key]
+
+        provider = MLXProvider(model_path, is_vision=is_vision, **kwargs)
+        cls._cache[cache_key] = provider
+        return provider
+
+    @classmethod
+    def clear_cache(cls):
+        """Clear the process-global model cache."""
+        cls._cache.clear()

@@ -324,3 +324,45 @@ async def test_process_document_mime_type_fast_path(db_session, reset_registry):
         assert doc.status == DocumentStatus.COMPLETED
     finally:
         await real_session.close()
+
+
+@pytest.mark.asyncio
+async def test_task_engine_abort(db_session, reset_registry):
+    # Setup doc
+    doc = Document(path="/dummy_abort.txt", mime_type="text/plain")
+    db_session.add(doc)
+    await db_session.commit()
+    await db_session.refresh(doc)
+    doc_id = doc.id
+
+    async_session = sessionmaker(
+        db_session.bind, class_=AsyncSession, expire_on_commit=False
+    )
+
+    abort_event = asyncio.Event()
+    engine = TaskEngine(
+        async_session_maker=async_session,
+        max_concurrent_tasks=1,
+        abort_event=abort_event,
+    )
+
+    # Occupy the only slot
+    async with engine._condition:
+        engine._active_total = 1
+
+    # Try to process in a task
+    process_task = asyncio.create_task(engine.process_document(doc_id))
+
+    # Give it a moment to enter the wait loop
+    await asyncio.sleep(0.05)
+
+    # Set abort and notify
+    engine.request_abort()
+    await engine.notify_all()
+
+    result = await process_task
+    assert result is False
+
+    # Verify document status remains unchanged (since it didn't start execution)
+    await db_session.refresh(doc)
+    assert doc.status == DocumentStatus.PENDING

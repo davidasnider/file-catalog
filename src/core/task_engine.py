@@ -20,11 +20,13 @@ class TaskEngine:
         max_concurrent_tasks: int = 5,
         mime_limit_ratio: float = 0.5,
         callbacks: Dict[str, Any] = None,
+        abort_event: Optional[asyncio.Event] = None,
     ):
         self.max_concurrent_tasks = max_concurrent_tasks
         self.mime_limit_ratio = mime_limit_ratio
         self.async_session_maker = async_session_maker
         self.callbacks = callbacks or {}
+        self.abort_event = abort_event
 
         # Concurrency management via Condition for finer-grained control (MIME balancing)
         self._condition = asyncio.Condition()
@@ -38,6 +40,16 @@ class TaskEngine:
                 self.callbacks[event_name](*args, **kwargs)
             except Exception:
                 pass
+
+    def request_abort(self):
+        """Signal the engine to abort processing."""
+        if self.abort_event:
+            self.abort_event.set()
+
+    async def notify_all(self):
+        """Wake up all waiting tasks."""
+        async with self._condition:
+            self._condition.notify_all()
 
     def _get_mime_group(self, mime_type: Optional[str]) -> str:
         """Group MIME types by prefix (e.g. image/jpeg -> image)."""
@@ -158,9 +170,12 @@ class TaskEngine:
                 doc = await session.get(Document, document_id)
                 if not doc:
                     logger.error(f"Document {document_id} not found")
-                    return
+                    return False
                 mime_type = doc.mime_type
                 doc_path = doc.path
+
+        if self.abort_event and self.abort_event.is_set():
+            return False
 
         group = self._get_mime_group(mime_type)
 
@@ -172,6 +187,11 @@ class TaskEngine:
 
             try:
                 while True:
+                    if self.abort_event and self.abort_event.is_set():
+                        self._queued_counts[group] -= 1
+                        self._condition.notify_all()
+                        return False
+
                     # Capacity check
                     if self._active_total < self.max_concurrent_tasks:
                         active_in_group = self._active_counts[group]
@@ -205,7 +225,7 @@ class TaskEngine:
                 # Refresh doc in new session
                 doc = await session.get(Document, document_id)
                 if not doc:
-                    return
+                    return False
                 doc_path = doc.path
                 self._trigger(
                     "doc_start", document_id, path=doc_path, mime_type=mime_type
@@ -317,6 +337,7 @@ class TaskEngine:
                         else DocumentStatus.FAILED
                     )
                     await session.commit()
+                    return True
 
                 except asyncio.CancelledError:
                     logger.warning(f"Processing cancelled for document {document_id}")
@@ -333,6 +354,7 @@ class TaskEngine:
                     if doc:
                         doc.status = DocumentStatus.FAILED
                         await session.commit()
+                    return False
         finally:
             # 4. Release slot
             async with self._condition:

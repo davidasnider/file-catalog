@@ -12,7 +12,14 @@ logger = logging.getLogger(__name__)
 # Because FTS (Full Text Search) indexing is write-intensive and involves complex virtual tables,
 # we use this semaphore to ensure only one document is being synced to FTS at a time across
 # all concurrent analysis workers.
-fts_semaphore = asyncio.Semaphore(1)
+_fts_semaphore = None
+
+
+def get_fts_semaphore():
+    global _fts_semaphore
+    if _fts_semaphore is None:
+        _fts_semaphore = asyncio.Semaphore(1)
+    return _fts_semaphore
 
 
 async def sync_document_to_fts(session: AsyncSession, document_id: int):
@@ -112,7 +119,7 @@ async def sync_document_to_fts(session: AsyncSession, document_id: int):
     # Use the global semaphore to ensure only one FTS write happens at a time.
     # While the scanner manages this globally, keeping the lock here provides
     # "safety by default" for other callers (like scripts or web UI updates).
-    async with fts_semaphore:
+    async with get_fts_semaphore():
         # Execute the two statements (delete old, insert new) separately
 
         # 1. Delete existing entry if it exists
