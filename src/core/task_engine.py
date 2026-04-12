@@ -170,9 +170,12 @@ class TaskEngine:
                 doc = await session.get(Document, document_id)
                 if not doc:
                     logger.error(f"Document {document_id} not found")
-                    return
+                    return False
                 mime_type = doc.mime_type
                 doc_path = doc.path
+
+        if self.abort_event and self.abort_event.is_set():
+            return False
 
         group = self._get_mime_group(mime_type)
 
@@ -184,6 +187,11 @@ class TaskEngine:
 
             try:
                 while True:
+                    if self.abort_event and self.abort_event.is_set():
+                        self._queued_counts[group] -= 1
+                        self._condition.notify_all()
+                        return False
+
                     # Capacity check
                     if self._active_total < self.max_concurrent_tasks:
                         active_in_group = self._active_counts[group]
@@ -203,11 +211,6 @@ class TaskEngine:
                             self._active_counts[group] += 1
                             self._active_total += 1
                             break
-
-                    if self.abort_event and self.abort_event.is_set():
-                        self._queued_counts[group] -= 1
-                        self._condition.notify_all()
-                        return False
 
                     # Wait for a notification that a slot has opened or queue state changed
                     await self._condition.wait()
