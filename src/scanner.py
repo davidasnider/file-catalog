@@ -42,6 +42,11 @@ IGNORED_EXTENSIONS = {
     ".map",
     ".jsx",
     ".tsx",
+    # Mailbox files should be exploded into individual .eml files first
+    # using extract_and_cleanup_mbox.py before scanning.
+    ".mbox",
+    ".mbx",
+    ".mbs",
 }
 
 # Ensure plugins are loaded dynamically from the plugin registry
