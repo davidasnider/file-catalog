@@ -113,10 +113,10 @@ class TextExtractorPlugin(AnalyzerBase):
                 with open(file_path, "r", encoding="utf-8", errors="replace") as f:
                     extracted_text = rtf_to_text(f.read())
             elif mime_type == "application/mbox":
-                import mailbox
                 import contextlib
+                from src.core.mbox_utils import RobustMbox
 
-                with contextlib.closing(mailbox.mbox(file_path)) as mbox:
+                with contextlib.closing(RobustMbox(file_path)) as mbox:
                     texts = []
                     for i, msg in enumerate(mbox):
                         if msg.is_multipart():

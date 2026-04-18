@@ -1,0 +1,5 @@
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "python3"
+decision = "allow"
+priority = 100

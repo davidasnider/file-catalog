@@ -3,7 +3,7 @@ from __future__ import annotations
 import email
 import email.policy
 import logging
-import mailbox
+from src.core.mbox_utils import RobustMbox
 from typing import Dict, Any
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
@@ -66,7 +66,7 @@ class EmailParserPlugin(AnalyzerBase):
 
     def _parse_mbox(self, file_path: str) -> list[Dict[str, Any]]:
         """Parse an .mbox file and return a list of email dicts."""
-        mbox = mailbox.mbox(file_path)
+        mbox = RobustMbox(file_path)
         emails = []
         try:
             for i, msg in enumerate(mbox):
