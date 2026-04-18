@@ -1,5 +1,6 @@
 import os
 import tempfile
+import contextlib
 from src.core.mbox_utils import RobustMbox
 
 
@@ -23,14 +24,17 @@ def test_robust_mbox_standard_ascii():
     path = create_mbox_file([msg1, msg2])
 
     try:
-        mbox = RobustMbox(path)
-        messages = list(mbox)
-        assert len(messages) == 2
-        assert messages[0].get_from() == "sender@example.com Mon Jan 1 00:00:00 2024"
-        assert messages[0]["Subject"] == "Test 1"
-        assert messages[1].get_from() == "sender@example.com Mon Jan 1 00:00:01 2024"
-        assert messages[1]["Subject"] == "Test 2"
-        mbox.close()
+        with contextlib.closing(RobustMbox(path)) as mbox:
+            messages = list(mbox)
+            assert len(messages) == 2
+            assert (
+                messages[0].get_from() == "sender@example.com Mon Jan 1 00:00:00 2024"
+            )
+            assert messages[0]["Subject"] == "Test 1"
+            assert (
+                messages[1].get_from() == "sender@example.com Mon Jan 1 00:00:01 2024"
+            )
+            assert messages[1]["Subject"] == "Test 2"
     finally:
         os.remove(path)
 
@@ -44,30 +48,27 @@ def test_robust_mbox_non_ascii_from_line():
     path = create_mbox_file([msg])
 
     try:
-        mbox = RobustMbox(path)
-        messages = list(mbox)
-        assert len(messages) == 1
-        # Should have decoded using latin-1 fallback
-        from_val = messages[0].get_from()
-        assert from_val == "userë@example.com Mon Jan 1 00:00:00 2024"
-        mbox.close()
+        with contextlib.closing(RobustMbox(path)) as mbox:
+            messages = list(mbox)
+            assert len(messages) == 1
+            # Should have decoded using latin-1 fallback
+            from_val = messages[0].get_from()
+            assert from_val == "userë@example.com Mon Jan 1 00:00:00 2024"
     finally:
         os.remove(path)
 
 
 def test_robust_mbox_mixed_line_endings():
     """Test RobustMbox with CRLF line endings in From lines."""
-    # Standard library mbox.py/mailbox.py often has trouble with CRLF From lines
     msg1 = b"From a@b.com Mon Jan 1 00:00:00 2024\r\nSubject: CRLF\r\n\r\nBody\r\n"
     msg2 = b"From c@d.com Mon Jan 1 00:00:01 2024\nSubject: LF\n\nBody\n"
     path = create_mbox_file([msg1, msg2])
 
     try:
-        mbox = RobustMbox(path)
-        messages = list(mbox)
-        assert len(messages) == 2
-        assert messages[0].get_from() == "a@b.com Mon Jan 1 00:00:00 2024"
-        assert messages[1].get_from() == "c@d.com Mon Jan 1 00:00:01 2024"
-        mbox.close()
+        with contextlib.closing(RobustMbox(path)) as mbox:
+            messages = list(mbox)
+            assert len(messages) == 2
+            assert messages[0].get_from() == "a@b.com Mon Jan 1 00:00:00 2024"
+            assert messages[1].get_from() == "c@d.com Mon Jan 1 00:00:01 2024"
     finally:
         os.remove(path)
