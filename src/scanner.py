@@ -42,7 +42,19 @@ IGNORED_EXTENSIONS = {
     ".map",
     ".jsx",
     ".tsx",
+    # Mailbox files should be exploded into individual .eml files first
+    # using extract_and_cleanup_mbox.py before scanning.
+    ".mbox",
+    ".mbx",
+    ".mbs",
 }
+
+
+def has_ignored_extension(filename: str) -> bool:
+    """Return True when any suffix in the filename should be ignored."""
+    suffixes = Path(filename).suffixes
+    return any(suffix.lower() in IGNORED_EXTENSIONS for suffix in suffixes)
+
 
 # Ensure plugins are loaded dynamically from the plugin registry
 plugin_dir = os.path.join(os.path.dirname(__file__), "plugins")
@@ -143,8 +155,7 @@ async def ingest_directory(
             for filename in files:
                 if filename.startswith("."):
                     continue
-                _, ext = os.path.splitext(filename)
-                if ext.lower() in IGNORED_EXTENSIONS:
+                if has_ignored_extension(filename):
                     continue
                 found.append(str((Path(root) / filename).resolve()))
         return found
