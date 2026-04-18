@@ -49,6 +49,13 @@ IGNORED_EXTENSIONS = {
     ".mbs",
 }
 
+
+def has_ignored_extension(filename: str) -> bool:
+    """Return True when any suffix in the filename should be ignored."""
+    suffixes = Path(filename).suffixes
+    return any(suffix.lower() in IGNORED_EXTENSIONS for suffix in suffixes)
+
+
 # Ensure plugins are loaded dynamically from the plugin registry
 plugin_dir = os.path.join(os.path.dirname(__file__), "plugins")
 load_plugins(plugin_dir)

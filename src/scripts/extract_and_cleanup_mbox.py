@@ -105,6 +105,19 @@ def _extract_date_prefix(date_header: str) -> str:
         return "0000-00-00"
 
 
+def _extract_sort_timestamp(date_header: str) -> float:
+    """Extract a sortable timestamp from an email Date header."""
+    if not date_header:
+        return 0.0
+    try:
+        from email.utils import parsedate_to_datetime
+
+        dt = parsedate_to_datetime(date_header)
+        return dt.timestamp()
+    except Exception:
+        return 0.0
+
+
 def _get_message_id(msg: email.message.Message) -> Optional[str]:
     """Extract the Message-ID header, stripping angle brackets."""
     mid = msg.get("Message-ID", "")
@@ -176,13 +189,6 @@ def _build_threads(
     # Phase 1: Build message-ID based thread graph
     # Maps message-id -> thread_id (the root message-id of the thread)
     id_to_thread: Dict[str, str] = {}
-    # Maps message-id -> message object
-    id_to_msg: Dict[str, email.message.Message] = {}
-
-    for msg in messages:
-        mid = _get_message_id(msg)
-        if mid:
-            id_to_msg[mid] = msg
 
     # Union-find style: link each message to its references
     def find_root(mid: str) -> str:
@@ -255,7 +261,7 @@ def _build_threads(
         if len(msgs) >= 2:
             thread_counter += 1
             # Sort by date
-            msgs.sort(key=lambda m: _extract_date_prefix(str(m.get("Date", ""))))
+            msgs.sort(key=lambda m: _extract_sort_timestamp(str(m.get("Date", ""))))
             # Use the normalized subject of the first message as the thread name
             subj = _normalize_subject(str(msgs[0].get("Subject", ""))) or "no_subject"
             thread_key = (
@@ -270,7 +276,7 @@ def _build_threads(
     for subj, msgs in subject_groups.items():
         if len(msgs) >= 2:
             thread_counter += 1
-            msgs.sort(key=lambda m: _extract_date_prefix(str(m.get("Date", ""))))
+            msgs.sort(key=lambda m: _extract_sort_timestamp(str(m.get("Date", ""))))
             thread_key = (
                 f"thread_{thread_counter:03d}_{_sanitize_filename(subj, max_len=60)}"
             )
@@ -373,16 +379,27 @@ def process_directory(
         if not _is_mailbox_file(file_path):
             continue
 
-        # Build destination directory name.
-        # Strip all mailbox-related suffixes: "In.mbx.002" -> "In_extracted"
-        name_parts = file_path.name.split(".")
-        base_name_parts = []
-        for part in name_parts:
-            if part.lower() in {"mbox", "mbx", "mbs"} or part.isdigit():
-                continue
-            base_name_parts.append(part)
+        # Strip mailbox suffixes without removing legitimate numeric filename parts:
+        # "In.mbx.002" -> "In_extracted"
+        # "project.2024.mbox" -> "project.2024_extracted"
+        mailbox_suffixes = {".mbox", ".mbx", ".mbs"}
+        suffixes = [suffix.lower() for suffix in file_path.suffixes]
+        suffixes_to_strip = 0
 
-        base_name = ".".join(base_name_parts) if base_name_parts else file_path.stem
+        if suffixes:
+            if suffixes[-1] in mailbox_suffixes:
+                suffixes_to_strip = 1
+            elif (
+                len(suffixes) >= 2
+                and suffixes[-1][1:].isdigit()
+                and suffixes[-2] in mailbox_suffixes
+            ):
+                suffixes_to_strip = 2
+
+        base_name = file_path.name
+        for _ in range(suffixes_to_strip):
+            base_name = Path(base_name).stem
+
         if not base_name:
             base_name = file_path.stem
 
