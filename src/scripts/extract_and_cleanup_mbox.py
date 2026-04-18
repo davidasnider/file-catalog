@@ -111,8 +111,11 @@ def _extract_sort_timestamp(date_header: str) -> float:
         return 0.0
     try:
         from email.utils import parsedate_to_datetime
+        from datetime import timezone
 
         dt = parsedate_to_datetime(date_header)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
         return dt.timestamp()
     except Exception:
         return 0.0

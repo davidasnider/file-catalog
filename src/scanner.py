@@ -155,8 +155,7 @@ async def ingest_directory(
             for filename in files:
                 if filename.startswith("."):
                     continue
-                _, ext = os.path.splitext(filename)
-                if ext.lower() in IGNORED_EXTENSIONS:
+                if has_ignored_extension(filename):
                     continue
                 found.append(str((Path(root) / filename).resolve()))
         return found
