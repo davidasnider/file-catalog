@@ -3,6 +3,7 @@ description: Systematically process and fix pull request review comments one by 
 ---
 
 1.  **Fetch Comments**: Use the GitHub MCP server (`mcp_github_pull_request_read`) with `method="get_review_comments"` to retrieve all review threads for the current PR.
+    a. If there are no comments, sleep for 1 minute and then repeat this step until comments are available.
 2.  **Filter Unresolved**: Identify threads where `isResolved` is `false` and examine the `comments` within those threads.
 3.  **Process Methodically**: For each unresolved comment thread:
     a. **Analyze**: Read the comment and the associated code carefully to understand the requested change.
