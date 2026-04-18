@@ -29,6 +29,12 @@ def detect_file_type(file_path: str) -> str:
     try:
         # 1. Use libmagic as the primary source of truth
         mime_type = magic.from_file(file_path, mime=True)
+
+        # FIX: If magic says it's a mailbox but it has a .txt extension, override it.
+        # libmagic often misidentifies text files starting with "From " as mbox.
+        if mime_type == "application/mbox" and file_path.lower().endswith(".txt"):
+            mime_type = "text/plain"
+
         # libmagic sometimes returns text/plain for things that are more specific
         if mime_type != "text/plain" and mime_type != "application/octet-stream":
             return mime_type

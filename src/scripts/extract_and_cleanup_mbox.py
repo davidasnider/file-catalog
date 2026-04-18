@@ -16,14 +16,16 @@ import argparse
 import email
 import email.generator
 import email.policy
+import io
 import logging
-import mailbox
 import os
 import re
 import unicodedata
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
+from src.core.mbox_utils import RobustMbox
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -149,8 +151,20 @@ def _get_references(msg: email.message.Message) -> List[str]:
 
 
 def _is_mailbox_file(file_path: Path) -> bool:
-    """Determine if a file is a mailbox by extension or MIME type detection."""
+    """Determine if a file is a mailbox by extension or MIME type detection.
+
+    Args:
+        file_path: Path to the file to check.
+
+    Returns:
+        bool: True if the file is likely a mailbox.
+    """
     suffix = file_path.suffix.lower()
+
+    # Explicitly skip .txt files — they are never mailboxes for our purposes.
+    if suffix == ".txt":
+        return False
+
     # Match on known extensions, including numbered variants like .mbx.002
     if suffix in MAILBOX_EXTENSIONS:
         return True
@@ -291,37 +305,65 @@ def _build_threads(
 
 
 def _write_eml(msg: email.message.Message, dest_path: Path):
-    """Write an email.message.Message to a .eml file."""
-    with open(dest_path, "wb") as f:
-        gen = email.generator.BytesGenerator(f)
-        gen.flatten(msg)
+    """Write an email.message.Message to a .eml file.
+
+    Args:
+        msg: The message to write.
+        dest_path: The destination path for the .eml file.
+    """
+    try:
+        with open(dest_path, "wb") as f:
+            # Try standard BytesGenerator first (fastest, preserves binary if possible)
+            gen = email.generator.BytesGenerator(f, policy=email.policy.default)
+            gen.flatten(msg)
+    except UnicodeEncodeError:
+        # Fallback for messages containing characters (like \ufffd) that BytesGenerator
+        # can't handle with its default 'ascii' + 'surrogateescape' strategy.
+        # We use a string-based Generator and encode the entire result to UTF-8.
+        with io.StringIO() as s_io:
+            gen = email.generator.Generator(s_io, policy=email.policy.default)
+            gen.flatten(msg)
+            with open(dest_path, "wb") as f:
+                f.write(s_io.getvalue().encode("utf-8", errors="replace"))
 
 
 def _make_eml_filename(msg: email.message.Message, index: int) -> str:
     """Generate a descriptive .eml filename from message headers."""
-    date_prefix = _extract_date_prefix(str(msg.get("Date", "")))
-    from_part = _extract_addr_local(str(msg.get("From", "")))
-    subject = (
-        _sanitize_filename(str(msg.get("Subject", "")), max_len=50) or "no_subject"
-    )
+    # Ensure headers are converted to string safely
+    date_header = msg.get("Date", "")
+    date_prefix = _extract_date_prefix(str(date_header))
+
+    from_header = msg.get("From", "")
+    from_part = _extract_addr_local(str(from_header))
+
+    subject_header = msg.get("Subject", "")
+    subject = _sanitize_filename(str(subject_header), max_len=50) or "no_subject"
 
     # Include index to guarantee uniqueness
     return f"{date_prefix}_{index:04d}_{from_part}_{subject}.eml"
 
 
 def extract_mailbox(file_path: Path, dest_dir: Path) -> int:
-    """
-    Extract a mailbox file into individual .eml files with thread grouping.
+    """Extract a mailbox file into individual .eml files with thread grouping.
 
-    Returns the number of emails extracted.
+    Args:
+        file_path: Path to the mailbox file.
+        dest_dir: Path to the directory where .eml files will be saved.
+
+    Returns:
+        int: Total number of emails extracted.
     """
     logger.info(f"Parsing mailbox: {file_path}")
 
-    mbox = mailbox.mbox(str(file_path))
+    # Use RobustMbox to handle legacy encodings in From lines
+    mbox = RobustMbox(str(file_path))
     messages = []
     try:
         for msg in mbox:
             messages.append(msg)
+    except Exception as e:
+        logger.error(f"Error iterating over mailbox {file_path}: {e}")
+        # If iteration fails, we return what we got so far or 0
     finally:
         mbox.close()
 
