@@ -49,7 +49,7 @@ def test_robust_mbox_non_ascii_from_line():
         assert len(messages) == 1
         # Should have decoded using latin-1 fallback
         from_val = messages[0].get_from()
-        assert "user\xeb" in from_val or "userë" in from_val
+        assert from_val == "userë@example.com Mon Jan 1 00:00:00 2024"
         mbox.close()
     finally:
         os.remove(path)

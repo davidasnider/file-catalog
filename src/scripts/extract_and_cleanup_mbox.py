@@ -361,9 +361,6 @@ def extract_mailbox(file_path: Path, dest_dir: Path) -> int:
     try:
         for msg in mbox:
             messages.append(msg)
-    except Exception as e:
-        logger.error(f"Error iterating over mailbox {file_path}: {e}")
-        # If iteration fails, we return what we got so far or 0
     finally:
         mbox.close()
 

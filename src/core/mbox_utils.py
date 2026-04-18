@@ -37,7 +37,14 @@ class RobustMbox(mailbox.mbox):
         # Read the rest of the message content
         # Tell() is at the start of the headers now (just after the From line)
         msg_bytes = self._file.read(offsets[1] - self._file.tell())
-        msg = mb.mboxMessage(msg_bytes)
+
+        # Use the configured message factory if available (matches stdlib behavior)
+        message_factory = (
+            getattr(self, "_factory", None)
+            or getattr(self, "_message_factory", None)
+            or mb.mboxMessage
+        )
+        msg = message_factory(msg_bytes)
 
         # Strip "From " (5 chars) and set it
         if from_line_str.startswith("From "):

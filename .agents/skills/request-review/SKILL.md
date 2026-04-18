@@ -8,6 +8,5 @@ description: Requests or re-requests a review for the current pull request, spec
 // turbo
 ```bash
 echo "🔄 Requesting review from GitHub Copilot..."
-gh pr edit --add-reviewer "@copilot"
-echo "✅ Review request sent."
+gh pr edit --add-reviewer "copilot" && echo "✅ Review request sent."
 ```
