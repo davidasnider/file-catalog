@@ -8,7 +8,7 @@ This directory contains standalone utility scripts for pre-processing data, mana
 Bulk extract mailbox files (`.mbox`, `.mbx`, `.mbs`) into individual `.eml` files. This script automatically groups conversation threads into subdirectories based on `Message-ID` and `Subject` headers.
 
 **Why use this?**
-The main scanner ignores large mailbox files to prevent performance issues. Running this script first ensures individual emails are indexed and searchable.
+The main scanner ignores mailbox container files such as `.mbox`, `.mbx`, and `.mbs`. Running this script first converts them into individual `.eml` files so the emails are indexed and searchable.
 
 **Examples:**
 ```bash
@@ -26,6 +26,9 @@ python -m src.scripts.extract_and_cleanup_mbox /path/to/mail --keep
 
 ### 2. Archive Extractor (`extract_and_cleanup_archives.py`)
 Recursively extracts compressed archives (`.zip`, `.tar.gz`, `.7z`, etc.) into nested folders and removes the original archive.
+
+**Note on .7z Support:**
+Extraction of `.7z` files requires the `archives` optional dependency (`uv add "file-catalog[archives]"`). If missing, the script will log a warning and skip `.7z` files.
 
 **Examples:**
 ```bash

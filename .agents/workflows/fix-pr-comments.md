@@ -3,7 +3,8 @@ description: Systematically process and fix pull request review comments one by 
 ---
 
 1.  **Fetch Comments**: Use the GitHub MCP server (`mcp_github_pull_request_read`) with `method="get_review_comments"` to retrieve all review threads for the current PR.
-    a. **Automatic Wait**: If there are no review threads, the agent **MUST** wait (e.g., sleep for 60 seconds) and repeat the fetch until at least one comment is found. Do not exit if the PR is still open and no comments have arrived yet.
+    a. **Automatic Wait**: If there are no comments, sleep for 1 minute and retry this step, but stop after 5 attempts total unless the user explicitly asked you to wait longer.
+    b. **Abort**: If there are still no comments after the final attempt, abort this workflow and report that no review comments were available.
 2.  **Filter Unresolved**: Identify threads where `isResolved` is `false` and examine the `comments` within those threads.
 
 // turbo

@@ -10,8 +10,8 @@ description: Ensures the git tree is on the main branch, clean, and runs uv sync
 
 // turbo
 ```bash
-if ! git diff --quiet || ! git diff --cached --quiet; then
-    echo "Error: Git tree is not clean. Please commit or stash your changes before syncing."
+if [ -n "$(git status --porcelain)" ]; then
+    echo "Error: Git tree is not clean (including untracked files). Please commit or stash your changes before syncing."
     exit 1
 fi
 

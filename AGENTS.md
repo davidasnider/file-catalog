@@ -20,7 +20,7 @@ A robust, local-first AI document analysis pipeline that ingests heterogeneous a
   - `task_engine.py`: Orchestrates document processing and plugin execution.
   - `plugin_registry.py`: Dynamically loads analysis plugins from `src/plugins/`.
   - `config.py`: Global settings using `pydantic-settings`.
-- `src/plugins/`: Modular analysis units (e.g., `OCRExtractor`, `Summarizer`, `EstateAnalyzer`, `PIIHarvester`).
+- `src/plugins/`: Modular analysis units (e.g., `TextExtractor`, `Summarizer`, `EstateAnalyzer`, `PIIHarvester`).
 - `src/db/`: Database models (`models.py`), engine setup (`engine.py`), and FTS5 search (`fts.py`).
 - `src/llm/`: Provider abstractions (`provider.py`, `llama_cpp.py`, `mlx_provider.py`, `gemini.py`).
 - `src/scripts/`: Utility scripts for archive extraction, mailbox processing, and FTS synchronization.
@@ -58,10 +58,10 @@ pytest
 ### Utilities
 ```bash
 # Extract .mbox files into individual .eml files before scanning
-python src/scripts/extract_and_cleanup_mbox.py /path/to/mail.mbox
+python -m src.scripts.extract_and_cleanup_mbox /path/to/mail.mbox
 
 # Manually sync Full-Text Search index
-python src/scripts/sync_fts.py
+python -m src.scripts.sync_fts
 ```
 
 ## 📝 Development Conventions
