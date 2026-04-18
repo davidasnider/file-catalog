@@ -9,11 +9,13 @@ description: Systematically process and fix pull request review comments one by 
 
 // turbo
 ```bash
-# Example logic for polling for PR comments
+# Example logic for polling for PR comments with retry limit
 PR_NUMBER=$(gh pr view --json number -q .number)
+ATTEMPT=1
+MAX_ATTEMPTS=5
 
-while true; do
-  echo "Checking for unresolved review comments on PR #$PR_NUMBER..."
+while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+  echo "Checking for unresolved review comments on PR #$PR_NUMBER (Attempt $ATTEMPT/$MAX_ATTEMPTS)..."
   THREADS=$(gh api graphql -f query='
     query($owner: String!, $repo: String!, $pull: Int!) {
       repository(owner: $owner, name: $repo) {
@@ -33,8 +35,14 @@ while true; do
     break
   fi
 
+  if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+    echo "No comments found after $MAX_ATTEMPTS attempts. Aborting."
+    exit 0
+  fi
+
   echo "No comments found yet. Sleeping for 60s..."
   sleep 60
+  ATTEMPT=$((ATTEMPT + 1))
 done
 ```
 3.  **Process Methodically**: For each unresolved comment thread:

@@ -42,31 +42,17 @@ python -m src.scripts.extract_and_cleanup_archives /path/to/archives --keep
 ---
 
 ### 3. FTS Index Synchronizer (`sync_fts.py`)
-Manually trigger a synchronization between the primary SQLite database and the Full-Text Search (FTS5) index.
+Manually trigger a synchronization between the primary SQLite database and the Full-Text Search (FTS5) index for documents currently marked `DocumentStatus.COMPLETED`.
 
 **Examples:**
 ```bash
-# Synchronize all pending documents to the search index
+# Synchronize documents in the COMPLETED state to the search index
 python -m src.scripts.sync_fts
-
-# Force a complete rebuild of the FTS index
-python -m src.scripts.sync_fts --rebuild
 ```
 
 ---
 
-### 4. Legacy Word Converter (`convert_doc_to_pdf.scpt`)
-An AppleScript utility to batch-convert legacy `.doc` files to `.pdf` using macOS native TextEdit/Pages automation. This allows the scanner to process content from older formats without requiring a Microsoft Word installation.
-
-**Usage:**
-```bash
-# Run via osascript from the terminal
-osascript src/scripts/convert_doc_to_pdf.scpt /path/to/documents
-```
-
----
-
-### 5. Performance Benchmarking (`perf_test_llms.py`)
+### 4. Performance Benchmarking (`perf_test_llms.py`)
 Test the inference speed and memory consumption of configured LLM providers (`mlx`, `llama_cpp`, `gemini`) on your local hardware.
 
 **Examples:**

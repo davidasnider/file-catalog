@@ -58,7 +58,7 @@ pytest
 ### Utilities
 ```bash
 # Extract .mbox files into individual .eml files before scanning
-python -m src.scripts.extract_and_cleanup_mbox /path/to/mail.mbox
+python -m src.scripts.extract_and_cleanup_mbox /path/to/mailboxes
 
 # Manually sync Full-Text Search index
 python -m src.scripts.sync_fts
