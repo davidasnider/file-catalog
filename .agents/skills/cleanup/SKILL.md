@@ -10,13 +10,13 @@ description: Safely cleans up the local repository after a PR is merged. Switche
 CURRENT_BRANCH=$(git branch --show-current)
 
 # 1. Safety Check: Don't run on main
-if [ "$CURRENT_BRANCH" == "main" ]; then
+if [[ "$CURRENT_BRANCH" == "main" ]]; then
     echo "ℹ️ Already on main branch. Nothing to clean up."
     exit 0
 fi
 
 # 2. Safety Check: Ensure git tree is clean
-if [ -n "$(git status --porcelain)" ]; then
+if [[ -n "$(git status --porcelain)" ]]; then
     echo "❌ Error: Git tree is not clean. Please commit or stash your changes before cleaning up."
     exit 1
 fi
@@ -25,7 +25,7 @@ fi
 echo "🔍 Checking PR status for branch: $CURRENT_BRANCH..."
 PR_STATE=$(gh pr view --json state --jq .state 2>/dev/null)
 
-if [ "$PR_STATE" != "MERGED" ]; then
+if [[ "$PR_STATE" != "MERGED" ]]; then
     echo "⚠️ Warning: PR for '$CURRENT_BRANCH' is not merged yet (State: ${PR_STATE:-UNKNOWN})."
     echo "Aborting cleanup to prevent data loss."
     exit 1
