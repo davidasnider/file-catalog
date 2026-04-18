@@ -3,8 +3,39 @@ description: Systematically process and fix pull request review comments one by 
 ---
 
 1.  **Fetch Comments**: Use the GitHub MCP server (`mcp_github_pull_request_read`) with `method="get_review_comments"` to retrieve all review threads for the current PR.
-    a. If there are no comments, sleep for 1 minute and then repeat this step until comments are available.
+    a. **Automatic Wait**: If there are no review threads, the agent **MUST** wait (e.g., sleep for 60 seconds) and repeat the fetch until at least one comment is found. Do not exit if the PR is still open and no comments have arrived yet.
 2.  **Filter Unresolved**: Identify threads where `isResolved` is `false` and examine the `comments` within those threads.
+
+// turbo
+```bash
+# Example logic for polling for PR comments
+PR_NUMBER=$(gh pr view --json number -q .number)
+
+while true; do
+  echo "Checking for unresolved review comments on PR #$PR_NUMBER..."
+  THREADS=$(gh api graphql -f query='
+    query($owner: String!, $repo: String!, $pull: Int!) {
+      repository(owner: $owner, name: $repo) {
+        pullRequest(number: $pull) {
+          reviewThreads(first: 50) {
+            nodes {
+              isResolved
+              comments(first: 1) { nodes { body } }
+            }
+          }
+        }
+      }
+    }' -f owner=:owner -f repo=:repo -I pull=$PR_NUMBER --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)')
+
+  if [ -n "$THREADS" ]; then
+    echo "Found unresolved comments. Proceeding with fixes..."
+    break
+  fi
+
+  echo "No comments found yet. Sleeping for 60s..."
+  sleep 60
+done
+```
 3.  **Process Methodically**: For each unresolved comment thread:
     a. **Analyze**: Read the comment and the associated code carefully to understand the requested change.
     b. **Implement**: Apply the necessary code changes to address the specific comment.
