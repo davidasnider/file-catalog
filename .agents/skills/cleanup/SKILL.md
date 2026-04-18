@@ -10,7 +10,7 @@ description: Safely cleans up the local repository after a PR is merged. Switche
 CURRENT_BRANCH=$(git branch --show-current)
 
 # 1. Safety Check: Don't run on main
-if [ "$CURRENT_BRANCH" == "main" ]; then
+if [ "$CURRENT_BRANCH" = "main" ]; then
     echo "ℹ️ Already on main branch. Nothing to clean up."
     exit 0
 fi
