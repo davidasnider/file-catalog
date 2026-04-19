@@ -199,27 +199,29 @@ async def ingest_directory(
     files_on_disk = []
 
     def walk_disk():
-        found = []
         for root, _, files in os.walk(base_path):
             for filename in files:
                 if filename.startswith("."):
                     continue
                 if has_ignored_extension(filename):
                     continue
-                found.append(str((Path(root) / filename).resolve()))
-        return found
+                yield str((Path(root) / filename).resolve())
 
-    files_on_disk = await asyncio.to_thread(walk_disk)
+    # Discovery is now incremental via a generator
+    files_on_disk = walk_disk()
 
     if progress and task_id is not None:
-        total_files = (
-            len(files_on_disk) if limit is None else min(limit, len(files_on_disk))
-        )
+        # Initial description for walking/ingesting
         progress.update(
-            task_id, total=total_files, description="[yellow]Ingesting files..."
+            task_id,
+            total=None,
+            description="[yellow]Discovering and ingesting files...",
         )
 
     processed_doc_ids = []
+    # Temporary buffers for the current transaction batch (Copilot Fix: Atomic Sets)
+    batch_processed_ids = []
+    batch_queued_ids = []
     # Patience: use smaller batch size and yield often so workers get DB time
     batch_size = getattr(config, "ingest_batch_size", 25)
     pending_updates = 0
@@ -280,7 +282,6 @@ async def ingest_directory(
                 doc.mime_type = mime_type
                 doc.file_size = file_size
                 doc.mtime = mtime
-                processed_doc_ids.append(doc.id)
                 current_doc_id = doc.id
             else:
                 # New document
@@ -295,24 +296,29 @@ async def ingest_directory(
                 session.add(new_doc)
                 # Flush the session to get the ID but don't commit yet to avoid overhead
                 await session.flush()
-                processed_doc_ids.append(new_doc.id)
                 current_doc_id = new_doc.id
 
             if (
                 doc_queue is not None
                 and queued_docs is not None
                 and current_doc_id not in queued_docs
+                and current_doc_id not in batch_queued_ids
             ):
                 # Buffer IDs to queue only after commit to avoid workers missing docs
                 batch_ids_to_queue.append((current_doc_id, file_path, mime_type))
-                queued_docs.add(current_doc_id)
+                batch_queued_ids.append(current_doc_id)
 
+            batch_processed_ids.append(current_doc_id)
             pending_updates += 1
 
             # Commit in batches to reduce SQLite locks and transaction overhead
             if pending_updates >= batch_size:
                 await session.commit()
-                # Now that commit is successful, push to queue
+                # Now that commit is successful, finalize state and push to queue
+                processed_doc_ids.extend(batch_processed_ids)
+                if queued_docs is not None:
+                    queued_docs.update(batch_queued_ids)
+
                 for bid, path, mtype in batch_ids_to_queue:
                     if id_to_path is not None:
                         id_to_path[bid] = path
@@ -323,6 +329,8 @@ async def ingest_directory(
                     await doc_queue.put(bid)
 
                 batch_ids_to_queue = []
+                batch_processed_ids = []
+                batch_queued_ids = []
                 pending_updates = 0
                 await asyncio.sleep(0.1)  # Patience: yield to worker tasks
 
@@ -332,13 +340,16 @@ async def ingest_directory(
             if isinstance(e, SQLAlchemyError):
                 logger.error(f"Database error during ingestion, rolling back: {e}")
                 await session.rollback()
-                # Clear buffers to prevent poisoning subsequent batches
+                # Reset buffers (Copilot Fix: Atomic Sets)
                 batch_ids_to_queue = []
+                batch_processed_ids = []
+                batch_queued_ids = []
                 pending_updates = 0
             else:
                 logger.error(f"Error ingesting {file_path}: {e}")
 
         if progress and task_id is not None:
+            # We don't have a fixed total yet, so we just advance
             progress.advance(task_id)
 
         if limit is not None and len(processed_doc_ids) >= limit:
@@ -347,6 +358,10 @@ async def ingest_directory(
     # Final commit for the last batch
     if pending_updates > 0 or batch_ids_to_queue:
         await session.commit()
+        processed_doc_ids.extend(batch_processed_ids)
+        if queued_docs is not None:
+            queued_docs.update(batch_queued_ids)
+
         for bid, path, mtype in batch_ids_to_queue:
             if id_to_path is not None:
                 id_to_path[bid] = path
