@@ -221,7 +221,7 @@ async def ingest_directory(
 
     processed_doc_ids = []
     # Patience: use smaller batch size and yield often so workers get DB time
-    batch_size = 25
+    batch_size = getattr(config, "ingest_batch_size", 25)
     pending_updates = 0
     batch_ids_to_queue = []
 
@@ -695,6 +695,12 @@ async def run_scanner(
             )
             for row in result.all():
                 doc_id, path, mime_type = row
+                # Verify file still exists on disk before queueing
+                if not os.path.exists(path):
+                    logger.warning(
+                        f"File missing on disk during startup, skipping: {path}"
+                    )
+                    continue
                 docs_to_process.append(doc_id)
                 queued_docs.add(doc_id)
                 id_to_path[doc_id] = path
@@ -941,14 +947,19 @@ async def run_scanner(
         try:
             # Wait for background ingest to finish streaming
             await ingest_bg_task
-
-            # Send sentinels to tell workers to shut down after queue is empty
+        except Exception as e:
+            logger.error(f"Background ingestion failed: {e}")
+            # Cancel workers on failure to stop processing
+            for w in workers:
+                w.cancel()
+        finally:
+            # Send sentinels to tell any remaining workers to shut down
             for _ in range(max_concurrent):
                 await doc_queue.put(None)
 
-            # Wait for all workers to finish
-            await asyncio.gather(*workers)
-        finally:
+            # Wait for all workers to finish (allowing for cancellation/sentinels)
+            await asyncio.gather(*workers, return_exceptions=True)
+
             import signal
 
             try:

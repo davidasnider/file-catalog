@@ -16,12 +16,12 @@ logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
-async def report_failures(format="table", task_filter=None, ext_filter=None):
+async def report_failures(output_format="table", task_filter=None, ext_filter=None):
     """
     Generate a report of pipeline failures from the database.
 
     Args:
-        format (str): Output format, either "table" (Rich) or "json".
+        output_format (str): Output format, either "table" (Rich) or "json".
         task_filter (str, optional): Name of a specific task to filter by.
         ext_filter (str, optional): File extension to filter by (e.g., ".pdf").
     """
@@ -81,7 +81,7 @@ async def report_failures(format="table", task_filter=None, ext_filter=None):
             }
         )
 
-    if format == "json":
+    if output_format == "json":
         print(json.dumps(failures, indent=2))
         return
 
@@ -139,19 +139,23 @@ async def report_failures(format="table", task_filter=None, ext_filter=None):
 
     for status, mime, count in raw_stats:
         m = mime or "unknown"
+        # Filter by extension if requested
+        # Note: raw_stats query should ideally be filtered in SQL if ext_filter is present
+        # but for now we aggregate here.
         s = status.name if hasattr(status, "name") else str(status)
-        if s in ["FAILED", "COMPLETED", "PENDING"]:
-            summary_stats[m][s] = count
-        elif s in ["ANALYZING", "EXTRACTING"]:
-            summary_stats[m]["PENDING"] += (
-                count  # Treat in-progress as pending for this view
-            )
+        if s == "COMPLETED":
+            summary_stats[m]["COMPLETED"] = count
+        elif s in ["PENDING", "ANALYZING", "EXTRACTING"]:
+            summary_stats[m]["PENDING"] += count
 
-    # Ensure anything that failed in tasks but not doc status is counted in FAILED for the summary
+    # Use the failures list for the most accurate FAILED counts
+    # (handles task-level failures that didn't flip doc status yet)
+    mime_to_failed_docs = defaultdict(set)
     for f in failures:
-        summary_stats[f["mime_type"] or "unknown"]["FAILED"] = max(
-            summary_stats[f["mime_type"] or "unknown"]["FAILED"], 1
-        )  # Just ensures it's at least 1 if we have a failure record
+        mime_to_failed_docs[f["mime_type"] or "unknown"].add(f["document_id"])
+
+    for mime, doc_ids in mime_to_failed_docs.items():
+        summary_stats[mime]["FAILED"] = len(doc_ids)
 
     # Sort by frequency of FAILED descending
     sorted_mimes = sorted(
@@ -191,7 +195,9 @@ def main():
     args = parser.parse_args()
 
     asyncio.run(
-        report_failures(format=args.format, task_filter=args.task, ext_filter=args.ext)
+        report_failures(
+            output_format=args.format, task_filter=args.task, ext_filter=args.ext
+        )
     )
 
 
