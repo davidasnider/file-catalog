@@ -21,33 +21,54 @@ ATTEMPT=1
 while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
   echo "🔍 Checking for unresolved comments on $OWNER/$REPO PR #$PR_NUMBER (Attempt $ATTEMPT/$MAX_ATTEMPTS)..."
 
-  # Fetch unresolved review threads using correctly typed parameters
-  THREADS=$(gh api graphql -F owner="$OWNER" -F repo="$REPO" -F pull="$PR_NUMBER" -f query='
-    query($owner: String!, $repo: String!, $pull: Int!) {
-      repository(owner: $owner, name: $repo) {
-        pullRequest(number: $pull) {
-          reviewThreads(first: 50) {
-            nodes {
-              isResolved
-              id
-              comments(last: 1) {
-                nodes {
-                  body
-                  path
-                  line
-                  author { login }
+  # We use cursor-based pagination to ensure we check all threads
+  HAS_NEXT_PAGE=true
+  CURSOR="null"
+  ALL_UNRESOLVED=""
+
+  while [ "$HAS_NEXT_PAGE" = "true" ]; do
+    # Ensure cursor is passed as null for the first page
+    [ "$CURSOR" = "null" ] && RE_CURSOR="" || RE_CURSOR="$CURSOR"
+
+    RESPONSE=$(gh api graphql -F owner="$OWNER" -F repo="$REPO" -F pull="$PR_NUMBER" -F cursor="$RE_CURSOR" -f query='
+      query($owner: String!, $repo: String!, $pull: Int!, $cursor: String) {
+        repository(owner: $owner, name: $repo) {
+          pullRequest(number: $pull) {
+            reviewThreads(first: 100, after: $cursor) {
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+              nodes {
+                isResolved
+                id
+                comments(last: 1) {
+                  nodes {
+                    body
+                    path
+                    line
+                    author { login }
+                  }
                 }
               }
             }
           }
         }
-      }
-    }' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)')
+      }')
 
-  if [ -n "$THREADS" ]; then
+    NEW_UNRESOLVED=$(echo "$RESPONSE" | jq -r '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | .comments.nodes[0] | "• \(.author.login) asks on \(.path):\(.line): \(.body)"')
+    if [ -n "$NEW_UNRESOLVED" ] && [ "$NEW_UNRESOLVED" != "null" ]; then
+      ALL_UNRESOLVED="${ALL_UNRESOLVED}${NEW_UNRESOLVED}"$'\n'
+    fi
+
+    HAS_NEXT_PAGE=$(echo "$RESPONSE" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage')
+    CURSOR=$(echo "$RESPONSE" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor')
+  done
+
+  if [ -n "$ALL_UNRESOLVED" ] && [ "$ALL_UNRESOLVED" != "" ]; then
     echo "📣 Found unresolved comments:"
-    echo "$THREADS" | jq -rs '.[] | .comments.nodes[0] | "• \(.author.login) asks on \(.path):\(.line): \(.body)"'
-    echo "💡 Proceeding to fix these issues one by one."
+    echo "$ALL_UNRESOLVED"
+    echo "💡 Proceeding to fix these issues. REMINDER: You MUST post a reply to every thread once addressed."
     exit 0
   fi
 

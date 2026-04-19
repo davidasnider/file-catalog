@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Optional, List
+from sqlalchemy import String
 from sqlmodel import Field, SQLModel, Relationship
 from datetime import datetime, timezone
 
@@ -10,6 +11,7 @@ class DocumentStatus(str, Enum):
     ANALYZING = "ANALYZING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
+    NOT_PRESENT = "NOT_PRESENT"
 
 
 class TaskStatus(str, Enum):
@@ -37,7 +39,11 @@ class Document(SQLModel, table=True):
     mtime: Optional[float] = Field(
         default=None, description="Modification time of the file (POSIX timestamp)"
     )
-    status: DocumentStatus = Field(default=DocumentStatus.PENDING)
+    # Use String for storage to avoid SQLite Enum CHECK constraints while keeping Python enum
+    status: DocumentStatus = Field(
+        default=DocumentStatus.PENDING,
+        sa_type=String,  # Avoid SQLAlchemy Enum type on SQLite
+    )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

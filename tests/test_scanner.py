@@ -1,3 +1,4 @@
+import asyncio
 import pytest
 
 from sqlmodel import select
@@ -100,6 +101,12 @@ async def test_ingest_directory_excludes_noise_files(db_session, temp_dir):
     css_file = temp_dir / "styles.css"
     css_file.write_text("body { color: red; }")
 
+    font_file = temp_dir / "font.ttf"
+    font_file.write_text("dummy font data")
+
+    source_file = temp_dir / "main.c"
+    source_file.write_text("int main() { return 0; }")
+
     # Ingest directory
     processed_ids = await ingest_directory(str(temp_dir), db_session)
 
@@ -110,11 +117,38 @@ async def test_ingest_directory_excludes_noise_files(db_session, temp_dir):
     docs = result.scalars().all()
     assert len(docs) == 2
     for doc in docs:
-        # Explicitly verify we didn't ingest any of the noise files
         assert "script.js" not in doc.path
         assert "module.py" not in doc.path
         assert "styles.css" not in doc.path
+        assert "font.ttf" not in doc.path
+        assert "main.c" not in doc.path
         assert doc.path.endswith(".txt")
+
+
+@pytest.mark.asyncio
+async def test_ingest_directory_with_queue(db_session, temp_dir):
+    doc_queue = asyncio.Queue()
+    queued_docs = set()
+    docs_to_process = []
+
+    # Ingest directory using the queue feature
+    processed_ids = await ingest_directory(
+        str(temp_dir),
+        db_session,
+        doc_queue=doc_queue,
+        queued_docs=queued_docs,
+        docs_to_process=docs_to_process,
+    )
+
+    assert len(processed_ids) == 2
+    assert len(queued_docs) == 2
+    assert len(docs_to_process) == 2
+
+    # Check that items were put on the queue
+    item1 = await doc_queue.get()
+    item2 = await doc_queue.get()
+
+    assert {item1, item2} == set(processed_ids)
 
 
 @pytest.mark.asyncio
@@ -160,3 +194,95 @@ async def test_run_scanner_chunked_metadata(db_session, temp_dir):
     assert len(id_to_path) == 1200
     assert id_to_path[ingested_ids[0]] == "/path/to/doc0.txt"
     assert id_to_mime[ingested_ids[1199]] == "text/plain"
+
+
+@pytest.mark.asyncio
+async def test_ingest_directory_atomic_queueing(db_session, temp_dir):
+    """Verify that IDs are only enqueued after the DB session is committed."""
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from src.core.config import config
+
+    doc_queue = asyncio.Queue()
+    queued_docs = set()
+
+    # We use a batch size of 1 for predictable commit points in this test
+    original_batch_size = config.ingest_batch_size
+    config.ingest_batch_size = 1
+
+    try:
+        async_session_maker = sessionmaker(
+            db_session.bind, class_=AsyncSession, expire_on_commit=False
+        )
+
+        real_put = doc_queue.put
+
+        async def wrapped_put(item):
+            # When an item is put in the queue, it MUST be visible to a new session
+            async with async_session_maker() as session:
+                doc = await session.get(Document, item)
+                assert (
+                    doc is not None
+                ), f"Document {item} was enqueued before it was committed to the DB!"
+            await real_put(item)
+
+        doc_queue.put = wrapped_put
+
+        await ingest_directory(
+            str(temp_dir), db_session, doc_queue=doc_queue, queued_docs=queued_docs
+        )
+
+        assert doc_queue.qsize() == 2
+    finally:
+        config.ingest_batch_size = original_batch_size
+
+
+@pytest.mark.asyncio
+async def test_run_scanner_handles_missing_files(db_session, temp_dir):
+    """Verify that documents whose files are missing on disk are marked as NOT_PRESENT."""
+    from src.scanner import _load_and_queue_existing_docs
+
+    # 1. Create a document in the DB
+    doc_path = str(temp_dir / "non_existent_file_12345.txt")
+    doc = Document(
+        path=doc_path,
+        mime_type="text/plain",
+        file_hash="dummyhash",
+        file_size=100,
+        mtime=1.0,
+        status=DocumentStatus.PENDING,
+    )
+    db_session.add(doc)
+    await db_session.commit()
+
+    # 2. Run the specific startup logic function
+    from unittest.mock import AsyncMock, MagicMock
+
+    docs_to_process = []
+    queued_docs = set()
+    id_to_path = {}
+    id_to_mime = {}
+    doc_queue = asyncio.Queue()
+
+    # Mocking the session maker context manager cleanly
+    mock_session_cm = AsyncMock()
+    mock_session_cm.__aenter__.return_value = db_session
+    mock_session_cm.__aexit__.return_value = None
+    mock_session_maker = MagicMock(return_value=mock_session_cm)
+
+    await _load_and_queue_existing_docs(
+        mock_session_maker,
+        docs_to_process,
+        queued_docs,
+        id_to_path,
+        id_to_mime,
+        doc_queue,
+    )
+
+    # 3. Verify the document is now NOT_PRESENT
+    # Reload from fresh query to avoid session state issues
+    result = await db_session.execute(select(Document).where(Document.id == doc.id))
+    updated_doc = result.scalars().first()
+    assert updated_doc.status == DocumentStatus.NOT_PRESENT
+    assert updated_doc.id not in docs_to_process
+    assert doc_queue.empty()
