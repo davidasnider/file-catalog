@@ -132,10 +132,12 @@ async def report_failures(output_format="table", task_filter=None, ext_filter=No
         stats_result = await session.execute(stats_query)
         raw_stats = stats_result.all()
 
-    # Aggregate stats: {mime: {"FAILED": X, "COMPLETED": Y, "PENDING": Z}}
+    # Aggregate stats: {mime: {"FAILED": X, "COMPLETED": Y, "PENDING": Z, "MISSING": W}}
     from collections import defaultdict
 
-    summary_stats = defaultdict(lambda: {"FAILED": 0, "COMPLETED": 0, "PENDING": 0})
+    summary_stats = defaultdict(
+        lambda: {"FAILED": 0, "COMPLETED": 0, "PENDING": 0, "MISSING": 0}
+    )
 
     for status, mime, count in raw_stats:
         m = mime or "unknown"
@@ -145,6 +147,8 @@ async def report_failures(output_format="table", task_filter=None, ext_filter=No
         s = status.name if hasattr(status, "name") else str(status)
         if s == "COMPLETED":
             summary_stats[m]["COMPLETED"] = count
+        elif s == "NOT_PRESENT":
+            summary_stats[m]["MISSING"] = count
         elif s in ["PENDING", "ANALYZING", "EXTRACTING"]:
             summary_stats[m]["PENDING"] += count
 
@@ -169,14 +173,21 @@ async def report_failures(output_format="table", task_filter=None, ext_filter=No
     summary_table.add_column("Failed", justify="right", style="bold red")
     summary_table.add_column("Succeeded", justify="right", style="green")
     summary_table.add_column("Pending", justify="right", style="dim yellow")
+    summary_table.add_column("Missing", justify="right", style="dim cyan")
 
     for mime, counts in sorted_mimes:
-        if counts["FAILED"] > 0 or counts["COMPLETED"] > 0 or counts["PENDING"] > 0:
+        if (
+            counts["FAILED"] > 0
+            or counts["COMPLETED"] > 0
+            or counts["PENDING"] > 0
+            or counts["MISSING"] > 0
+        ):
             summary_table.add_row(
                 mime,
                 str(counts["FAILED"]),
                 str(counts["COMPLETED"]),
                 str(counts["PENDING"]),
+                str(counts["MISSING"]),
             )
 
     console.print(summary_table)

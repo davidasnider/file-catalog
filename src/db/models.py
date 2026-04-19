@@ -10,6 +10,7 @@ class DocumentStatus(str, Enum):
     ANALYZING = "ANALYZING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
+    NOT_PRESENT = "NOT_PRESENT"
 
 
 class TaskStatus(str, Enum):

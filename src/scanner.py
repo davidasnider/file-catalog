@@ -350,6 +350,40 @@ async def ingest_directory(
     return processed_doc_ids
 
 
+async def _load_and_queue_existing_docs(
+    async_session_maker,
+    docs_to_process,
+    queued_docs,
+    id_to_path,
+    id_to_mime,
+    doc_queue,
+):
+    """Helper to load non-COMPLETED docs from DB and queue those present on disk."""
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(Document).where(
+                (Document.status != DocumentStatus.COMPLETED)
+                & (Document.status != DocumentStatus.NOT_PRESENT)
+            )
+        )
+        # Fetch all so we can modify and commit missing ones
+        docs = result.scalars().all()
+        for doc in docs:
+            # Verify file still exists on disk before queueing
+            if not os.path.exists(doc.path):
+                logger.warning(
+                    f"File missing on disk during startup, marking as NOT_PRESENT: {doc.path}"
+                )
+                doc.status = DocumentStatus.NOT_PRESENT
+                continue
+            docs_to_process.append(doc.id)
+            queued_docs.add(doc.id)
+            id_to_path[doc.id] = doc.path
+            id_to_mime[doc.id] = doc.mime_type
+            doc_queue.put_nowait(doc.id)
+        await session.commit()
+
+
 async def run_scanner(
     directory: str,
     max_concurrent: int,
@@ -679,33 +713,24 @@ async def run_scanner(
         progress.start()
         ingest_task = progress.add_task("[yellow]Ingesting files...", total=None)
 
+        id_to_mime = {}
+
         doc_queue = asyncio.Queue()
         docs_to_process = []
         started_ids = set()
         queued_docs = set()
         id_to_path = {}
-        id_to_mime = {}
 
         # 1. Initial Startup: Load PENDING/FAILED documents from DB first
-        async with async_session_maker() as session:
-            result = await session.execute(
-                select(Document.id, Document.path, Document.mime_type).where(
-                    Document.status != DocumentStatus.COMPLETED
-                )
-            )
-            for row in result.all():
-                doc_id, path, mime_type = row
-                # Verify file still exists on disk before queueing
-                if not os.path.exists(path):
-                    logger.warning(
-                        f"File missing on disk during startup, skipping: {path}"
-                    )
-                    continue
-                docs_to_process.append(doc_id)
-                queued_docs.add(doc_id)
-                id_to_path[doc_id] = path
-                id_to_mime[doc_id] = mime_type
-                doc_queue.put_nowait(doc_id)
+        # Extract to a function to handle detection logic cleanly
+        await _load_and_queue_existing_docs(
+            async_session_maker,
+            docs_to_process,
+            queued_docs,
+            id_to_path,
+            id_to_mime,
+            doc_queue,
+        )
 
         # Update total docs early for the progress bar
         total_docs = len(docs_to_process)

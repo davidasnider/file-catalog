@@ -235,3 +235,54 @@ async def test_ingest_directory_atomic_queueing(db_session, temp_dir):
         assert doc_queue.qsize() == 2
     finally:
         config.ingest_batch_size = original_batch_size
+
+
+@pytest.mark.asyncio
+async def test_run_scanner_handles_missing_files(db_session, temp_dir):
+    """Verify that documents whose files are missing on disk are marked as NOT_PRESENT."""
+    from src.scanner import _load_and_queue_existing_docs
+
+    # 1. Create a document in the DB
+    doc_path = "/tmp/non_existent_file_12345.txt"
+    doc = Document(
+        path=doc_path,
+        mime_type="text/plain",
+        file_hash="dummyhash",
+        file_size=100,
+        mtime=1.0,
+        status=DocumentStatus.PENDING,
+    )
+    db_session.add(doc)
+    await db_session.commit()
+
+    # 2. Run the specific startup logic function
+    from unittest.mock import AsyncMock, MagicMock
+
+    docs_to_process = []
+    queued_docs = set()
+    id_to_path = {}
+    id_to_mime = {}
+    doc_queue = asyncio.Queue()
+
+    # Mocking the session maker context manager cleanly
+    mock_session_cm = AsyncMock()
+    mock_session_cm.__aenter__.return_value = db_session
+    mock_session_cm.__aexit__.return_value = None
+    mock_session_maker = MagicMock(return_value=mock_session_cm)
+
+    await _load_and_queue_existing_docs(
+        mock_session_maker,
+        docs_to_process,
+        queued_docs,
+        id_to_path,
+        id_to_mime,
+        doc_queue,
+    )
+
+    # 3. Verify the document is now NOT_PRESENT
+    # Reload from fresh query to avoid session state issues
+    result = await db_session.execute(select(Document).where(Document.id == doc.id))
+    updated_doc = result.scalars().first()
+    assert updated_doc.status == DocumentStatus.NOT_PRESENT
+    assert updated_doc.id not in docs_to_process
+    assert doc_queue.empty()
