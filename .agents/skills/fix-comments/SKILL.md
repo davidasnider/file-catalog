@@ -47,7 +47,7 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
   if [ -n "$THREADS" ]; then
     echo "📣 Found unresolved comments:"
     echo "$THREADS" | jq -rs '.[] | .comments.nodes[0] | "• \(.author.login) asks on \(.path):\(.line): \(.body)"'
-    echo "💡 Proceeding to fix these issues one by one."
+    echo "💡 Proceeding to fix these issues. REMINDER: You MUST post a reply to every thread once addressed."
     exit 0
   fi
 

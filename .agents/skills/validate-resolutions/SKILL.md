@@ -34,7 +34,34 @@ if [ -n "$UNRESOLVED" ]; then
     exit 1
 fi
 
-echo "✅ All PR comments have been resolved."
+echo "✅ All PR threads are marked as resolved."
+
+echo "🔍 Verifying agent responses for all threads..."
+THREADS_WITHOUT_REPLIES=$(gh api graphql -F owner="$OWNER" -F repo="$REPO" -F pull="$PR_NUMBER" -f query='
+  query($owner: String!, $repo: String!, $pull: Int!) {
+    repository(owner: $owner, name: $repo) {
+      pullRequest(number: $pull) {
+        reviewThreads(first: 50) {
+          nodes {
+            isResolved
+            comments(first: 100) {
+              nodes {
+                author { login }
+              }
+            }
+          }
+        }
+      }
+    }
+  }' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.comments.nodes | map(.author.login) | length < 2)')
+
+if [ -n "$THREADS_WITHOUT_REPLIES" ]; then
+    NUM_MISSING=$(echo "$THREADS_WITHOUT_REPLIES" | wc -l | tr -d ' ')
+    echo "❌ Error: $NUM_MISSING review threads have zero replies. You MUST reply to every thread."
+    exit 1
+fi
+
+echo "✅ All review threads have received a response."
 
 # Now trigger code analysis
 echo "🧪 Running final code analysis..."
