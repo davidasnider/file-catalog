@@ -223,6 +223,7 @@ async def ingest_directory(
     # Patience: use smaller batch size and yield often so workers get DB time
     batch_size = 25
     pending_updates = 0
+    batch_ids_to_queue = []
 
     for file_path in files_on_disk:
         try:
@@ -302,20 +303,26 @@ async def ingest_directory(
                 and queued_docs is not None
                 and current_doc_id not in queued_docs
             ):
+                # Buffer IDs to queue only after commit to avoid workers missing docs
+                batch_ids_to_queue.append((current_doc_id, file_path, mime_type))
                 queued_docs.add(current_doc_id)
-                if id_to_path is not None:
-                    id_to_path[current_doc_id] = file_path
-                if id_to_mime is not None:
-                    id_to_mime[current_doc_id] = mime_type
-                if docs_to_process is not None:
-                    docs_to_process.append(current_doc_id)
-                await doc_queue.put(current_doc_id)
 
             pending_updates += 1
 
             # Commit in batches to reduce SQLite locks and transaction overhead
             if pending_updates >= batch_size:
                 await session.commit()
+                # Now that commit is successful, push to queue
+                for bid, path, mtype in batch_ids_to_queue:
+                    if id_to_path is not None:
+                        id_to_path[bid] = path
+                    if id_to_mime is not None:
+                        id_to_mime[bid] = mtype
+                    if docs_to_process is not None:
+                        docs_to_process.append(bid)
+                    await doc_queue.put(bid)
+
+                batch_ids_to_queue = []
                 pending_updates = 0
                 await asyncio.sleep(0.1)  # Patience: yield to worker tasks
 
@@ -329,8 +336,16 @@ async def ingest_directory(
             break
 
     # Final commit for the last batch
-    if pending_updates > 0:
+    if pending_updates > 0 or batch_ids_to_queue:
         await session.commit()
+        for bid, path, mtype in batch_ids_to_queue:
+            if id_to_path is not None:
+                id_to_path[bid] = path
+            if id_to_mime is not None:
+                id_to_mime[bid] = mtype
+            if docs_to_process is not None:
+                docs_to_process.append(bid)
+            await doc_queue.put(bid)
 
     return processed_doc_ids
 
