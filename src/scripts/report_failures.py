@@ -121,14 +121,29 @@ async def report_failures(output_format="table", task_filter=None, ext_filter=No
 
     console.print(table)
 
-    # Fetch global stats for the summary table
+    # Fetch summary stats for the summary table
     async with async_session_maker() as session:
         from sqlalchemy import func
 
         # Query: count(id), status, mime_type GROUP BY status, mime_type
         stats_query = select(
             Document.status, Document.mime_type, func.count(Document.id)
-        ).group_by(Document.status, Document.mime_type)
+        )
+
+        if ext_filter:
+            stats_query = stats_query.where(Document.path.like(f"%{ext_filter}"))
+
+        if task_filter:
+            # If filtering by task, we need to join AnalysisTask to correctly count
+            # but note that simple COMPLETED/PENDING might not make sense if we only
+            # look at documents that have at least one of that specific task.
+            # For simplicity, we filter the doc set to those that have the task.
+            stats_query = stats_query.join(AnalysisTask).where(
+                AnalysisTask.task_name == task_filter
+            )
+
+        stats_query = stats_query.group_by(Document.status, Document.mime_type)
+
         stats_result = await session.execute(stats_query)
         raw_stats = stats_result.all()
 
@@ -141,9 +156,7 @@ async def report_failures(output_format="table", task_filter=None, ext_filter=No
 
     for status, mime, count in raw_stats:
         m = mime or "unknown"
-        # Filter by extension if requested
-        # Note: raw_stats query should ideally be filtered in SQL if ext_filter is present
-        # but for now we aggregate here.
+        # Filter by extension logic moved to SQL stats_query
         s = status.name if hasattr(status, "name") else str(status)
         if s == "COMPLETED":
             summary_stats[m]["COMPLETED"] = count

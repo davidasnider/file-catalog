@@ -327,7 +327,16 @@ async def ingest_directory(
                 await asyncio.sleep(0.1)  # Patience: yield to worker tasks
 
         except Exception as e:
-            logger.error(f"Error ingesting {file_path}: {e}")
+            from sqlalchemy.exc import SQLAlchemyError
+
+            if isinstance(e, SQLAlchemyError):
+                logger.error(f"Database error during ingestion, rolling back: {e}")
+                await session.rollback()
+                # Clear buffers to prevent poisoning subsequent batches
+                batch_ids_to_queue = []
+                pending_updates = 0
+            else:
+                logger.error(f"Error ingesting {file_path}: {e}")
 
         if progress and task_id is not None:
             progress.advance(task_id)
@@ -972,6 +981,9 @@ async def run_scanner(
         try:
             # Wait for background ingest to finish streaming
             await ingest_bg_task
+        except asyncio.CancelledError:
+            # Re-raise cancellation to allow proper shutdown cleanup
+            raise
         except Exception as e:
             logger.error(f"Background ingestion failed: {e}")
             # Cancel workers on failure to stop processing

@@ -19,7 +19,7 @@ UNRESOLVED=$(gh api graphql -F owner="$OWNER" -F repo="$REPO" -F pull="$PR_NUMBE
   query($owner: String!, $repo: String!, $pull: Int!) {
     repository(owner: $owner, name: $repo) {
       pullRequest(number: $pull) {
-        reviewThreads(first: 50) {
+        reviewThreads(last: 50) {
           nodes {
             isResolved
           }
@@ -41,7 +41,7 @@ THREADS_WITHOUT_REPLIES=$(gh api graphql -F owner="$OWNER" -F repo="$REPO" -F pu
   query($owner: String!, $repo: String!, $pull: Int!) {
     repository(owner: $owner, name: $repo) {
       pullRequest(number: $pull) {
-        reviewThreads(first: 50) {
+        reviewThreads(last: 50) {
           nodes {
             isResolved
             comments(first: 100) {
@@ -53,11 +53,10 @@ THREADS_WITHOUT_REPLIES=$(gh api graphql -F owner="$OWNER" -F repo="$REPO" -F pu
         }
       }
     }
-  }' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.comments.nodes | map(.author.login) | length < 2)')
+  }' --jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.comments.nodes | map(.author.login) | length < 2)] | length')
 
-if [ -n "$THREADS_WITHOUT_REPLIES" ]; then
-    NUM_MISSING=$(echo "$THREADS_WITHOUT_REPLIES" | wc -l | tr -d ' ')
-    echo "❌ Error: $NUM_MISSING review threads have zero replies. You MUST reply to every thread."
+if [ "$THREADS_WITHOUT_REPLIES" -gt 0 ]; then
+    echo "❌ Error: $THREADS_WITHOUT_REPLIES review threads have zero replies. You MUST reply to every thread."
     exit 1
 fi
 

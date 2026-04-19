@@ -243,7 +243,7 @@ async def test_run_scanner_handles_missing_files(db_session, temp_dir):
     from src.scanner import _load_and_queue_existing_docs
 
     # 1. Create a document in the DB
-    doc_path = "/tmp/non_existent_file_12345.txt"
+    doc_path = str(temp_dir / "non_existent_file_12345.txt")
     doc = Document(
         path=doc_path,
         mime_type="text/plain",

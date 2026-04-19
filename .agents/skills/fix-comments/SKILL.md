@@ -26,7 +26,7 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
     query($owner: String!, $repo: String!, $pull: Int!) {
       repository(owner: $owner, name: $repo) {
         pullRequest(number: $pull) {
-          reviewThreads(first: 50) {
+          reviewThreads(last: 50) {
             nodes {
               isResolved
               id
