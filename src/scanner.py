@@ -47,6 +47,33 @@ IGNORED_EXTENSIONS = {
     ".mbox",
     ".mbx",
     ".mbs",
+    # Fonts
+    ".ttf",
+    ".otf",
+    ".fon",
+    ".woff",
+    ".woff2",
+    # Source Code
+    ".c",
+    ".h",
+    ".cpp",
+    ".hpp",
+    ".cc",
+    ".hh",
+    ".java",
+    ".go",
+    ".rs",
+    ".php",
+    ".rb",
+    ".m",
+    ".mm",
+}
+
+IGNORED_MIME_TYPES = {
+    "text/x-c",
+    "text/xml",
+    "application/vnd.microsoft.portable-executable",
+    "text/x-c++",
 }
 
 
@@ -120,8 +147,30 @@ async def ingest_directory(
     task_id=None,
     limit: int = None,
     mime_type_filter: str = None,
+    doc_queue: asyncio.Queue = None,
+    queued_docs: set = None,
+    id_to_path: dict = None,
+    id_to_mime: dict = None,
+    docs_to_process: list = None,
 ) -> List[int]:
-    """Walk directory, compute hashes, and insert/update documents."""
+    """
+    Walk directory, compute hashes, and insert/update documents.
+
+    Supports a producer-consumer model via doc_queue.
+
+    Args:
+        directory: Path to scan.
+        session: DB session.
+        progress: Rich Progress object.
+        task_id: Rich Task ID for the ingestion bar.
+        limit: Max files to ingest.
+        mime_type_filter: Filter by MIME prefix.
+        doc_queue: Queue to push discovered/updated doc IDs into.
+        queued_docs: Set of IDs already in queue to prevent duplicates.
+        id_to_path: Map of doc ID to path (updated for streaming).
+        id_to_mime: Map of doc ID to MIME (updated for streaming).
+        docs_to_process: List of doc IDs (updated for streaming).
+    """
     base_path = Path(directory)
     if not base_path.exists() or not base_path.is_dir():
         if progress:
@@ -171,7 +220,8 @@ async def ingest_directory(
         )
 
     processed_doc_ids = []
-    batch_size = config.ingest_batch_size
+    # Patience: use smaller batch size and yield often so workers get DB time
+    batch_size = 25
     pending_updates = 0
 
     for file_path in files_on_disk:
@@ -197,6 +247,11 @@ async def ingest_directory(
 
             # 4. Content-based ingestion (only if needed)
             mime_type = await asyncio.to_thread(detect_file_type, file_path)
+
+            if mime_type in IGNORED_MIME_TYPES:
+                if progress and task_id is not None:
+                    progress.advance(task_id)
+                continue
 
             if mime_type_filter and not (
                 mime_type and mime_type.startswith(mime_type_filter)
@@ -225,6 +280,7 @@ async def ingest_directory(
                 doc.file_size = file_size
                 doc.mtime = mtime
                 processed_doc_ids.append(doc.id)
+                current_doc_id = doc.id
             else:
                 # New document
                 new_doc = Document(
@@ -239,6 +295,21 @@ async def ingest_directory(
                 # Flush the session to get the ID but don't commit yet to avoid overhead
                 await session.flush()
                 processed_doc_ids.append(new_doc.id)
+                current_doc_id = new_doc.id
+
+            if (
+                doc_queue is not None
+                and queued_docs is not None
+                and current_doc_id not in queued_docs
+            ):
+                queued_docs.add(current_doc_id)
+                if id_to_path is not None:
+                    id_to_path[current_doc_id] = file_path
+                if id_to_mime is not None:
+                    id_to_mime[current_doc_id] = mime_type
+                if docs_to_process is not None:
+                    docs_to_process.append(current_doc_id)
+                await doc_queue.put(current_doc_id)
 
             pending_updates += 1
 
@@ -246,6 +317,7 @@ async def ingest_directory(
             if pending_updates >= batch_size:
                 await session.commit()
                 pending_updates = 0
+                await asyncio.sleep(0.1)  # Patience: yield to worker tasks
 
         except Exception as e:
             logger.error(f"Error ingesting {file_path}: {e}")
@@ -592,47 +664,59 @@ async def run_scanner(
         progress.start()
         ingest_task = progress.add_task("[yellow]Ingesting files...", total=None)
 
+        doc_queue = asyncio.Queue()
+        docs_to_process = []
+        started_ids = set()
+        queued_docs = set()
+        id_to_path = {}
+        id_to_mime = {}
+
+        # 1. Initial Startup: Load PENDING/FAILED documents from DB first
         async with async_session_maker() as session:
-            # 1. Ingest files
-            ingested_ids = await ingest_directory(
-                directory, session, progress, ingest_task, limit, mime_type_filter
-            )
-            progress.update(
-                ingest_task,
-                description=f"[green]Ingestion complete! Found {len(ingested_ids)} valid files.",
-                completed=True,
-            )
-
-            if not ingested_ids:
-                return
-
-            # Fetch metadata in chunks to avoid SQLite's parameter limit (SQLITE_MAX_VARIABLE_NUMBER)
-            rows = []
-            chunk_size = 500
-            for i in range(0, len(ingested_ids), chunk_size):
-                chunk = ingested_ids[i : i + chunk_size]
-                result = await session.execute(
-                    select(Document.id, Document.path, Document.mime_type).where(
-                        Document.id.in_(chunk)
-                    )
+            result = await session.execute(
+                select(Document.id, Document.path, Document.mime_type).where(
+                    Document.status != DocumentStatus.COMPLETED
                 )
-                rows.extend(result.all())
-            id_to_path = {row[0]: row[1] for row in rows}
-            id_to_mime = {row[0]: row[2] for row in rows}
-            docs_to_process = ingested_ids
+            )
+            for row in result.all():
+                doc_id, path, mime_type = row
+                docs_to_process.append(doc_id)
+                queued_docs.add(doc_id)
+                id_to_path[doc_id] = path
+                id_to_mime[doc_id] = mime_type
+                doc_queue.put_nowait(doc_id)
 
-        if not docs_to_process:
-            console.print("[yellow]No documents to process.")
-            return
-
+        # Update total docs early for the progress bar
         total_docs = len(docs_to_process)
         overall_task = progress.add_task(
             "[cyan]Processing documents...", total=total_docs
         )
 
+        async def run_background_ingest():
+            async with async_session_maker() as session:
+                ingested_ids = await ingest_directory(
+                    directory,
+                    session,
+                    progress,
+                    ingest_task,
+                    limit,
+                    mime_type_filter,
+                    doc_queue=doc_queue,
+                    queued_docs=queued_docs,
+                    id_to_path=id_to_path,
+                    id_to_mime=id_to_mime,
+                    docs_to_process=docs_to_process,
+                )
+                progress.update(
+                    ingest_task,
+                    description=f"[green]Ingestion complete! Found {len(ingested_ids)} valid files.",
+                    completed=True,
+                )
+
+        ingest_bg_task = asyncio.create_task(run_background_ingest())
+
         active_tasks = {}  # doc_id -> progress_task_id
         waiting_tasks = {}  # doc_id -> progress_task_id
-        started_ids = set()
         completed_count = 0
         missing_models = set()
         missing_libraries = set()
@@ -659,6 +743,9 @@ async def run_scanner(
                 waiting_tasks[did] = progress.add_task(
                     f"  [dim]Waiting: {filename}[/dim]", total=None
                 )
+
+            # Keep total updated if ingest is streaming
+            progress.update(overall_task, total=len(docs_to_process))
 
         update_waiting()
 
@@ -822,9 +909,30 @@ async def run_scanner(
                         doc_id,
                     )
 
-        tasks = [process_and_check(doc_id) for doc_id in docs_to_process]
+        async def worker():
+            while True:
+                doc_id = await doc_queue.get()
+                if doc_id is None:  # Sentinel for shutdown
+                    doc_queue.task_done()
+                    break
+                try:
+                    await process_and_check(doc_id)
+                finally:
+                    doc_queue.task_done()
+
+        # Start workers
+        workers = [asyncio.create_task(worker()) for _ in range(max_concurrent)]
+
         try:
-            await asyncio.gather(*tasks)
+            # Wait for background ingest to finish streaming
+            await ingest_bg_task
+
+            # Send sentinels to tell workers to shut down after queue is empty
+            for _ in range(max_concurrent):
+                await doc_queue.put(None)
+
+            # Wait for all workers to finish
+            await asyncio.gather(*workers)
         finally:
             import signal
 

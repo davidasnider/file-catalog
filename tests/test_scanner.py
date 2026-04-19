@@ -1,3 +1,4 @@
+import asyncio
 import pytest
 
 from sqlmodel import select
@@ -100,6 +101,12 @@ async def test_ingest_directory_excludes_noise_files(db_session, temp_dir):
     css_file = temp_dir / "styles.css"
     css_file.write_text("body { color: red; }")
 
+    font_file = temp_dir / "font.ttf"
+    font_file.write_text("dummy font data")
+
+    source_file = temp_dir / "main.c"
+    source_file.write_text("int main() { return 0; }")
+
     # Ingest directory
     processed_ids = await ingest_directory(str(temp_dir), db_session)
 
@@ -110,11 +117,38 @@ async def test_ingest_directory_excludes_noise_files(db_session, temp_dir):
     docs = result.scalars().all()
     assert len(docs) == 2
     for doc in docs:
-        # Explicitly verify we didn't ingest any of the noise files
         assert "script.js" not in doc.path
         assert "module.py" not in doc.path
         assert "styles.css" not in doc.path
+        assert "font.ttf" not in doc.path
+        assert "main.c" not in doc.path
         assert doc.path.endswith(".txt")
+
+
+@pytest.mark.asyncio
+async def test_ingest_directory_with_queue(db_session, temp_dir):
+    doc_queue = asyncio.Queue()
+    queued_docs = set()
+    docs_to_process = []
+
+    # Ingest directory using the queue feature
+    processed_ids = await ingest_directory(
+        str(temp_dir),
+        db_session,
+        doc_queue=doc_queue,
+        queued_docs=queued_docs,
+        docs_to_process=docs_to_process,
+    )
+
+    assert len(processed_ids) == 2
+    assert len(queued_docs) == 2
+    assert len(docs_to_process) == 2
+
+    # Check that items were put on the queue
+    item1 = await doc_queue.get()
+    item2 = await doc_queue.get()
+
+    assert {item1, item2} == set(processed_ids)
 
 
 @pytest.mark.asyncio
