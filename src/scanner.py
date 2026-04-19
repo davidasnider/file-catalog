@@ -352,7 +352,10 @@ async def ingest_directory(
             # We don't have a fixed total yet, so we just advance
             progress.advance(task_id)
 
-        if limit is not None and len(processed_doc_ids) >= limit:
+        if (
+            limit is not None
+            and (len(processed_doc_ids) + len(batch_processed_ids)) >= limit
+        ):
             break
 
     # Final commit for the last batch

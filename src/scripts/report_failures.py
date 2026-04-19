@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.table import Table
 from sqlmodel import select
 
-from src.db.engine import async_session_maker
+from src.db.engine import async_session_maker, init_db
 from src.db.models import Document, AnalysisTask, DocumentStatus, TaskStatus
 
 # Set up logging early (or use the one from config)
@@ -25,6 +25,7 @@ async def report_failures(output_format="table", task_filter=None, ext_filter=No
         task_filter (str, optional): Name of a specific task to filter by.
         ext_filter (str, optional): File extension to filter by (e.g., ".pdf").
     """
+    await init_db()
     async with async_session_maker() as session:
         # Load all failed tasks and link them to their documents
         query = (

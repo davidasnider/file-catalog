@@ -27,18 +27,14 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
   ALL_UNRESOLVED=""
 
   while [ "$HAS_NEXT_PAGE" = "true" ]; do
-    # Handle the null cursor for the first page
-    if [ "$CURSOR" = "null" ]; then
-      AFTER_ARG=""
-    else
-      AFTER_ARG=", after: \\\"$CURSOR\\\""
-    fi
+    # Ensure cursor is passed as null for the first page
+    [ "$CURSOR" = "null" ] && RE_CURSOR="" || RE_CURSOR="$CURSOR"
 
-    RESPONSE=$(gh api graphql -F owner="$OWNER" -F repo="$REPO" -F pull="$PR_NUMBER" -f query='
-      query($owner: String!, $repo: String!, $pull: Int!) {
+    RESPONSE=$(gh api graphql -F owner="$OWNER" -F repo="$REPO" -F pull="$PR_NUMBER" -F cursor="$RE_CURSOR" -f query='
+      query($owner: String!, $repo: String!, $pull: Int!, $cursor: String) {
         repository(owner: $owner, name: $repo) {
           pullRequest(number: $pull) {
-            reviewThreads(first: 100'"$AFTER_ARG"') {
+            reviewThreads(first: 100, after: $cursor) {
               pageInfo {
                 hasNextPage
                 endCursor

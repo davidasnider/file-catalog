@@ -21,17 +21,13 @@ CURSOR="null"
 UNRESOLVED_COUNT=0
 
 while [ "$HAS_NEXT_PAGE" = "true" ]; do
-  if [ "$CURSOR" = "null" ]; then
-    AFTER_ARG=""
-  else
-    AFTER_ARG=", after: \\\"$CURSOR\\\""
-  fi
+  [ "$CURSOR" = "null" ] && RE_CURSOR="" || RE_CURSOR="$CURSOR"
 
-  RESPONSE=$(gh api graphql -F owner="$OWNER" -F repo="$REPO" -F pull="$PR_NUMBER" -f query='
-    query($owner: String!, $repo: String!, $pull: Int!) {
+  RESPONSE=$(gh api graphql -F owner="$OWNER" -F repo="$REPO" -F pull="$PR_NUMBER" -F cursor="$RE_CURSOR" -f query='
+    query($owner: String!, $repo: String!, $pull: Int!, $cursor: String) {
       repository(owner: $owner, name: $repo) {
         pullRequest(number: $pull) {
-          reviewThreads(first: 100'"$AFTER_ARG"') {
+          reviewThreads(first: 100, after: $cursor) {
             pageInfo { hasNextPage, endCursor }
             nodes { isResolved }
           }
@@ -54,22 +50,19 @@ echo "✅ All PR threads are marked as resolved."
 
 # 2. Verify Agent Responses (with pagination)
 echo "🔍 Verifying agent responses for all threads..."
+SELF=$(gh api user --jq .login)
 HAS_NEXT_PAGE=true
 CURSOR="null"
 THREADS_WITHOUT_REPLIES=0
 
 while [ "$HAS_NEXT_PAGE" = "true" ]; do
-  if [ "$CURSOR" = "null" ]; then
-    AFTER_ARG=""
-  else
-    AFTER_ARG=", after: \\\"$CURSOR\\\""
-  fi
+  [ "$CURSOR" = "null" ] && RE_CURSOR="" || RE_CURSOR="$CURSOR"
 
-  RESPONSE=$(gh api graphql -F owner="$OWNER" -F repo="$REPO" -F pull="$PR_NUMBER" -f query='
-    query($owner: String!, $repo: String!, $pull: Int!) {
+  RESPONSE=$(gh api graphql -F owner="$OWNER" -F repo="$REPO" -F pull="$PR_NUMBER" -F cursor="$RE_CURSOR" -f query='
+    query($owner: String!, $repo: String!, $pull: Int!, $cursor: String) {
       repository(owner: $owner, name: $repo) {
         pullRequest(number: $pull) {
-          reviewThreads(first: 100'"$AFTER_ARG"') {
+          reviewThreads(first: 100, after: $cursor) {
             pageInfo { hasNextPage, endCursor }
             nodes {
               comments(first: 100) {
@@ -81,7 +74,7 @@ while [ "$HAS_NEXT_PAGE" = "true" ]; do
       }
     }')
 
-  PAGE_WITHOUT_REPLIES=$(echo "$RESPONSE" | jq -r '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.comments.nodes | map(.author.login) | length < 2)] | length')
+  PAGE_WITHOUT_REPLIES=$(echo "$RESPONSE" | jq -r --arg self "$SELF" '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.comments.nodes | map(.author.login) | contains([$self]) | not)] | length')
   THREADS_WITHOUT_REPLIES=$((THREADS_WITHOUT_REPLIES + PAGE_WITHOUT_REPLIES))
   HAS_NEXT_PAGE=$(echo "$RESPONSE" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage')
   CURSOR=$(echo "$RESPONSE" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor')

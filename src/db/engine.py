@@ -48,7 +48,7 @@ async def init_db():
             )
         except OperationalError:
             logger.info(
-                "Outdated schema detected (missing file_size, mtime, plugin_version, or retry_count), dropping all tables for migration..."
+                "Outdated schema detected (missing file_size, mtime, or AnalysisTask enhancements), dropping tables for migration..."
             )
             await conn.execute(text("DROP TABLE IF EXISTS document_fts"))
             await conn.run_sync(SQLModel.metadata.drop_all)
