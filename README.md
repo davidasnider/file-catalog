@@ -57,3 +57,12 @@ The system implements a **Quick Skip** mechanism. It tracks the `file_size` and 
 
 ---
 *Built with Python, SQLite (SQLModel), Streamlit, and Llama.cpp.*
+
+### Development
+Dev dependencies (`pytest`, `ruff`, `pre-commit`) are separated from runtime dependencies and managed as optional dependencies in `pyproject.toml`. To install them for development, run:
+```bash
+uv sync --all-extras --dev
+```
+
+### Retry Mechanism
+The application features an automatic retry mechanism with exponential backoff for failed analysis tasks. The number of retries is controlled by the `MAX_RETRIES` configuration.
