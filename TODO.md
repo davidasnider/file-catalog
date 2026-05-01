@@ -34,7 +34,7 @@
 - [x] **P1 — Add skip-list for binary types + source code (~8,100 files)** — Create an `UNTEXTABLE_MIMES` set for binary types (executables, fonts, archives, etc.) AND source code files (C, C++, JS, CSS) to return a success-with-no-text result instead of failure.
 - [x] **P2 — Add text extraction for XML, RTF, XHTML (~1,500 files)** — Read any `text/xml`, `application/xhtml+xml`, or `text/rtf` (via `striprtf`) as text.
 - [ ] **P3 — Investigate existing handler failures (~1,750 files)** — Debug why `application/mbox`, `message/rfc822`, `audio/*`, `image/tiff`, and `text/html` files fail despite having handlers (likely corrupt files, encoding issues, or multi-page TIFFs).
-- [x] **P4 — Batch-convert legacy `.doc` → `.pdf` via Mac automation (~840 files)** — Created an AppleScript in `src/scripts/convert_doc_to_pdf.scpt` to batch-convert legacy Word files using TextEdit for PDF export (replaces Word dependency).
+- [ ] **P4 — Batch-convert legacy `.doc` → `.pdf` via Mac automation (~840 files)** — Created an AppleScript in `src/scripts/convert_doc_to_pdf.scpt` to batch-convert legacy Word files using TextEdit for PDF export (replaces Word dependency).
 - [x] **P5 — Add Outlook `.msg` support (~576 files)** — Use `extract-msg` library to parse `application/vnd.ms-outlook` files for sender, subject, body, and attachments.
 - [x] **P6 — Add OLE container extraction (~250 files)** — Use `olefile` to identify and extract text streams from `application/x-ole-storage` containers.
 
@@ -46,12 +46,12 @@
 - [ ] Support dark mode toggle in the Streamlit UI.
 
 ## Infrastructure & Reliability
-- [ ] Add a retry mechanism with exponential backoff for failed analysis tasks (the `RETRIES` status exists in the schema but isn't implemented).
+- [x] Add a retry mechanism with exponential backoff for failed analysis tasks (the `RETRIES` status exists in the schema but isn't implemented).
 - [x] Add a CLI progress report / summary that runs after scanning completes (total processed, failed, skipped, time elapsed).
 - [x] Implement a rich, multi-pane scanner interface with live log tailing and plugin stats.
 - [x] Fix database locking issues by implementing WAL mode and FTS write serialization.
 - [ ] Implement incremental scanning — detect changed files (via mtime or hash comparison) and only re-process modified files.
-- [ ] Add a configuration file (`config.yaml` or `.env`) to centralize settings: target directory, model paths, concurrency limits, RAM thresholds.
+- [x] Add a configuration file (`config.yaml` or `.env`) to centralize settings: target directory, model paths, concurrency limits, RAM thresholds.
 - [ ] Separate dev dependencies (`pytest`, `ruff`, `pre-commit`) from runtime dependencies in `pyproject.toml` using `[project.optional-dependencies]`.
 - [ ] Add structured logging with JSON output option for production use and easier log aggregation.
 - [ ] Add a `--dry-run` mode to the scanner that reports what would be processed without actually running analysis.
@@ -60,7 +60,7 @@
 - [ ] Add integration tests that run the full pipeline on a small test corpus with known expected outputs.
 - [ ] Add test coverage reporting and set a minimum coverage threshold in CI.
 - [ ] Add tests for the Streamlit dashboard (e.g., using `streamlit.testing` or snapshot tests).
-- [ ] Add tests for the `LlamaCppProvider` and `ModelManager` (mocked inference, LRU eviction behavior, memory monitoring).
+- [x] Add tests for the `LlamaCppProvider` and `ModelManager` (mocked inference, LRU eviction behavior, memory monitoring).
 
 ## Documentation
 - [ ] Write a contributor guide explaining how to create a new plugin (step-by-step with the `@register_analyzer` decorator pattern).
