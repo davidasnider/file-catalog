@@ -42,20 +42,28 @@ def safe_extract_7z(archive: "py7zr.SevenZipFile", dest_dir: Path):
         member_path = (dest_dir / member.filename).resolve()
         if not is_within_directory(dest_dir, member_path):
             raise Exception(f"Potential path traversal attempt: {member.filename}")
+
+        # Check for symlinks if supported by the member object
+        if hasattr(member, "is_symlink") and member.is_symlink():
+            link_target = Path(member.link_target)
+            if link_target.is_absolute():
+                raise Exception(
+                    f"Potential path traversal attempt (absolute link): {member.filename} -> {member.link_target}"
+                )
+            member_parent = (dest_dir / member.filename).parent
+            resolved_link_target = (member_parent / link_target).resolve()
+            if not is_within_directory(dest_dir, resolved_link_target):
+                raise Exception(
+                    f"Potential path traversal attempt (link target outside): {member.filename} -> {member.link_target}"
+                )
+
     archive.extractall(path=dest_dir)
 
 
 def safe_extract_tar(tar_ref: tarfile.TarFile, dest_dir: Path):
-    """Safely extracts a Tar file, checking for path traversal or using filters."""
-    # If Python 3.12+, use the 'data' filter for safety.
-    if hasattr(tarfile, "data_filter"):
-        tar_ref.extractall(dest_dir, filter="data")
-    else:
-        for member in tar_ref.getmembers():
-            member_path = (dest_dir / member.name).resolve()
-            if not is_within_directory(dest_dir, member_path):
-                raise Exception(f"Potential path traversal attempt: {member.name}")
-        tar_ref.extractall(dest_dir)
+    """Safely extracts a Tar file using the 'data' filter for safety."""
+    # Since Python 3.12+ is required, we can rely on the 'data' filter.
+    tar_ref.extractall(dest_dir, filter="data")
 
 
 def extract_archive(file_path: Path, dest_dir: Path):
