@@ -56,9 +56,9 @@ The scanner can be configured via environment variables (in a `.env` file) or CL
 The system implements a **Quick Skip** mechanism. It tracks the `file_size` and `mtime` of every ingested file. On subsequent runs, if a file's metadata hasn't changed and its status is `COMPLETED`, the scanner skips the entire analysis pipeline for that file, significantly reducing processing time for large, stable archives. Non-`COMPLETED` files that are no longer present on the filesystem when resuming an interrupted run are marked with a `NOT_PRESENT` status to track missing files and prevent redundant operations.
 
 ### Included Utilities
-The project includes several utilities in `src/scripts/` to help manage archives and failures. Run these from the project root using `python -m src.scripts.<script_name>`:
-- **Mailbox Extraction**: Use `python -m src.scripts.extract_and_cleanup_mbox` to recursively extract `.mbox`, `.mbx`, and `.mbs` archives into individual `.eml` files grouped by thread.
-- **Archive Extraction**: Use `python -m src.scripts.extract_and_cleanup_archives` to recursively extract compressed archives (`.zip`, `.tar.gz`, `.7z` (requires `py7zr` via `archives` extra), etc.) into nested folders. By default, the original archive is removed unless `--keep` is specified.
+The project includes several utilities in `src/scripts/` to help manage archives and failures. Run these from the project root using `python -m src.scripts.<script_name> <directory>`:
+- **Mailbox Extraction**: Use `python -m src.scripts.extract_and_cleanup_mbox <directory>` to recursively extract `.mbox`, `.mbx`, and `.mbs` archives into individual `.eml` files grouped by thread. By default, the original mailbox is removed unless `--keep` is specified.
+- **Archive Extraction**: Use `python -m src.scripts.extract_and_cleanup_archives <directory>` to recursively extract compressed archives (`.zip`, `.tar.gz`, `.7z` (requires `py7zr` via `archives` extra), etc.) into nested folders. By default, the original archive is removed unless `--keep` is specified.
 - **Failure Reporting**: Use `python -m src.scripts.report_failures` to generate rich terminal or JSON reports of documents and tasks that failed during ingestion.
 
 ---
