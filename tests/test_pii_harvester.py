@@ -1,5 +1,6 @@
 import pytest
 from src.plugins.pii_harvester import PIIHarvesterPlugin
+from src.plugins.text_extractor import TEXT_EXTRACTOR_NAME
 
 
 def test_pii_harvester_should_run():
@@ -12,12 +13,12 @@ def test_pii_harvester_should_run():
 
     # Should skip text without enough content
     assert not harvester.should_run(
-        "/a.txt", "text/plain", {"TextExtractor": {"text": "short"}}
+        "/a.txt", "text/plain", {TEXT_EXTRACTOR_NAME: {"text": "short"}}
     )
 
     # Should run on long text
     assert harvester.should_run(
-        "/a.txt", "text/plain", {"TextExtractor": {"text": "a" * 100}}
+        "/a.txt", "text/plain", {TEXT_EXTRACTOR_NAME: {"text": "a" * 100}}
     )
 
 
@@ -33,7 +34,7 @@ async def test_pii_harvester_json_cleanup(monkeypatch):
         "src.plugins.pii_harvester.get_llm_provider", lambda **kwargs: MockLLM()
     )
 
-    context = {"TextExtractor": {"text": "John Doe was here." * 10}}
+    context = {TEXT_EXTRACTOR_NAME: {"text": "John Doe was here." * 10}}
     res = await harvester.analyze("/doc.txt", "text/plain", context)
 
     assert res["skipped"] is False

@@ -1,9 +1,10 @@
 from src.core.text_utils import get_all_extracted_text, repair_and_load_json
+from src.plugins.text_extractor import TEXT_EXTRACTOR_NAME
 
 
 def test_get_all_extracted_text_aggregation():
     ctx = {
-        "TextExtractor": {"text": "Doc text"},
+        TEXT_EXTRACTOR_NAME: {"text": "Doc text"},
         "DocumentAIExtractor": {"text": "DocAI text"},
         "audio_transcriber": {"text": "Spoken transcript"},
         "vision_analyzer": {"description": "Image description"},
@@ -28,7 +29,7 @@ def test_get_all_extracted_text_aggregation():
 
 def test_get_all_extracted_text_partial():
     ctx = {
-        "TextExtractor": {"text": "Doc text"},
+        TEXT_EXTRACTOR_NAME: {"text": "Doc text"},
         "vision_analyzer": {"description": "Image description"},
     }
     result = get_all_extracted_text(ctx)

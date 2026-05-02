@@ -4,6 +4,7 @@ from typing import Dict, Any
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
 from src.llm.factory import get_llm_provider
+from src.plugins.text_extractor import TEXT_EXTRACTOR_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +12,9 @@ logger = logging.getLogger(__name__)
 
 
 @register_analyzer(
-    name="PIIHarvester", depends_on=["TextExtractor", "Router"], version="1.7"
+    name="PIIHarvester",
+    depends_on=[TEXT_EXTRACTOR_NAME, "Router"],
+    version="1.7",
 )
 class PIIHarvesterPlugin(AnalyzerBase):
     """

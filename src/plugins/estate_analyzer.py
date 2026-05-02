@@ -4,12 +4,15 @@ from typing import Dict, Any
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
 from src.llm.factory import get_llm_provider
 from src.core.config import config
+from src.plugins.text_extractor import TEXT_EXTRACTOR_NAME
 
 logger = logging.getLogger(__name__)
 
 
 @register_analyzer(
-    name="EstateAnalyzer", depends_on=["TextExtractor", "Router"], version="1.8"
+    name="EstateAnalyzer",
+    depends_on=[TEXT_EXTRACTOR_NAME, "Router"],
+    version="1.8",
 )
 class EstateAnalyzerPlugin(AnalyzerBase):
     """
@@ -31,7 +34,7 @@ class EstateAnalyzerPlugin(AnalyzerBase):
         logger.info(f"Checking estate relevance for {file_path}")
 
         # 1. Fetch text from upstream Extractors Context
-        text_data = context.get("TextExtractor", {})
+        text_data = context.get(TEXT_EXTRACTOR_NAME, {})
 
         extracted_text = text_data.get("text", "")
 

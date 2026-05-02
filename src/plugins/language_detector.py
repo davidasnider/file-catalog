@@ -5,6 +5,7 @@ from langdetect import detect, detect_langs, LangDetectException
 from langdetect import DetectorFactory
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
+from src.plugins.text_extractor import TEXT_EXTRACTOR_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,9 @@ LANGUAGE_NAMES = {
 MIN_TEXT_LENGTH = 20
 
 
-@register_analyzer(name="LanguageDetector", depends_on=["TextExtractor"], version="1.0")
+@register_analyzer(
+    name="LanguageDetector", depends_on=[TEXT_EXTRACTOR_NAME], version="1.0"
+)
 class LanguageDetectorPlugin(AnalyzerBase):
     """
     Detects the primary language of a document using the langdetect library.
@@ -83,7 +86,7 @@ class LanguageDetectorPlugin(AnalyzerBase):
     def should_run(
         self, file_path: str, mime_type: str, context: Dict[str, Any]
     ) -> bool:
-        extracted_text = context.get("TextExtractor", {}).get("text", "")
+        extracted_text = context.get(TEXT_EXTRACTOR_NAME, {}).get("text", "")
         return len(extracted_text) >= MIN_TEXT_LENGTH
 
     async def analyze(
@@ -91,7 +94,7 @@ class LanguageDetectorPlugin(AnalyzerBase):
     ) -> Dict[str, Any]:
         logger.info(f"Detecting language for {file_path}")
 
-        extracted_text = context.get("TextExtractor", {}).get("text", "")
+        extracted_text = context.get(TEXT_EXTRACTOR_NAME, {}).get("text", "")
 
         try:
             language_code = detect(extracted_text)

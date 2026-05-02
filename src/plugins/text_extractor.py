@@ -16,8 +16,10 @@ logger = logging.getLogger(__name__)
 
 SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/bmp", "image/tiff"}
 
+TEXT_EXTRACTOR_NAME = "TextExtractor"
 
-@register_analyzer(name="TextExtractor", depends_on=[], version="1.6")
+
+@register_analyzer(name=TEXT_EXTRACTOR_NAME, depends_on=[], version="1.6")
 class TextExtractorPlugin(AnalyzerBase):
     """
     Extracts raw text from common document types (PDFs, docs) and images (OCR).
@@ -34,7 +36,7 @@ class TextExtractorPlugin(AnalyzerBase):
             }
             if any(mime_type.startswith(p) for p in supported_docai_prefixes):
                 logger.debug(
-                    f"Skipping TextExtractor for {file_path} because Document AI is enabled."
+                    f"Skipping {TEXT_EXTRACTOR_NAME} for {file_path} because Document AI is enabled."
                 )
                 return False
         return True

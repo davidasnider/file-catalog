@@ -1,5 +1,6 @@
 import pytest
 from src.plugins.deep_summarizer import DeepSummarizerPlugin
+from src.plugins.text_extractor import TEXT_EXTRACTOR_NAME
 
 
 @pytest.mark.asyncio
@@ -27,7 +28,7 @@ async def test_deep_summarizer_map_reduce(monkeypatch):
 
     # 3 chunks worth of text
     large_text = "A" * 40000
-    context = {"TextExtractor": {"text": large_text}}
+    context = {TEXT_EXTRACTOR_NAME: {"text": large_text}}
 
     res = await summarizer.analyze("/large.txt", "text/plain", context)
 

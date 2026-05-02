@@ -5,6 +5,7 @@ from src.core.plugin_registry import AnalyzerBase, register_analyzer
 from src.llm.factory import get_llm_provider
 from src.core.config import config
 from src.core.text_utils import get_all_extracted_text
+from src.plugins.text_extractor import TEXT_EXTRACTOR_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 @register_analyzer(
     name="Summarizer",
     depends_on=[
-        "TextExtractor",
+        TEXT_EXTRACTOR_NAME,
         "DocumentAIExtractor",
         "audio_transcriber",
         "vision_analyzer",

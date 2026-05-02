@@ -4,6 +4,7 @@ import asyncio
 from faster_whisper import WhisperModel
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
+from src.plugins.text_extractor import TEXT_EXTRACTOR_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +41,7 @@ class AudioTranscriberPlugin(AnalyzerBase):
         self, file_path: str, mime_type: str, context: Dict[str, Any]
     ) -> bool:
         # Avoid running if we somehow already have text (though we shouldn't unless cached)
-        # Fix: Using "TextExtractor" to match the registered name in src/plugins/text_extractor.py
-        if "text" in context.get("TextExtractor", {}):
+        if "text" in context.get(TEXT_EXTRACTOR_NAME, {}):
             return False
 
         return mime_type.startswith("audio/") or mime_type.startswith("video/")
