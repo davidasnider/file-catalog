@@ -80,6 +80,7 @@ class TaskEngine:
 
         retry_count = 0
         max_retries = config.max_retries
+        task = None
 
         while True:
             try:
@@ -138,7 +139,7 @@ class TaskEngine:
                         f"Error executing plugin {task_name} on {document_path}: {e}. "
                         f"Retrying in {backoff}s ({retry_count}/{max_retries})..."
                     )
-                    if task:
+                    if task is not None:
                         task.status = TaskStatus.RETRIES
                         task.error_message = str(e)
                         task.retry_count = retry_count
@@ -150,7 +151,7 @@ class TaskEngine:
                     f"Plugin {task_name} failed after {max_retries} retries on {document_path}: {e}"
                 )
                 # Ensure task is marked as failed
-                if task:
+                if task is not None:
                     task.status = TaskStatus.FAILED
                     task.error_message = str(e)
                     task.retry_count = retry_count
