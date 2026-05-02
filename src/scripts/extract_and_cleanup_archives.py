@@ -79,12 +79,13 @@ def safe_extract_tar(tar_ref: tarfile.TarFile, dest_dir: Path):
                         f"Potential path traversal attempt (absolute link): {member.name} -> {member.linkname}"
                     )
 
+                # Resolve the link target.
+                # Symlinks are relative to the member's location.
+                # Hardlinks are relative to the archive root.
                 if member.issym():
-                    # Resolve symlink relative to the member's parent directory
                     member_parent = (dest_dir / member.name).parent
                     resolved_link_target = (member_parent / link_target).resolve()
-                else:
-                    # Resolve hardlink relative to the archive root (dest_dir)
+                else:  # islnk()
                     resolved_link_target = (dest_dir / link_target).resolve()
 
                 if not is_within_directory(dest_dir, resolved_link_target):

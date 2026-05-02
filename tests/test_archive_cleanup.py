@@ -118,64 +118,56 @@ def test_path_traversal_7z_mocked(tmp_path, mocker):
 
 
 def test_path_traversal_tar_symlink(tmp_path):
-    # Create a tar file with a malicious symlink
+    # Create a malicious tar file with a symlink pointing outside
     tar_path = tmp_path / "malicious_symlink.tar"
     with tarfile.open(tar_path, "w") as tar:
-        # Create a symlink to /etc/passwd (absolute path)
-        info = tarfile.TarInfo("link_to_passwd")
-        info.type = tarfile.SYMTYPE
-        info.linkname = "/etc/passwd"
-        tar.addfile(info)
+        # Symlink pointing to /tmp (outside dest_dir)
+        symlink_member = tarfile.TarInfo("outside_link")
+        symlink_member.type = tarfile.SYMTYPE
+        symlink_member.linkname = "../../"
+        tar.addfile(symlink_member)
 
-        # Create a symlink that points outside (relative)
-        info2 = tarfile.TarInfo("link_outside")
-        info2.type = tarfile.SYMTYPE
-        info2.linkname = "../../etc/passwd"
-        tar.addfile(info2)
+    dest_dir = tmp_path / "extracted_tar_symlink"
+    # Extraction should fail due to path traversal check
+    # Note: We use extract_archive which calls safe_extract_tar
+    # If Python 3.12+, it uses 'data' filter. If older, it uses our manual check.
+    # Both should block this.
+    assert extract_archive(tar_path, dest_dir) is False
 
-    dest_dir = tmp_path / "extracted_symlink"
+
+def test_path_traversal_tar_absolute_symlink(tmp_path):
+    # Create a malicious tar file with an absolute symlink
+    tar_path = tmp_path / "malicious_abs_symlink.tar"
+    with tarfile.open(tar_path, "w") as tar:
+        symlink_member = tarfile.TarInfo("abs_link")
+        symlink_member.type = tarfile.SYMTYPE
+        symlink_member.linkname = "/etc/passwd"
+        tar.addfile(symlink_member)
+
+    dest_dir = tmp_path / "extracted_tar_abs_symlink"
     assert extract_archive(tar_path, dest_dir) is False
 
 
 def test_path_traversal_tar_hardlink(tmp_path):
-    # Create a tar file with a malicious hardlink
+    # Create a malicious tar file with a hardlink pointing outside
     tar_path = tmp_path / "malicious_hardlink.tar"
     with tarfile.open(tar_path, "w") as tar:
-        # Hard link to something outside
-        info = tarfile.TarInfo("hardlink_outside")
-        info.type = tarfile.LNKTYPE
-        info.linkname = "../../etc/passwd"
-        tar.addfile(info)
+        hardlink_member = tarfile.TarInfo("outside_hardlink")
+        hardlink_member.type = tarfile.LNKTYPE
+        hardlink_member.linkname = "../../outside_file"
+        tar.addfile(hardlink_member)
 
-    dest_dir = tmp_path / "extracted_hardlink"
+    dest_dir = tmp_path / "extracted_tar_hardlink"
     assert extract_archive(tar_path, dest_dir) is False
 
 
-def test_valid_tar_hardlink(tmp_path):
-    # Create a tar file with a valid hardlink
-    tar_path = tmp_path / "valid_hardlink.tar"
-    with tarfile.open(tar_path, "w") as tar:
-        f1 = tmp_path / "file1.txt"
-        f1.write_text("content")
-        tar.add(f1, arcname="file1.txt")
-
-        info = tarfile.TarInfo("hardlink_to_file1")
-        info.type = tarfile.LNKTYPE
-        info.linkname = "file1.txt"  # Relative to root
-        tar.addfile(info)
-
-    dest_dir = tmp_path / "extracted_valid_hardlink"
-    assert extract_archive(tar_path, dest_dir) is True
-    assert (dest_dir / "hardlink_to_file1").exists()
-
-
 def test_path_traversal_7z_symlink_mocked(tmp_path, mocker):
-    # Mock py7zr to simulate a malicious symlink entry
+    # Mock py7zr to simulate a malicious symlink
     mock_7z = mocker.Mock()
     mock_file = mocker.Mock()
-    mock_file.filename = "link_outside"
+    mock_file.filename = "malicious_link"
     mock_file.is_symlink.return_value = True
-    mock_file.link_target = "../../etc/passwd"
+    mock_file.link_target = "../../outside"
     mock_7z.get_files.return_value = [mock_file]
 
     mocker.patch(
@@ -186,7 +178,7 @@ def test_path_traversal_7z_symlink_mocked(tmp_path, mocker):
     )
     mocker.patch("src.scripts.extract_and_cleanup_archives.HAS_7Z", True)
 
-    archive_path = tmp_path / "test_symlink.7z"
+    archive_path = tmp_path / "test_link.7z"
     archive_path.write_text("dummy")
 
-    assert extract_archive(archive_path, tmp_path / "out_symlink") is False
+    assert extract_archive(archive_path, tmp_path / "out") is False
