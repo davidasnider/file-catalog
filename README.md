@@ -18,14 +18,14 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 - **Skip Irrelevant Work**: The `TaskEngine` seamlessly evaluates `should_run()` conditions for every plugin. Heavy analytical models (like the Estate Analyzer) only trigger if the Router tags the document appropriately, saving immense compute time and context bloat.
 
 ### 4. Specialized Analytical Pipelines
-- **Metadata & Language Detection**: Features a `LanguageDetectorPlugin` to tag document language and a `DuplicateDetectorPlugin` to find near-duplicate files using hashes.
+- **Metadata & Language Detection**: Features a `LanguageDetectorPlugin` to tag document language and a `DuplicateDetectorPlugin` to find exact-duplicate files using hashes.
 - **Two-Tier Summarization**:
   - **Universal Short Summary**: A lightning-fast, 3-sentence summary generated for *every* standard document.
   - **Deep Map-Reduce Summarization**: A specialized `DeepSummarizerPlugin` built for massive documents. It dynamically chunks text exceeding the context window, summarizes each chunk sequentially (Map), and synthesizes a final cohesive report (Reduce).
 - **PII Harvesting**: A specialized `PIIHarvesterPlugin` leverages strict JSON-Schema enforcement to extract named entities (Names, Emails, Addresses) into the database.
 - **Credential Detection**: A high-precision `PasswordExtractorPlugin` specifically identifies authentication passwords, PINs, and secrets with advanced hallucination filtering.
 - **Estate & Legal Analysis**: `EstateAnalyzerPlugin` identifies critical documents for estate planning (Wills, Trusts, Financial Assets) using forensic-level reasoning.
-- **Data Parsing & Spreadsheets**: An `EmailParserPlugin` accurately parses `.eml` and `.mbox` files (note: `.mbox` files are ignored by default and require extraction or explicit enabling to be parsed), while the `SpreadsheetAnalyzerPlugin` extracts and summarizes tabular data from `.xlsx`, `.csv`, and `.ods`.
+- **Data Parsing & Spreadsheets**: An `EmailParserPlugin` accurately parses `.eml` (and `.mbox` after extraction into `.eml` format) files, while the `SpreadsheetAnalyzerPlugin` extracts and summarizes tabular data from `.xlsx`, `.csv`, and `.ods`.
 
 ### 5. Rich Text & Metadata Extraction
 - **Broad File Support**: Extract metadata and content from PDFs (`pdfplumber`), Word Docs (`python-docx`), HTML web pages (`BeautifulSoup4`), and standard text/code files.
