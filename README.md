@@ -6,8 +6,8 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 
 ### 1. Multi-Model Orchestration & Memory Management
 - **Multi-Backend Python LLM Management**: Directly manages models using `llama-cpp-python` (GGUF), `mlx-lm` (Apple Silicon), or `google-genai` (Cloud Fallback) without external proxy bloat.
-- **LRU Cache & RAM Monitoring**: Actively monitors system RAM (via `psutil`). Models are cached "hot" in unified memory for maximum speed between tasks, and gracefully evicted using an LRU strategy only when memory drops below 2GB.
-- **Dynamic Model Fetching**: Automatically downloads and manages localized GGUF models directly from HuggingFace (e.g., `Llama-3.1-8B-Instruct`, `Phi-4-mini`) upon first request.
+- **LRU Cache & RAM Monitoring (llama-cpp)**: For GGUF models, actively monitors system RAM (via `psutil`). Models are cached "hot" in unified memory and gracefully evicted using an LRU strategy only when memory drops below 2GB.
+- **Dynamic Model Fetching (llama-cpp)**: Automatically downloads and manages localized GGUF models directly from HuggingFace (e.g., `Llama-3.1-8B-Instruct`, `Phi-4-mini`) upon first request.
 
 ### 2. Intelligent Document Routing
 - **Hybrid Router Paradigm**: The pipeline utilizes a dedicated `RouterPlugin` to act as a traffic controller before touching heavy, specialized reasoning models.
@@ -25,7 +25,7 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 - **PII Harvesting**: A specialized `PIIHarvesterPlugin` leverages strict JSON-Schema enforcement to extract named entities (Names, Emails, Addresses) into the database.
 - **Credential Detection**: A high-precision `PasswordExtractorPlugin` specifically identifies authentication passwords, PINs, and secrets with advanced hallucination filtering.
 - **Estate & Legal Analysis**: `EstateAnalyzerPlugin` identifies critical documents for estate planning (Wills, Trusts, Financial Assets) using forensic-level reasoning.
-- **Data Parsing & Spreadsheets**: An `EmailParserPlugin` accurately parses `.eml` and `.mbox` files, while the `SpreadsheetAnalyzerPlugin` extracts and summarizes tabular data from `.xlsx`, `.csv`, and `.ods`.
+- **Data Parsing & Spreadsheets**: An `EmailParserPlugin` accurately parses `.eml` (and `.mbox` when explicitly enabled or after extraction) files, while the `SpreadsheetAnalyzerPlugin` extracts and summarizes tabular data from `.xlsx`, `.csv`, and `.ods`.
 
 ### 5. Rich Text & Metadata Extraction
 - **Broad File Support**: Extract metadata and content from PDFs (`pdfplumber`), Word Docs (`python-docx`), HTML web pages (`BeautifulSoup4`), and standard text/code files.
