@@ -1052,7 +1052,13 @@ def main():
     parser = argparse.ArgumentParser(
         description="Scan a directory and run LLM analysis pipeline."
     )
-    parser.add_argument("directory", type=str, help="Path to the directory to scan.")
+    parser.add_argument(
+        "directory",
+        type=str,
+        nargs="?",
+        default=None,
+        help="Path to the directory to scan. Optional if scan_directory is set in .env.",
+    )
     parser.add_argument(
         "--concurrency",
         type=int,
@@ -1139,16 +1145,23 @@ def main():
     # Update global config from CLI args before we run anything
     from src.core.config import update_config_from_cli
 
-    # We remove mime_type from args before updating config because config doesn't have it
+    # We remove mime_type and directory from args before updating config because config doesn't have it
     args_dict = vars(args).copy()
+    directory = args_dict.pop("directory", None)
     mime_type = args_dict.pop("mime_type", None)
     update_config_from_cli(**args_dict)
 
     setup_logging(args.debug)
 
+    scan_dir = directory or config.scan_directory
+    if not scan_dir:
+        parser.error(
+            "The following arguments are required: directory (or set scan_directory in .env)"
+        )
+
     asyncio.run(
         run_scanner(
-            args.directory,
+            scan_dir,
             args.concurrency,
             args.clean,
             args.limit,
