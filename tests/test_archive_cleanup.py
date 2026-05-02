@@ -196,10 +196,9 @@ def test_path_traversal_tar_symlink(tmp_path):
         tar.addfile(symlink_member)
 
     dest_dir = tmp_path / "extracted_tar_symlink"
-    # Extraction should fail due to path traversal check
-    # Note: We use extract_archive which calls safe_extract_tar
-    # If Python 3.12+, it uses 'data' filter. If older, it uses our manual check.
-    # Both should block this.
+    # Extraction should fail due to path traversal check.
+    # Note: Since Python 3.12+ is required (see pyproject.toml), safe_extract_tar
+    # uses the built-in 'data' filter to block traversal.
     assert extract_archive(tar_path, dest_dir) is False
 
 
