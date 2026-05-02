@@ -115,3 +115,78 @@ def test_path_traversal_7z_mocked(tmp_path, mocker):
     archive_path.write_text("dummy")
 
     assert extract_archive(archive_path, tmp_path / "out") is False
+
+
+def test_path_traversal_tar_symlink(tmp_path):
+    # Create a tar file with a malicious symlink
+    tar_path = tmp_path / "malicious_symlink.tar"
+    with tarfile.open(tar_path, "w") as tar:
+        # Create a symlink to /etc/passwd (absolute path)
+        info = tarfile.TarInfo("link_to_passwd")
+        info.type = tarfile.SYMTYPE
+        info.linkname = "/etc/passwd"
+        tar.addfile(info)
+
+        # Create a symlink that points outside (relative)
+        info2 = tarfile.TarInfo("link_outside")
+        info2.type = tarfile.SYMTYPE
+        info2.linkname = "../../etc/passwd"
+        tar.addfile(info2)
+
+    dest_dir = tmp_path / "extracted_symlink"
+    assert extract_archive(tar_path, dest_dir) is False
+
+
+def test_path_traversal_tar_hardlink(tmp_path):
+    # Create a tar file with a malicious hardlink
+    tar_path = tmp_path / "malicious_hardlink.tar"
+    with tarfile.open(tar_path, "w") as tar:
+        # Hard link to something outside
+        info = tarfile.TarInfo("hardlink_outside")
+        info.type = tarfile.LNKTYPE
+        info.linkname = "../../etc/passwd"
+        tar.addfile(info)
+
+    dest_dir = tmp_path / "extracted_hardlink"
+    assert extract_archive(tar_path, dest_dir) is False
+
+
+def test_valid_tar_hardlink(tmp_path):
+    # Create a tar file with a valid hardlink
+    tar_path = tmp_path / "valid_hardlink.tar"
+    with tarfile.open(tar_path, "w") as tar:
+        f1 = tmp_path / "file1.txt"
+        f1.write_text("content")
+        tar.add(f1, arcname="file1.txt")
+
+        info = tarfile.TarInfo("hardlink_to_file1")
+        info.type = tarfile.LNKTYPE
+        info.linkname = "file1.txt"  # Relative to root
+        tar.addfile(info)
+
+    dest_dir = tmp_path / "extracted_valid_hardlink"
+    assert extract_archive(tar_path, dest_dir) is True
+    assert (dest_dir / "hardlink_to_file1").exists()
+
+
+def test_path_traversal_7z_symlink_mocked(tmp_path, mocker):
+    # Mock py7zr to simulate a malicious symlink entry
+    mock_7z = mocker.Mock()
+    mock_file = mocker.Mock()
+    mock_file.filename = "link_outside"
+    mock_file.is_symlink.return_value = True
+    mock_file.link_target = "../../etc/passwd"
+    mock_7z.get_files.return_value = [mock_file]
+
+    mocker.patch(
+        "py7zr.SevenZipFile",
+        return_value=mocker.MagicMock(
+            __enter__=lambda x: mock_7z, __exit__=lambda x, *args: None
+        ),
+    )
+    mocker.patch("src.scripts.extract_and_cleanup_archives.HAS_7Z", True)
+
+    archive_path = tmp_path / "test_symlink.7z"
+    archive_path.write_text("dummy")
+
+    assert extract_archive(archive_path, tmp_path / "out_symlink") is False
