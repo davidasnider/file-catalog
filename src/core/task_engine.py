@@ -80,13 +80,13 @@ class TaskEngine:
 
         retry_count = 0
         max_retries = config.max_retries
-        task = None
+        task: Optional[AnalysisTask] = None
 
         while True:
             try:
                 # Rehydrate the task to update status
                 task = await session.get(AnalysisTask, task_id)
-                if not task:
+                if task is None:
                     return False, f"Task {task_id} not found in DB", {}
 
                 task.status = TaskStatus.IN_PROGRESS
