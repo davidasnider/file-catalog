@@ -3,11 +3,12 @@ from typing import Dict, Any
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
 from src.llm.factory import get_llm_provider
+from src.core.analyzer_names import VISION_ANALYZER_NAME
 
 logger = logging.getLogger(__name__)
 
 
-@register_analyzer(name="vision_analyzer", depends_on=[], version="1.0")
+@register_analyzer(name=VISION_ANALYZER_NAME, depends_on=[], version="1.0")
 class VisionAnalyzerPlugin(AnalyzerBase):
     """
     Uses a multimodal local LLM (LLaVA) to describe images and categorize them as SFW/NSFW.

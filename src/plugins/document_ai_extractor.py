@@ -4,6 +4,7 @@ from typing import Dict, Any
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
 from src.core.config import config
+from src.core.analyzer_names import DOCUMENT_AI_EXTRACTOR_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ except ImportError:
     HAS_DOC_AI = False
 
 
-@register_analyzer(name="DocumentAIExtractor", depends_on=[], version="1.0")
+@register_analyzer(name=DOCUMENT_AI_EXTRACTOR_NAME, depends_on=[], version="1.0")
 class DocumentAIExtractorPlugin(AnalyzerBase):
     """
     Extracts text from documents using Google Cloud Document AI.

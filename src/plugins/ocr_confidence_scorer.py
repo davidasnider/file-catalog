@@ -6,6 +6,7 @@ import pytesseract
 from PIL import Image
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
+from src.core.analyzer_names import OCR_CONFIDENCE_SCORER_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,7 @@ SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/bmp", "image/tiff"}
 REVIEW_THRESHOLD = 60.0
 
 
-@register_analyzer(name="OCRConfidenceScorer", depends_on=[], version="1.1")
+@register_analyzer(name=OCR_CONFIDENCE_SCORER_NAME, depends_on=[], version="1.1")
 class OCRConfidenceScorerPlugin(AnalyzerBase):
     """
     Scores OCR quality for image-based documents using pytesseract's

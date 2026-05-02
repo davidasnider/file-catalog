@@ -4,14 +4,18 @@ from typing import Dict, Any
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
 from src.llm.factory import get_llm_provider
 from src.core.config import config
-from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
+from src.core.analyzer_names import (
+    TEXT_EXTRACTOR_NAME,
+    ESTATE_ANALYZER_NAME,
+    ROUTER_NAME,
+)
 
 logger = logging.getLogger(__name__)
 
 
 @register_analyzer(
-    name="EstateAnalyzer",
-    depends_on=[TEXT_EXTRACTOR_NAME, "Router"],
+    name=ESTATE_ANALYZER_NAME,
+    depends_on=[TEXT_EXTRACTOR_NAME, ROUTER_NAME],
     version="1.8",
 )
 class EstateAnalyzerPlugin(AnalyzerBase):
@@ -23,7 +27,7 @@ class EstateAnalyzerPlugin(AnalyzerBase):
     def should_run(
         self, file_path: str, mime_type: str, context: Dict[str, Any]
     ) -> bool:
-        router_data = context.get("Router", {})
+        router_data = context.get(ROUTER_NAME, {})
         category = router_data.get("category", "")
         # Run for Legal/Estate or Financial documents as both are critical for estate archives
         return category in ["Legal/Estate", "Financial"]

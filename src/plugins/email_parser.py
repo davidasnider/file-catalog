@@ -7,6 +7,7 @@ from src.core.mbox_utils import RobustMbox
 from typing import Dict, Any
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
+from src.core.analyzer_names import EMAIL_PARSER_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ EMAIL_EXTENSIONS = {".eml", ".mbox"}
 MAX_EMAILS_FROM_MBOX = 1000
 
 
-@register_analyzer(name="EmailParser", depends_on=[], version="1.0")
+@register_analyzer(name=EMAIL_PARSER_NAME, depends_on=[], version="1.0")
 class EmailParserPlugin(AnalyzerBase):
     """
     Parses .eml and .mbox files to extract sender, recipients,

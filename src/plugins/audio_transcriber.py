@@ -4,7 +4,7 @@ import asyncio
 from faster_whisper import WhisperModel
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
-from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME, AUDIO_TRANSCRIBER_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ async def get_whisper_model():
         return model
 
 
-@register_analyzer(name="audio_transcriber", depends_on=[], version="1.0")
+@register_analyzer(name=AUDIO_TRANSCRIBER_NAME, depends_on=[], version="1.0")
 class AudioTranscriberPlugin(AnalyzerBase):
     """
     Extracts audio transcripts from audio and video files using faster-whisper.

@@ -3,11 +3,12 @@ import logging
 from typing import Dict, Any
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
+from src.core.analyzer_names import DUPLICATE_DETECTOR_NAME
 
 logger = logging.getLogger(__name__)
 
 
-@register_analyzer(name="DuplicateDetector", depends_on=[], version="1.0")
+@register_analyzer(name=DUPLICATE_DETECTOR_NAME, depends_on=[], version="1.0")
 class DuplicateDetectorPlugin(AnalyzerBase):
     """
     Computes the SHA-256 hash of a file and returns it as part of the

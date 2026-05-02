@@ -4,7 +4,16 @@ import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from src.db.models import DocumentStatus, TaskStatus
-from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
+from src.core.analyzer_names import (
+    TEXT_EXTRACTOR_NAME,
+    DOCUMENT_AI_EXTRACTOR_NAME,
+    AUDIO_TRANSCRIBER_NAME,
+    VISION_ANALYZER_NAME,
+    VIDEO_ANALYZER_NAME,
+    EMAIL_PARSER_NAME,
+    SPREADSHEET_ANALYZER_NAME,
+    SUMMARIZER_NAME,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +81,6 @@ async def sync_document_to_fts(session: AsyncSession, document_id: int):
         if (
             task_name == TEXT_EXTRACTOR_NAME
             or normalized_task_name == TEXT_EXTRACTOR_NAME.lower()
-            or normalized_task_name == "text_extractor"
         ):
             if text_content := data.get("text"):
                 content_parts.append(text_content)

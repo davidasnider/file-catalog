@@ -1,21 +1,22 @@
 """
-Shared analyzer name constants to avoid circular imports and duplicate module execution.
+Centralized repository for all analyzer plugin names.
+Used to avoid hardcoded strings and cross-plugin import dependencies.
 """
 
 TEXT_EXTRACTOR_NAME = "TextExtractor"
 DOCUMENT_AI_EXTRACTOR_NAME = "DocumentAIExtractor"
 AUDIO_TRANSCRIBER_NAME = "audio_transcriber"
-VISION_ANALYZER_NAME = "vision_analyzer"
 VIDEO_ANALYZER_NAME = "video_analyzer"
-SUMMARIZER_NAME = "Summarizer"
+VISION_ANALYZER_NAME = "vision_analyzer"
 ROUTER_NAME = "Router"
-PII_HARVESTER_NAME = "PIIHarvester"
-PASSWORD_EXTRACTOR_NAME = "PasswordExtractor"  # pragma: allowlist secret
-ESTATE_ANALYZER_NAME = "EstateAnalyzer"
+SUMMARIZER_NAME = "Summarizer"
 DEEP_SUMMARIZER_NAME = "DeepSummarizer"
+ESTATE_ANALYZER_NAME = "EstateAnalyzer"
+PII_HARVESTER_NAME = "PIIHarvester"
+PASSWORD_EXTRACTOR_NAME = "PasswordExtractor"
+LANGUAGE_DETECTOR_NAME = "LanguageDetector"
+METADATA_EXTRACTOR_NAME = "MetadataExtractor"
 SPREADSHEET_ANALYZER_NAME = "SpreadsheetAnalyzer"
 EMAIL_PARSER_NAME = "EmailParser"
-OCR_CONFIDENCE_SCORER_NAME = "OCRConfidenceScorer"
 DUPLICATE_DETECTOR_NAME = "DuplicateDetector"
-METADATA_EXTRACTOR_NAME = "MetadataExtractor"
-LANGUAGE_DETECTOR_NAME = "LanguageDetector"
+OCR_CONFIDENCE_SCORER_NAME = "OCRConfidenceScorer"

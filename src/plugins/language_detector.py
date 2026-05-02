@@ -5,7 +5,7 @@ from langdetect import detect, detect_langs, LangDetectException
 from langdetect import DetectorFactory
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
-from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME, LANGUAGE_DETECTOR_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +75,7 @@ MIN_TEXT_LENGTH = 20
 
 
 @register_analyzer(
-    name="LanguageDetector", depends_on=[TEXT_EXTRACTOR_NAME], version="1.0"
+    name=LANGUAGE_DETECTOR_NAME, depends_on=[TEXT_EXTRACTOR_NAME], version="1.0"
 )
 class LanguageDetectorPlugin(AnalyzerBase):
     """

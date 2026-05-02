@@ -1,7 +1,13 @@
 from typing import Dict, Any
 
 
-from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
+from src.core.analyzer_names import (
+    TEXT_EXTRACTOR_NAME,
+    DOCUMENT_AI_EXTRACTOR_NAME,
+    AUDIO_TRANSCRIBER_NAME,
+    VISION_ANALYZER_NAME,
+    VIDEO_ANALYZER_NAME,
+)
 
 
 def get_all_extracted_text(context: Dict[str, Any]) -> str:
@@ -29,26 +35,26 @@ def get_all_extracted_text(context: Dict[str, Any]) -> str:
             aggregated_parts.append(text)
 
     # 2. Document AI (replaces TextExtractor when enabled)
-    if "DocumentAIExtractor" in context:
-        docai_text = context["DocumentAIExtractor"].get("text", "").strip()
+    if DOCUMENT_AI_EXTRACTOR_NAME in context:
+        docai_text = context[DOCUMENT_AI_EXTRACTOR_NAME].get("text", "").strip()
         if docai_text:
             aggregated_parts.append(docai_text)
 
     # 3. Audio Transcriber
-    if "audio_transcriber" in context:
-        transcript = context["audio_transcriber"].get("text", "").strip()
+    if AUDIO_TRANSCRIBER_NAME in context:
+        transcript = context[AUDIO_TRANSCRIBER_NAME].get("text", "").strip()
         if transcript:
             aggregated_parts.append(f"[Audio Transcript]\n{transcript}")
 
     # 4. Vision Analyzer (Image Descriptions)
-    if "vision_analyzer" in context:
-        img_desc = context["vision_analyzer"].get("description", "").strip()
+    if VISION_ANALYZER_NAME in context:
+        img_desc = context[VISION_ANALYZER_NAME].get("description", "").strip()
         if img_desc:
             aggregated_parts.append(f"[Visual Description]\n{img_desc}")
 
     # 5. Video Analyzer (Keyframe Descriptions)
-    if "video_analyzer" in context:
-        vid_desc = context["video_analyzer"].get("visual_description", "").strip()
+    if VIDEO_ANALYZER_NAME in context:
+        vid_desc = context[VIDEO_ANALYZER_NAME].get("visual_description", "").strip()
         if vid_desc:
             aggregated_parts.append(f"[Video Visual Description]\n{vid_desc}")
 
