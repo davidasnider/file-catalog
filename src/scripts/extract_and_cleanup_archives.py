@@ -42,6 +42,21 @@ def safe_extract_7z(archive: "py7zr.SevenZipFile", dest_dir: Path):
         member_path = (dest_dir / member.filename).resolve()
         if not is_within_directory(dest_dir, member_path):
             raise Exception(f"Potential path traversal attempt: {member.filename}")
+
+        # Check for symlinks if supported by the member object
+        if hasattr(member, "is_symlink") and member.is_symlink():
+            link_target = Path(member.link_target)
+            if link_target.is_absolute():
+                raise Exception(
+                    f"Potential path traversal attempt (absolute link): {member.filename} -> {member.link_target}"
+                )
+            member_parent = (dest_dir / member.filename).parent
+            resolved_link_target = (member_parent / link_target).resolve()
+            if not is_within_directory(dest_dir, resolved_link_target):
+                raise Exception(
+                    f"Potential path traversal attempt (link target outside): {member.filename} -> {member.link_target}"
+                )
+
     archive.extractall(path=dest_dir)
 
 
@@ -55,6 +70,22 @@ def safe_extract_tar(tar_ref: tarfile.TarFile, dest_dir: Path):
             member_path = (dest_dir / member.name).resolve()
             if not is_within_directory(dest_dir, member_path):
                 raise Exception(f"Potential path traversal attempt: {member.name}")
+
+            # Check for symlinks and hardlinks traversal
+            if member.issym() or member.islnk():
+                link_target = Path(member.linkname)
+                if link_target.is_absolute():
+                    raise Exception(
+                        f"Potential path traversal attempt (absolute link): {member.name} -> {member.linkname}"
+                    )
+
+                # Resolve the link target relative to the member's parent directory
+                member_parent = (dest_dir / member.name).parent
+                resolved_link_target = (member_parent / link_target).resolve()
+                if not is_within_directory(dest_dir, resolved_link_target):
+                    raise Exception(
+                        f"Potential path traversal attempt (link target outside): {member.name} -> {member.linkname}"
+                    )
         tar_ref.extractall(dest_dir)
 
 
