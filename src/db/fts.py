@@ -4,6 +4,7 @@ import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from src.db.models import DocumentStatus, TaskStatus
+from src.plugins.text_extractor import TEXT_EXTRACTOR_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,10 @@ async def sync_document_to_fts(session: AsyncSession, document_id: int):
         normalized_task_name = task_name.lower()
 
         # Extract textual content based on the task type
-        if task_name == "TextExtractor" or normalized_task_name == "text_extractor":
+        if (
+            task_name == TEXT_EXTRACTOR_NAME
+            or normalized_task_name == TEXT_EXTRACTOR_NAME.lower()
+        ):
             if text_content := data.get("text"):
                 content_parts.append(text_content)
 

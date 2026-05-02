@@ -1,6 +1,9 @@
 from typing import Dict, Any
 
 
+from src.plugins.text_extractor import TEXT_EXTRACTOR_NAME
+
+
 def get_all_extracted_text(context: Dict[str, Any]) -> str:
     """
     Aggregates text extracted from all available analyzers in the context.
@@ -20,8 +23,8 @@ def get_all_extracted_text(context: Dict[str, Any]) -> str:
     aggregated_parts = []
 
     # 1. Standard Document / OCR Text Extractor
-    if "TextExtractor" in context:
-        text = context["TextExtractor"].get("text", "").strip()
+    if TEXT_EXTRACTOR_NAME in context:
+        text = context[TEXT_EXTRACTOR_NAME].get("text", "").strip()
         if text:
             aggregated_parts.append(text)
 

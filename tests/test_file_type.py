@@ -35,9 +35,11 @@ def test_detect_file_type_missing_file(caplog):
 
 def test_detect_file_type_magic_fallback_to_mimetypes():
     """Test that it falls back to mimetypes if magic returns a generic text/plain."""
-    with patch("magic.from_file") as mock_magic, patch(
-        "os.path.exists"
-    ) as mock_exists, patch("mimetypes.guess_type") as mock_guess:
+    with (
+        patch("magic.from_file") as mock_magic,
+        patch("os.path.exists") as mock_exists,
+        patch("mimetypes.guess_type") as mock_guess,
+    ):
         mock_exists.return_value = True
         mock_magic.return_value = "text/plain"
         # Simulate mimetypes having a more specific type for .md
@@ -59,9 +61,11 @@ def test_detect_file_type_no_extension():
 
 def test_detect_file_type_magic_error():
     """Test that it handles libmagic exceptions gracefully."""
-    with patch("magic.from_file", side_effect=Exception("Magic failed")), patch(
-        "os.path.exists"
-    ) as mock_exists, patch("mimetypes.guess_type") as mock_guess:
+    with (
+        patch("magic.from_file", side_effect=Exception("Magic failed")),
+        patch("os.path.exists") as mock_exists,
+        patch("mimetypes.guess_type") as mock_guess,
+    ):
         mock_exists.return_value = True
         mock_guess.return_value = ("image/png", None)
 

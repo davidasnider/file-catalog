@@ -33,7 +33,9 @@ async def test_router_llm_fallback(monkeypatch):
     )
 
     context = {
-        TEXT_EXTRACTOR_NAME: {"text": "This is a highly complex engineering server log."}
+        TEXT_EXTRACTOR_NAME: {
+            "text": "This is a highly complex engineering server log."
+        }
     }
     res = await router.analyze("/unknown.log", "application/octet-stream", context)
 

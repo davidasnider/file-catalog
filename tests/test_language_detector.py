@@ -71,7 +71,11 @@ async def test_language_detector_should_run_accepts_long_text():
     assert plugin.should_run(
         "/a.txt",
         "text/plain",
-        {TEXT_EXTRACTOR_NAME: {"text": "This is a sufficiently long text for detection."}},
+        {
+            TEXT_EXTRACTOR_NAME: {
+                "text": "This is a sufficiently long text for detection."
+            }
+        },
     )
 
 

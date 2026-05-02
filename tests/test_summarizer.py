@@ -31,7 +31,9 @@ async def test_summarizer_uses_context_text(mock_get_llm_provider):
     plugin = SummarizerPlugin()
 
     context = {
-        TEXT_EXTRACTOR_NAME: {"text": "A full long document text that needs summarizing."}
+        TEXT_EXTRACTOR_NAME: {
+            "text": "A full long document text that needs summarizing."
+        }
     }
     result = await plugin.analyze("/fake/doc.pdf", "application/pdf", context)
 
