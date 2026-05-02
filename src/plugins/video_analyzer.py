@@ -109,7 +109,7 @@ class VideoAnalyzerPlugin(AnalyzerBase):
                     "visual_description": result.get(
                         "description", "No visual description provided."
                     ),
-                    "source": "video_analyzer",
+                    "source": VIDEO_ANALYZER_NAME,
                 }
             except json.JSONDecodeError:
                 logger.error(
@@ -117,7 +117,7 @@ class VideoAnalyzerPlugin(AnalyzerBase):
                 )
                 return {
                     "visual_description": response_text,
-                    "source": "video_analyzer",
+                    "source": VIDEO_ANALYZER_NAME,
                     "parse_error": True,
                 }
 

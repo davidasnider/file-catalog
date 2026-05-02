@@ -7,6 +7,17 @@ import json
 from src.db.engine import async_session_maker
 from src.db.models import Document, AnalysisTask
 from src.db.fts import search_fts
+from src.core.analyzer_names import (
+    TEXT_EXTRACTOR_NAME,
+    SUMMARIZER_NAME,
+    DEEP_SUMMARIZER_NAME,
+    ESTATE_ANALYZER_NAME,
+    VISION_ANALYZER_NAME,
+    VIDEO_ANALYZER_NAME,
+    PII_HARVESTER_NAME,
+    PASSWORD_EXTRACTOR_NAME,
+    METADATA_EXTRACTOR_NAME,
+)
 
 # Configure page
 st.set_page_config(
@@ -163,7 +174,8 @@ def main():
                 if f == "Estate Documents":
                     # Check EstateAnalyzer
                     estate_task = next(
-                        (t for t in doc_tasks if t.task_name == "EstateAnalyzer"), None
+                        (t for t in doc_tasks if t.task_name == ESTATE_ANALYZER_NAME),
+                        None,
                     )
                     is_estate = False
                     if estate_task and estate_task.result_data:
@@ -181,7 +193,13 @@ def main():
                         (
                             t
                             for t in doc_tasks
-                            if t.task_name in ["vision_analyzer", "video_analyzer"]
+                            if t.task_name
+                            in [
+                                VISION_ANALYZER_NAME,
+                                VIDEO_ANALYZER_NAME,
+                                "vision_analyzer",
+                                "video_analyzer",
+                            ]
                         ),
                         None,
                     )
@@ -200,7 +218,11 @@ def main():
                 elif f == "Contains Passwords":
                     # Check PasswordExtractor for 'passwords'
                     pw_task = next(
-                        (t for t in doc_tasks if t.task_name == "PasswordExtractor"),
+                        (
+                            t
+                            for t in doc_tasks
+                            if t.task_name == PASSWORD_EXTRACTOR_NAME
+                        ),
                         None,
                     )
                     has_passwords = False
@@ -215,7 +237,7 @@ def main():
                     # Fallback to legacy PIIHarvester
                     if not has_passwords:
                         pii_task = next(
-                            (t for t in doc_tasks if t.task_name == "PIIHarvester"),
+                            (t for t in doc_tasks if t.task_name == PII_HARVESTER_NAME),
                             None,
                         )
                         if pii_task and pii_task.result_data:
@@ -340,10 +362,10 @@ def main():
             # Separate out the Summarizer
             # Prioritize DeepSummarizer for large documents
             deep_summarizer_task = next(
-                (t for t in raw_tasks if t.task_name == "DeepSummarizer"), None
+                (t for t in raw_tasks if t.task_name == DEEP_SUMMARIZER_NAME), None
             )
             standard_summarizer_task = next(
-                (t for t in raw_tasks if t.task_name == "Summarizer"), None
+                (t for t in raw_tasks if t.task_name == SUMMARIZER_NAME), None
             )
 
             summarizer_task = deep_summarizer_task or standard_summarizer_task
@@ -363,7 +385,7 @@ def main():
             main_tasks = [
                 t
                 for t in raw_tasks
-                if t.task_name not in ["Summarizer", "DeepSummarizer"]
+                if t.task_name not in [SUMMARIZER_NAME, DEEP_SUMMARIZER_NAME]
             ]
 
             # 1. AI Summary Section (Top)
@@ -403,13 +425,13 @@ def main():
             # Visually sort the tasks so Extractors appear before Analyzers, and skipped tasks go to the bottom
             def task_sort_key(t):
                 is_skipped = get_task_status_color(t) == "⚪"
-                if t.task_name == "MetadataExtractor":
+                if t.task_name == METADATA_EXTRACTOR_NAME:
                     order = 0
-                elif t.task_name == "TextExtractor":
+                elif t.task_name == TEXT_EXTRACTOR_NAME:
                     order = 1
-                elif t.task_name == "PasswordExtractor":
+                elif t.task_name == PASSWORD_EXTRACTOR_NAME:
                     order = 2
-                elif t.task_name == "PIIHarvester":
+                elif t.task_name == PII_HARVESTER_NAME:
                     order = 3
                 else:
                     order = 4

@@ -3,6 +3,7 @@ import shutil
 import asyncio
 from unittest.mock import MagicMock, patch, AsyncMock
 from src.plugins.text_extractor import TextExtractorPlugin
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
 
 
 @pytest.mark.asyncio
@@ -41,7 +42,7 @@ async def test_text_extractor_doc_mock(tmp_path):
 
             assert result["extracted"] is True
             assert result["text"] == "Extracted text from legacy doc"
-            assert result["source"] == "text_extractor"
+            assert result["source"] == TEXT_EXTRACTOR_NAME
             mock_exec.assert_called_once()
 
 

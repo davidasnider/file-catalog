@@ -1,14 +1,20 @@
 from src.core.text_utils import get_all_extracted_text, repair_and_load_json
-from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
+from src.core.analyzer_names import (
+    TEXT_EXTRACTOR_NAME,
+    DOCUMENT_AI_EXTRACTOR_NAME,
+    AUDIO_TRANSCRIBER_NAME,
+    VISION_ANALYZER_NAME,
+    VIDEO_ANALYZER_NAME,
+)
 
 
 def test_get_all_extracted_text_aggregation():
     ctx = {
         TEXT_EXTRACTOR_NAME: {"text": "Doc text"},
-        "DocumentAIExtractor": {"text": "DocAI text"},
-        "audio_transcriber": {"text": "Spoken transcript"},
-        "vision_analyzer": {"description": "Image description"},
-        "video_analyzer": {"visual_description": "Keyframe summary"},
+        DOCUMENT_AI_EXTRACTOR_NAME: {"text": "DocAI text"},
+        AUDIO_TRANSCRIBER_NAME: {"text": "Spoken transcript"},
+        VISION_ANALYZER_NAME: {"description": "Image description"},
+        VIDEO_ANALYZER_NAME: {"visual_description": "Keyframe summary"},
     }
     result = get_all_extracted_text(ctx)
 
@@ -30,7 +36,7 @@ def test_get_all_extracted_text_aggregation():
 def test_get_all_extracted_text_partial():
     ctx = {
         TEXT_EXTRACTOR_NAME: {"text": "Doc text"},
-        "vision_analyzer": {"description": "Image description"},
+        VISION_ANALYZER_NAME: {"description": "Image description"},
     }
     result = get_all_extracted_text(ctx)
 

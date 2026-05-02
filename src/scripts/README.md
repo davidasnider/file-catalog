@@ -64,5 +64,25 @@ python -m src.scripts.perf_test_llms
 python -m src.scripts.perf_test_llms --model-path "mlx-community/Meta-Llama-3.1-8B-Instruct-4bit"
 ```
 
+---
+
+### 5. Failure Reporter (`report_failures.py`)
+Generate a report of pipeline failures from the database. It supports outputting to a Rich table or JSON, and allows filtering by specific task name or file extension.
+
+**Examples:**
+```bash
+# Generate a summary of all failures in a table format
+python -m src.scripts.report_failures
+
+# Output failures as JSON
+python -m src.scripts.report_failures --format json
+
+# Filter failures for a specific task
+python -m src.scripts.report_failures --task TextExtractor
+
+# Filter failures for a specific file extension
+python -m src.scripts.report_failures --ext .pdf
+```
+
 ## General Usage Note
 All scripts should be run from the root of the project using the `python -m src.scripts.<script_name>` syntax to ensure that internal imports and the `PYTHONPATH` are handled correctly.

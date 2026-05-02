@@ -75,7 +75,7 @@ class AudioTranscriberPlugin(AnalyzerBase):
                 "text": transcript.strip(),
                 "extracted": bool(transcript.strip()),
                 "language": language,
-                "source": "audio_transcriber",
+                "source": AUDIO_TRANSCRIBER_NAME,
             }
 
         except Exception as e:

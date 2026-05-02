@@ -82,7 +82,7 @@ class VisionAnalyzerPlugin(AnalyzerBase):
                     or "No description provided (possible safety refusal).",
                     "is_sfw": is_sfw,
                     "adult_content_score": score,
-                    "source": "vision_analyzer",
+                    "source": VISION_ANALYZER_NAME,
                 }
                 logger.info(
                     f"Vision analysis result for {file_path}: is_sfw={result['is_sfw']} (score={score}), description='{result['description'][:100]}...'"
@@ -105,7 +105,7 @@ class VisionAnalyzerPlugin(AnalyzerBase):
                 return {
                     "description": "Image analysis completed but the model failed to output a formatted description.",
                     "is_sfw": False,  # Conservative default
-                    "source": "vision_analyzer",
+                    "source": VISION_ANALYZER_NAME,
                     "parse_error": True,
                 }
 
