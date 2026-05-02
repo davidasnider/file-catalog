@@ -80,13 +80,12 @@ class TaskEngine:
 
         retry_count = 0
         max_retries = config.max_retries
-        task: Optional[AnalysisTask] = None
 
         while True:
             try:
                 # Rehydrate the task to update status
                 task = await session.get(AnalysisTask, task_id)
-                if task is None:
+                if not task:
                     return False, f"Task {task_id} not found in DB", {}
 
                 task.status = TaskStatus.IN_PROGRESS
@@ -98,6 +97,7 @@ class TaskEngine:
                 # Instantiate and check conditionally
                 analyzer = plugin_class()
                 if not analyzer.should_run(document_path, mime_type, context):
+                    task = await session.get(AnalysisTask, task_id)
                     task.status = TaskStatus.COMPLETED
                     result = {
                         "skipped": True,
@@ -117,6 +117,7 @@ class TaskEngine:
                 result = await analyzer.analyze(document_path, mime_type, context)
 
                 # Successful completion
+                task = await session.get(AnalysisTask, task_id)
                 task.status = TaskStatus.COMPLETED
                 try:
                     task.result_data = json.dumps(result)
@@ -139,7 +140,8 @@ class TaskEngine:
                         f"Error executing plugin {task_name} on {document_path}: {e}. "
                         f"Retrying in {backoff}s ({retry_count}/{max_retries})..."
                     )
-                    if task is not None:
+                    task = await session.get(AnalysisTask, task_id)
+                    if task:
                         task.status = TaskStatus.RETRIES
                         task.error_message = str(e)
                         task.retry_count = retry_count
@@ -151,7 +153,8 @@ class TaskEngine:
                     f"Plugin {task_name} failed after {max_retries} retries on {document_path}: {e}"
                 )
                 # Ensure task is marked as failed
-                if task is not None:
+                task = await session.get(AnalysisTask, task_id)
+                if task:
                     task.status = TaskStatus.FAILED
                     task.error_message = str(e)
                     task.retry_count = retry_count
