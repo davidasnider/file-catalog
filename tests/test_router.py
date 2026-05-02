@@ -1,6 +1,6 @@
 import pytest
 from src.plugins.router import RouterPlugin
-from src.plugins.text_extractor import TEXT_EXTRACTOR_NAME
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
 
 
 @pytest.mark.asyncio

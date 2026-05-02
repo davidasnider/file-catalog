@@ -4,7 +4,7 @@ import asyncio
 from faster_whisper import WhisperModel
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
-from src.plugins.text_extractor import TEXT_EXTRACTOR_NAME
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
 
 logger = logging.getLogger(__name__)
 

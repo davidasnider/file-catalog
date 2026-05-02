@@ -3,7 +3,7 @@ import json
 from sqlmodel import text
 from src.db.models import Document, AnalysisTask, DocumentStatus, TaskStatus
 from src.db.fts import sync_document_to_fts, search_fts
-from src.plugins.text_extractor import TEXT_EXTRACTOR_NAME
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
 
 
 @pytest.fixture

@@ -1,7 +1,7 @@
 from typing import Dict, Any
 
 
-from src.plugins.text_extractor import TEXT_EXTRACTOR_NAME
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
 
 
 def get_all_extracted_text(context: Dict[str, Any]) -> str:

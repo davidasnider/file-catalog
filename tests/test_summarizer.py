@@ -1,6 +1,6 @@
 import pytest
 from src.plugins.summarizer import SummarizerPlugin
-from src.plugins.text_extractor import TEXT_EXTRACTOR_NAME
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
 
 
 class MockLLM:

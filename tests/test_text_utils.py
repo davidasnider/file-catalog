@@ -1,5 +1,5 @@
 from src.core.text_utils import get_all_extracted_text, repair_and_load_json
-from src.plugins.text_extractor import TEXT_EXTRACTOR_NAME
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
 
 
 def test_get_all_extracted_text_aggregation():

@@ -1,6 +1,6 @@
 import pytest
 from src.plugins.estate_analyzer import EstateAnalyzerPlugin
-from src.plugins.text_extractor import TEXT_EXTRACTOR_NAME
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
 
 
 class MockLLMJson:

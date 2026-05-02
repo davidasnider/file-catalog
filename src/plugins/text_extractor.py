@@ -11,12 +11,11 @@ from hachoir.metadata import extractMetadata
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
 from src.core.config import config
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
 
 logger = logging.getLogger(__name__)
 
 SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/bmp", "image/tiff"}
-
-TEXT_EXTRACTOR_NAME = "TextExtractor"
 
 
 @register_analyzer(name=TEXT_EXTRACTOR_NAME, depends_on=[], version="1.6")

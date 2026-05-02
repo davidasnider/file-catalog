@@ -1,0 +1,21 @@
+"""
+Shared analyzer name constants to avoid circular imports and duplicate module execution.
+"""
+
+TEXT_EXTRACTOR_NAME = "TextExtractor"
+DOCUMENT_AI_EXTRACTOR_NAME = "DocumentAIExtractor"
+AUDIO_TRANSCRIBER_NAME = "audio_transcriber"
+VISION_ANALYZER_NAME = "vision_analyzer"
+VIDEO_ANALYZER_NAME = "video_analyzer"
+SUMMARIZER_NAME = "Summarizer"
+ROUTER_NAME = "Router"
+PII_HARVESTER_NAME = "PIIHarvester"
+PASSWORD_EXTRACTOR_NAME = "PasswordExtractor"  # pragma: allowlist secret
+ESTATE_ANALYZER_NAME = "EstateAnalyzer"
+DEEP_SUMMARIZER_NAME = "DeepSummarizer"
+SPREADSHEET_ANALYZER_NAME = "SpreadsheetAnalyzer"
+EMAIL_PARSER_NAME = "EmailParser"
+OCR_CONFIDENCE_SCORER_NAME = "OCRConfidenceScorer"
+DUPLICATE_DETECTOR_NAME = "DuplicateDetector"
+METADATA_EXTRACTOR_NAME = "MetadataExtractor"
+LANGUAGE_DETECTOR_NAME = "LanguageDetector"

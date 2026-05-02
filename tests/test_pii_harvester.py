@@ -1,6 +1,6 @@
 import pytest
 from src.plugins.pii_harvester import PIIHarvesterPlugin
-from src.plugins.text_extractor import TEXT_EXTRACTOR_NAME
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
 
 
 def test_pii_harvester_should_run():
