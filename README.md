@@ -53,12 +53,12 @@ The scanner can be configured via environment variables (in a `.env` file) or CL
 - `LOG_FORMAT`: Set to `json` for structured logging or `standard` for human-readable logs.
 
 ### Performance: Incremental Scanning
-The system implements a **Quick Skip** mechanism. It tracks the `file_size` and `mtime` of every ingested file. On subsequent runs, if a file's metadata hasn't changed and its status is `COMPLETED`, the scanner skips the entire analysis pipeline for that file, significantly reducing processing time for large, stable archives. Files that are no longer present on the filesystem are marked with a `NOT_PRESENT` status to track missing files and prevent redundant operations.
+The system implements a **Quick Skip** mechanism. It tracks the `file_size` and `mtime` of every ingested file. On subsequent runs, if a file's metadata hasn't changed and its status is `COMPLETED`, the scanner skips the entire analysis pipeline for that file, significantly reducing processing time for large, stable archives. When resuming an interrupted run, non-completed files that are no longer present on the filesystem are marked with a `NOT_PRESENT` status.
 
 ### Included Utilities
 The project includes several utilities in `src/scripts/` to help manage archives and failures:
 - **MBOX Extraction**: Use `extract_and_cleanup_mbox.py` to recursively extract `.mbox` email archives into individual `.eml` files grouped by thread, making them easily ingestible by the scanner.
-- **Archive Extraction**: Use `extract_and_cleanup_archives.py` to recursively extract compressed archives (`.zip`, `.tar.gz`, `.7z`, etc.) into nested folders and remove the original archive.
+- **Archive Extraction**: Use `extract_and_cleanup_archives.py` to recursively extract compressed archives (`.zip`, `.tar.gz`, `.7z` (requires `py7zr` via `archives` extra), etc.) into nested folders and remove the original archive.
 - **Failure Reporting**: Use `report_failures.py` to generate rich terminal or JSON reports of documents and tasks that failed during ingestion, making it easy to identify and resolve problematic files.
 
 ---
