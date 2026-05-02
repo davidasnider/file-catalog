@@ -63,3 +63,12 @@ The project includes several utilities in `src/scripts/` to help manage archives
 
 ---
 *Built with Python, SQLite (SQLModel), Streamlit, and Llama.cpp.*
+
+### Development
+Dev dependencies (`pytest`, `ruff`, `pre-commit`) are separated from runtime dependencies and managed as optional dependencies in `pyproject.toml`. To install them for development, run:
+```bash
+uv sync --all-extras
+```
+
+### Retry Mechanism
+The application features an automatic retry mechanism with exponential backoff for failed analysis tasks. The number of retries is controlled by the `MAX_RETRIES` configuration.
