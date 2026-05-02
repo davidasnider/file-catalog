@@ -6,8 +6,8 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 
 ### 1. Multi-Model Orchestration & Memory Management
 - **Multi-Backend Python LLM Management**: Directly manages models using `llama-cpp-python` (GGUF), `mlx-lm` (Apple Silicon), or `google-genai` (Cloud Fallback) without external proxy bloat.
-- **LRU Cache & RAM Monitoring (llama-cpp)**: For GGUF models, actively monitors system RAM (via `psutil`). Models are cached "hot" in unified memory and gracefully evicted using an LRU strategy only when memory drops below 2GB.
-- **Dynamic Model Fetching (llama-cpp)**: Automatically downloads and manages localized GGUF models directly from HuggingFace (e.g., `Llama-3.1-8B-Instruct`, `Phi-4-mini`) upon first request.
+- **LRU Cache & RAM Monitoring**: For the `llama-cpp` backend, actively monitors system RAM (via `psutil`). Models are cached "hot" in unified memory for maximum speed between tasks, and gracefully evicted using an LRU strategy only when memory drops below 2GB.
+- **Dynamic Model Fetching**: For the `llama-cpp` backend, automatically downloads and manages localized GGUF models directly from HuggingFace (e.g., `Llama-3.1-8B-Instruct`, `Phi-4-mini`) upon first request.
 
 ### 2. Intelligent Document Routing
 - **Hybrid Router Paradigm**: The pipeline utilizes a dedicated `RouterPlugin` to act as a traffic controller before touching heavy, specialized reasoning models.
@@ -25,7 +25,7 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 - **PII Harvesting**: A specialized `PIIHarvesterPlugin` leverages strict JSON-Schema enforcement to extract named entities (Names, Emails, Addresses) into the database.
 - **Credential Detection**: A high-precision `PasswordExtractorPlugin` specifically identifies authentication passwords, PINs, and secrets with advanced hallucination filtering.
 - **Estate & Legal Analysis**: `EstateAnalyzerPlugin` identifies critical documents for estate planning (Wills, Trusts, Financial Assets) using forensic-level reasoning.
-- **Data Parsing & Spreadsheets**: An `EmailParserPlugin` accurately parses `.eml` (and `.mbox` when explicitly enabled or after extraction) files, while the `SpreadsheetAnalyzerPlugin` extracts and summarizes tabular data from `.xlsx`, `.csv`, and `.ods`.
+- **Data Parsing & Spreadsheets**: An `EmailParserPlugin` accurately parses `.eml` and `.mbox` files (note: `.mbox` files are ignored by default and require extraction or explicit enabling to be parsed), while the `SpreadsheetAnalyzerPlugin` extracts and summarizes tabular data from `.xlsx`, `.csv`, and `.ods`.
 
 ### 5. Rich Text & Metadata Extraction
 - **Broad File Support**: Extract metadata and content from PDFs (`pdfplumber`), Word Docs (`python-docx`), HTML web pages (`BeautifulSoup4`), and standard text/code files.
@@ -57,22 +57,7 @@ Configuration is centrally managed via `pydantic-settings`.
 - `LOG_FORMAT`: Set to `json` for structured logging or `standard` for human-readable logs.
 
 ### Performance: Incremental Scanning
-The system implements a **Quick Skip** mechanism. It tracks the `file_size` and `mtime` of every ingested file. On subsequent runs, if a file's metadata hasn't changed and its status is `COMPLETED`, the scanner skips the entire analysis pipeline for that file, significantly reducing processing time for large, stable archives. Non-`COMPLETED` files that are no longer present on the filesystem when resuming an interrupted run are marked with a `NOT_PRESENT` status to track missing files and prevent redundant operations.
-
-### Included Utilities
-The project includes several utilities in `src/scripts/` to help manage archives and failures. Run these from the project root using `python -m src.scripts.<script_name> <directory>`:
-- **Mailbox Extraction**: Use `python -m src.scripts.extract_and_cleanup_mbox <directory>` to recursively extract `.mbox`, `.mbx`, and `.mbs` archives into individual `.eml` files grouped by thread. By default, the original mailbox is removed unless `--keep` is specified.
-- **Archive Extraction**: Use `python -m src.scripts.extract_and_cleanup_archives <directory>` to recursively extract compressed archives (`.zip`, `.tar.gz`, `.7z` (requires `py7zr` via `archives` extra), etc.) into nested folders. By default, the original archive is removed unless `--keep` is specified.
-- **Failure Reporting**: Use `python -m src.scripts.report_failures` to generate rich terminal or JSON reports of documents and tasks that failed during ingestion.
+The system implements a **Quick Skip** mechanism. It tracks the `file_size` and `mtime` of every ingested file. On subsequent runs, if a file's metadata hasn't changed and its status is `COMPLETED`, the scanner skips the entire analysis pipeline for that file, significantly reducing processing time for large, stable archives.
 
 ---
 *Built with Python, SQLite (SQLModel), Streamlit, and Llama.cpp.*
-
-### Development
-Dev dependencies (`pytest`, `ruff`, `pre-commit`) are separated from runtime dependencies and managed as optional dependencies in `pyproject.toml`. To install them for development, run:
-```bash
-uv sync --all-extras
-```
-
-### Retry Mechanism
-The application features an automatic retry mechanism with exponential backoff for failed analysis tasks. The number of retries is controlled by the `MAX_RETRIES` configuration.
