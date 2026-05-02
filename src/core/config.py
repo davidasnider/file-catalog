@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     document_ai_location: str = "us"
 
     # Infrastructure & Reliability
+    scan_directory: str | None = None
     max_concurrent: int = 4
     ingest_batch_size: int = 100
     max_retries: int = 3
