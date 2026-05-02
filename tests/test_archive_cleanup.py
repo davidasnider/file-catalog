@@ -2,6 +2,7 @@ import sys
 import types
 import zipfile
 import tarfile
+import io
 from src.scripts.extract_and_cleanup_archives import extract_archive, process_directory
 
 try:
@@ -112,6 +113,73 @@ def test_path_traversal_7z_mocked(tmp_path, mocker):
     mocker.patch("src.scripts.extract_and_cleanup_archives.HAS_7Z", True)
 
     archive_path = tmp_path / "test.7z"
+    archive_path.write_text("dummy")
+
+    assert extract_archive(archive_path, tmp_path / "out") is False
+
+
+def test_valid_tar_symlink(tmp_path):
+    # Create a tar file with a valid internal symlink
+    tar_path = tmp_path / "valid_symlink.tar"
+    with tarfile.open(tar_path, "w") as tar:
+        # Create a file
+        content = b"hello"
+        info = tarfile.TarInfo("target.txt")
+        info.size = len(content)
+        tar.addfile(info, io.BytesIO(content))
+
+        # Internal symlink
+        symlink_member = tarfile.TarInfo("link.txt")
+        symlink_member.type = tarfile.SYMTYPE
+        symlink_member.linkname = "target.txt"
+        tar.addfile(symlink_member)
+
+    dest_dir = tmp_path / "extracted_valid_tar"
+    assert extract_archive(tar_path, dest_dir) is True
+    assert (dest_dir / "target.txt").exists()
+    assert (dest_dir / "link.txt").is_symlink()
+
+
+def test_valid_tar_hardlink(tmp_path):
+    # Create a tar file with a valid internal hardlink
+    tar_path = tmp_path / "valid_hardlink.tar"
+    with tarfile.open(tar_path, "w") as tar:
+        # Create a file
+        content = b"hello"
+        info = tarfile.TarInfo("target.txt")
+        info.size = len(content)
+        tar.addfile(info, io.BytesIO(content))
+
+        # Internal hardlink
+        hardlink_member = tarfile.TarInfo("hardlink.txt")
+        hardlink_member.type = tarfile.LNKTYPE
+        hardlink_member.linkname = "target.txt"
+        tar.addfile(hardlink_member)
+
+    dest_dir = tmp_path / "extracted_valid_hardlink"
+    assert extract_archive(tar_path, dest_dir) is True
+    assert (dest_dir / "target.txt").exists()
+    assert (dest_dir / "hardlink.txt").exists()
+
+
+def test_path_traversal_7z_absolute_symlink_mocked(tmp_path, mocker):
+    # Mock py7zr to simulate an absolute symlink
+    mock_7z = mocker.Mock()
+    mock_file = mocker.Mock()
+    mock_file.filename = "abs_link"
+    mock_file.is_symlink.return_value = True
+    mock_file.link_target = "/tmp/outside"
+    mock_7z.get_files.return_value = [mock_file]
+
+    mocker.patch(
+        "py7zr.SevenZipFile",
+        return_value=mocker.MagicMock(
+            __enter__=lambda x: mock_7z, __exit__=lambda x, *args: None
+        ),
+    )
+    mocker.patch("src.scripts.extract_and_cleanup_archives.HAS_7Z", True)
+
+    archive_path = tmp_path / "test_abs_link.7z"
     archive_path.write_text("dummy")
 
     assert extract_archive(archive_path, tmp_path / "out") is False
