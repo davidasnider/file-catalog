@@ -28,7 +28,7 @@ Rebuild the application from the ground up to address robustness, extensibility,
 - **Problem:** The current JSON manifest easily gets corrupted or out-of-sync during multithreaded operations.
 - **Solution:** Use **SQLite** via `SQLModel` (or `SQLAlchemy`).
 - **Schema Design:**
-  - `Document`: Tracks path, robustly detected MIME type, file hash (a cryptographic hash of the file contents to prevent duplicate processing if moved or renamed), and overall status (`PENDING`, `EXTRACTING`, `ANALYZING`, `COMPLETED`, `FAILED`, `NOT_PRESENT`).
+  - `Document`: Tracks path, robustly detected MIME type, file hash (to detect content changes and reset tasks if changed), and overall status (`PENDING`, `EXTRACTING`, `ANALYZING`, `COMPLETED`, `FAILED`, `NOT_PRESENT`).
   - `AnalysisTask`: Each document has multiple linked tasks (e.g., OCR, Text Splitting, Summarization, Estate Analysis). Each task has its own status (`PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `RETRIES`).
 
 ### 2.2 Advanced File Type Detection
