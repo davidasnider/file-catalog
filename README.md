@@ -5,9 +5,9 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 ## Core Features
 
 ### 1. Multi-Model Orchestration & Memory Management
-- **Native Python LLM Management**: Directly manages models using `llama-cpp-python` without external proxy bloat.
-- **LRU Cache & RAM Monitoring**: Actively monitors system RAM (via `psutil`). Models are cached "hot" in unified memory for maximum speed between tasks, and gracefully evicted using an LRU strategy only when memory drops below 2GB.
-- **Dynamic Model Fetching**: Automatically downloads and manages localized GGUF models directly from HuggingFace (e.g., `Llama-3.1-8B-Instruct`, `Phi-4-mini`) upon first request.
+- **Multi-Backend Python LLM Management**: Directly manages models using `llama-cpp-python` (GGUF), `mlx-lm` (Apple Silicon), or `google-genai` (Cloud Fallback) without external proxy bloat.
+- **LRU Cache & RAM Monitoring**: For the `llama-cpp` backend, actively monitors system RAM (via `psutil`). Models are cached "hot" in unified memory for maximum speed between tasks, and gracefully evicted using an LRU strategy only when memory drops below 2GB.
+- **Dynamic Model Fetching**: For the `llama-cpp` backend, automatically downloads and manages localized GGUF models directly from HuggingFace (e.g., `Llama-3.1-8B-Instruct`, `Phi-4-mini`) upon first request.
 
 ### 2. Intelligent Document Routing
 - **Hybrid Router Paradigm**: The pipeline utilizes a dedicated `RouterPlugin` to act as a traffic controller before touching heavy, specialized reasoning models.
@@ -18,16 +18,18 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 - **Skip Irrelevant Work**: The `TaskEngine` seamlessly evaluates `should_run()` conditions for every plugin. Heavy analytical models (like the Estate Analyzer) only trigger if the Router tags the document appropriately, saving immense compute time and context bloat.
 
 ### 4. Specialized Analytical Pipelines
+- **Metadata & Language Detection**: Features a `LanguageDetectorPlugin` to tag document language and a `DuplicateDetectorPlugin` to find exact-duplicate files using hashes.
 - **Two-Tier Summarization**:
   - **Universal Short Summary**: A lightning-fast, 3-sentence summary generated for *every* standard document.
   - **Deep Map-Reduce Summarization**: A specialized `DeepSummarizerPlugin` built for massive documents. It dynamically chunks text exceeding the context window, summarizes each chunk sequentially (Map), and synthesizes a final cohesive report (Reduce).
 - **PII Harvesting**: A specialized `PIIHarvesterPlugin` leverages strict JSON-Schema enforcement to extract named entities (Names, Emails, Addresses) into the database.
 - **Credential Detection**: A high-precision `PasswordExtractorPlugin` specifically identifies authentication passwords, PINs, and secrets with advanced hallucination filtering.
 - **Estate & Legal Analysis**: `EstateAnalyzerPlugin` identifies critical documents for estate planning (Wills, Trusts, Financial Assets) using forensic-level reasoning.
+- **Data Parsing & Spreadsheets**: An `EmailParserPlugin` accurately parses `.eml` and `.mbox` files (note: `.mbox` files are ignored by the scanner by default and must be extracted into `.eml` format first to be parsed), while the `SpreadsheetAnalyzerPlugin` extracts and summarizes tabular data from `.xlsx`, `.csv`, and `.ods`.
 
 ### 5. Rich Text & Metadata Extraction
 - **Broad File Support**: Extract metadata and content from PDFs (`pdfplumber`), Word Docs (`python-docx`), HTML web pages (`BeautifulSoup4`), and standard text/code files.
-- **Optical Character Recognition (OCR) & Vision Fallback**: Automatically detects images and extracts text using Tesseract OCR (`pytesseract`). For complex images or failed OCR, it utilizes a multimodal Vision LLM to describe the content.
+- **Optical Character Recognition (OCR) & Vision Fallback**: Automatically detects images and extracts text using Tesseract OCR (`pytesseract`). The `OCRConfidenceScorerPlugin` scores the quality of the extraction. For complex images or failed OCR, it utilizes a multimodal Vision LLM to describe the content.
 - **Vision Memory Safeguards**: Implements proactive image resizing (configurable via `VISION_MAX_PIXELS`) to prevent out-of-memory (OOM) crashes during local inference of high-resolution scans.
 
 ### 6. Interactive Visualization & Monitoring
@@ -46,6 +48,8 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 The scanner can be configured via environment variables (in a `.env` file) or CLI arguments.
 
 ### Key Configuration Options:
+Configuration is centrally managed via `pydantic-settings`.
+- `LLM_PROVIDER` / `VISION_PROVIDER`: Choose `mlx`, `llama_cpp`, or `gemini` (defaults to `mlx`).
 - `MAX_CONCURRENT`: Number of documents to process in parallel (default: 4).
 - `INGEST_BATCH_SIZE`: Number of files to commit to the database in a single transaction (default: 100).
 - `MAX_RETRIES`: Number of times to retry a failed plugin task with exponential backoff (default: 3).
