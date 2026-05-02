@@ -1152,8 +1152,9 @@ def main():
             args.concurrency,
             args.clean,
             args.limit,
+            args.recursive,
+            args.force,
             mime_type,
-            args.concurrency_limit_ratio,
         )
     )
 

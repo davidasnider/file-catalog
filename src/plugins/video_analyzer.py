@@ -6,6 +6,7 @@ import tempfile
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
 from src.llm.factory import get_llm_provider
+from src.core.analyzer_names import VIDEO_ANALYZER_NAME, AUDIO_TRANSCRIBER_NAME
 
 # Conditional import as PyAV might not be installed yet during tests
 try:
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 @register_analyzer(
-    name="video_analyzer", depends_on=["audio_transcriber"], version="1.0"
+    name=VIDEO_ANALYZER_NAME, depends_on=[AUDIO_TRANSCRIBER_NAME], version="1.0"
 )
 class VideoAnalyzerPlugin(AnalyzerBase):
     """
@@ -70,7 +71,7 @@ class VideoAnalyzerPlugin(AnalyzerBase):
         temp_img_path = None
         try:
             # 1. Grab transcript from our dependency plugin if it successfully ran
-            transcript = context.get("audio_transcriber", {}).get("text", "")
+            transcript = context.get(AUDIO_TRANSCRIBER_NAME, {}).get("text", "")
 
             # 2. Extract Keyframe
             temp_img_path = self.extract_keyframe(file_path)
@@ -108,7 +109,7 @@ class VideoAnalyzerPlugin(AnalyzerBase):
                     "visual_description": result.get(
                         "description", "No visual description provided."
                     ),
-                    "source": "video_analyzer",
+                    "source": VIDEO_ANALYZER_NAME,
                 }
             except json.JSONDecodeError:
                 logger.error(
@@ -116,7 +117,7 @@ class VideoAnalyzerPlugin(AnalyzerBase):
                 )
                 return {
                     "visual_description": response_text,
-                    "source": "video_analyzer",
+                    "source": VIDEO_ANALYZER_NAME,
                     "parse_error": True,
                 }
 

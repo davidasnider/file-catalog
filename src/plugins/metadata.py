@@ -4,11 +4,12 @@ import logging
 from typing import Dict, Any
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
+from src.core.analyzer_names import METADATA_EXTRACTOR_NAME
 
 logger = logging.getLogger(__name__)
 
 
-@register_analyzer(name="MetadataExtractor", depends_on=[])
+@register_analyzer(name=METADATA_EXTRACTOR_NAME, depends_on=[])
 class MetadataExtractorPlugin(AnalyzerBase):
     """
     A basic plugin that extracts simple file system metadata.

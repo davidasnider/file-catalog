@@ -4,6 +4,7 @@ from typing import Dict, Any
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
 from src.llm.factory import get_llm_provider
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME, PII_HARVESTER_NAME, ROUTER_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +12,9 @@ logger = logging.getLogger(__name__)
 
 
 @register_analyzer(
-    name="PIIHarvester", depends_on=["TextExtractor", "Router"], version="1.7"
+    name=PII_HARVESTER_NAME,
+    depends_on=[TEXT_EXTRACTOR_NAME, ROUTER_NAME],
+    version="1.7",
 )
 class PIIHarvesterPlugin(AnalyzerBase):
     """
@@ -22,7 +25,7 @@ class PIIHarvesterPlugin(AnalyzerBase):
     def should_run(
         self, file_path: str, mime_type: str, context: Dict[str, Any]
     ) -> bool:
-        category = context.get("Router", {}).get("category", "")
+        category = context.get(ROUTER_NAME, {}).get("category", "")
         # Images won't have text unless OCR is run. For now, skip Images/Video/Audio.
         if category in ["Image", "Video", "Audio"]:
             return False

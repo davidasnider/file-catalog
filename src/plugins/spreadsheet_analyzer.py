@@ -4,6 +4,7 @@ from typing import Dict, Any
 import pandas as pd
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
+from src.core.analyzer_names import SPREADSHEET_ANALYZER_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ MAX_SAMPLE_ROWS = 5
 MAX_SPREADSHEET_ROWS = 10000
 
 
-@register_analyzer(name="SpreadsheetAnalyzer", depends_on=[], version="1.0")
+@register_analyzer(name=SPREADSHEET_ANALYZER_NAME, depends_on=[], version="1.0")
 class SpreadsheetAnalyzerPlugin(AnalyzerBase):
     """
     Extracts and summarizes data from spreadsheet files (.xlsx, .csv, .ods).

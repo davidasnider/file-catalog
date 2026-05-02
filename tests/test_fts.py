@@ -3,6 +3,7 @@ import json
 from sqlmodel import text
 from src.db.models import Document, AnalysisTask, DocumentStatus, TaskStatus
 from src.db.fts import sync_document_to_fts, search_fts
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
 
 
 @pytest.fixture
@@ -36,7 +37,7 @@ async def test_sync_document_to_fts(fts_setup):
     tasks = [
         AnalysisTask(
             document_id=doc.id,
-            task_name="TextExtractor",
+            task_name=TEXT_EXTRACTOR_NAME,
             status=TaskStatus.COMPLETED,
             result_data=json.dumps(
                 {"text": "The quick brown fox jumps over the lazy dog."}
@@ -95,7 +96,7 @@ async def test_search_fts(fts_setup):
 
     task = AnalysisTask(
         document_id=doc.id,
-        task_name="TextExtractor",
+        task_name=TEXT_EXTRACTOR_NAME,
         status=TaskStatus.COMPLETED,
         result_data=json.dumps(
             {

@@ -1,5 +1,6 @@
 import pytest
 from src.plugins.router import RouterPlugin
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
 
 
 @pytest.mark.asyncio
@@ -32,7 +33,9 @@ async def test_router_llm_fallback(monkeypatch):
     )
 
     context = {
-        "TextExtractor": {"text": "This is a highly complex engineering server log."}
+        TEXT_EXTRACTOR_NAME: {
+            "text": "This is a highly complex engineering server log."
+        }
     }
     res = await router.analyze("/unknown.log", "application/octet-stream", context)
 
@@ -52,7 +55,7 @@ async def test_router_llm_fallback_malformed(monkeypatch):
         "src.plugins.router.get_llm_provider", lambda **kwargs: MockLLM()
     )
 
-    context = {"TextExtractor": {"text": "Some text."}}
+    context = {TEXT_EXTRACTOR_NAME: {"text": "Some text."}}
     res = await router.analyze("/unknown.xyz", "application/octet-stream", context)
 
     assert res["category"] == "GenericText"

@@ -4,6 +4,16 @@ import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from src.db.models import DocumentStatus, TaskStatus
+from src.core.analyzer_names import (
+    TEXT_EXTRACTOR_NAME,
+    DOCUMENT_AI_EXTRACTOR_NAME,
+    AUDIO_TRANSCRIBER_NAME,
+    VISION_ANALYZER_NAME,
+    VIDEO_ANALYZER_NAME,
+    EMAIL_PARSER_NAME,
+    SPREADSHEET_ANALYZER_NAME,
+    SUMMARIZER_NAME,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -68,40 +78,49 @@ async def sync_document_to_fts(session: AsyncSession, document_id: int):
         normalized_task_name = task_name.lower()
 
         # Extract textual content based on the task type
-        if task_name == "TextExtractor" or normalized_task_name == "text_extractor":
+        if (
+            task_name == TEXT_EXTRACTOR_NAME
+            or normalized_task_name == TEXT_EXTRACTOR_NAME.lower()
+            or normalized_task_name == "text_extractor"
+        ):
             if text_content := data.get("text"):
                 content_parts.append(text_content)
 
         elif (
-            task_name == "DocumentAIExtractor"
+            task_name == DOCUMENT_AI_EXTRACTOR_NAME
             or normalized_task_name == "document_ai_extractor"
         ):
             if text_content := data.get("text"):
                 content_parts.append(text_content)
 
         elif (
-            task_name == "AudioTranscriber"
+            task_name == AUDIO_TRANSCRIBER_NAME
             or normalized_task_name == "audio_transcriber"
         ):
             if text_content := data.get("text"):
                 content_parts.append(text_content)
 
-        elif task_name == "VisionAnalyzer" or normalized_task_name == "vision_analyzer":
+        elif (
+            task_name == VISION_ANALYZER_NAME
+            or normalized_task_name == "vision_analyzer"
+        ):
             if description := data.get("description"):
                 content_parts.append(description)
 
-        elif task_name == "VideoAnalyzer" or normalized_task_name == "video_analyzer":
+        elif (
+            task_name == VIDEO_ANALYZER_NAME or normalized_task_name == "video_analyzer"
+        ):
             if description := data.get("visual_description"):
                 content_parts.append(description)
 
-        elif task_name == "EmailParser" or normalized_task_name == "email_parser":
+        elif task_name == EMAIL_PARSER_NAME or normalized_task_name == "email_parser":
             if subject := data.get("subject"):
                 content_parts.append(f"Subject: {subject}")
             if text_content := data.get("text_body"):
                 content_parts.append(text_content)
 
         elif (
-            task_name == "SpreadsheetAnalyzer"
+            task_name == SPREADSHEET_ANALYZER_NAME
             or normalized_task_name == "spreadsheet_analyzer"
         ):
             if text_content := data.get("raw_text_content"):
@@ -109,7 +128,7 @@ async def sync_document_to_fts(session: AsyncSession, document_id: int):
             elif summary := data.get("summary"):
                 content_parts.append(summary)
 
-        elif task_name == "Summarizer" or normalized_task_name == "summarizer":
+        elif task_name == SUMMARIZER_NAME or normalized_task_name == "summarizer":
             if summary := data.get("summary"):
                 summary_text = summary
 

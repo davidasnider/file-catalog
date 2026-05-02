@@ -3,6 +3,12 @@ from typing import Dict, Any
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
 from src.llm.factory import get_llm_provider
+from src.core.analyzer_names import (
+    TEXT_EXTRACTOR_NAME,
+    DEEP_SUMMARIZER_NAME,
+    ROUTER_NAME,
+    SUMMARIZER_NAME,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -10,8 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 @register_analyzer(
-    name="DeepSummarizer",
-    depends_on=["TextExtractor", "Router", "Summarizer"],
+    name=DEEP_SUMMARIZER_NAME,
+    depends_on=[TEXT_EXTRACTOR_NAME, ROUTER_NAME, SUMMARIZER_NAME],
     version="1.0",
 )
 class DeepSummarizerPlugin(AnalyzerBase):
@@ -29,7 +35,7 @@ class DeepSummarizerPlugin(AnalyzerBase):
         if len(extracted_text) < 20000:
             return False
 
-        router_data = context.get("Router", {})
+        router_data = context.get(ROUTER_NAME, {})
         category = router_data.get("category", "")
         # Optionally restrict to important categories, but for now we'll do it for all large text docs
         # where deep insight is needed.

@@ -1,5 +1,6 @@
 import pytest
 from src.plugins.text_extractor import TextExtractorPlugin
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
 
 
 @pytest.mark.asyncio
@@ -13,7 +14,7 @@ async def test_text_extractor_plain_text(tmp_path):
 
     assert result["extracted"] is True
     assert result["text"] == "This is a simple text file."
-    assert result["source"] == "text_extractor"
+    assert result["source"] == TEXT_EXTRACTOR_NAME
 
 
 @pytest.mark.asyncio

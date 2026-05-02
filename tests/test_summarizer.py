@@ -1,5 +1,6 @@
 import pytest
 from src.plugins.summarizer import SummarizerPlugin
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
 
 
 class MockLLM:
@@ -18,7 +19,7 @@ def mock_get_llm_provider(monkeypatch):
 async def test_summarizer_skips_empty_text():
     plugin = SummarizerPlugin()
     result = await plugin.analyze(
-        "/fake/doc.pdf", "application/pdf", {"TextExtractor": {"text": ""}}
+        "/fake/doc.pdf", "application/pdf", {TEXT_EXTRACTOR_NAME: {"text": ""}}
     )
 
     assert result["skipped"] is True
@@ -30,7 +31,9 @@ async def test_summarizer_uses_context_text(mock_get_llm_provider):
     plugin = SummarizerPlugin()
 
     context = {
-        "TextExtractor": {"text": "A full long document text that needs summarizing."}
+        TEXT_EXTRACTOR_NAME: {
+            "text": "A full long document text that needs summarizing."
+        }
     }
     result = await plugin.analyze("/fake/doc.pdf", "application/pdf", context)
 
@@ -44,7 +47,7 @@ async def test_summarizer_skips_large_text(mock_get_llm_provider):
 
     # Generate text > 20,000 chars
     large_text = "A" * 20001
-    context = {"TextExtractor": {"text": large_text}}
+    context = {TEXT_EXTRACTOR_NAME: {"text": large_text}}
 
     result = await plugin.analyze("/fake/doc.pdf", "application/pdf", context)
 

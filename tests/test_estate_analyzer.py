@@ -1,5 +1,6 @@
 import pytest
 from src.plugins.estate_analyzer import EstateAnalyzerPlugin
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
 
 
 class MockLLMJson:
@@ -28,7 +29,7 @@ async def test_estate_analyzer_skips_empty():
 async def test_estate_analyzer_parses_json(mock_get_llm_provider):
     plugin = EstateAnalyzerPlugin()
 
-    context = {"TextExtractor": {"text": "I hereby declare this my last will..."}}
+    context = {TEXT_EXTRACTOR_NAME: {"text": "I hereby declare this my last will..."}}
     result = await plugin.analyze(
         "/fake/will.docx",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",

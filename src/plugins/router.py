@@ -4,18 +4,26 @@ from typing import Dict, Any
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
 from src.llm.factory import get_llm_provider
 from src.core.text_utils import get_all_extracted_text
+from src.core.analyzer_names import (
+    TEXT_EXTRACTOR_NAME,
+    ROUTER_NAME,
+    DOCUMENT_AI_EXTRACTOR_NAME,
+    AUDIO_TRANSCRIBER_NAME,
+    VISION_ANALYZER_NAME,
+    VIDEO_ANALYZER_NAME,
+)
 
 logger = logging.getLogger(__name__)
 
 
 @register_analyzer(
-    name="Router",
+    name=ROUTER_NAME,
     depends_on=[
-        "TextExtractor",
-        "DocumentAIExtractor",
-        "audio_transcriber",
-        "vision_analyzer",
-        "video_analyzer",
+        TEXT_EXTRACTOR_NAME,
+        DOCUMENT_AI_EXTRACTOR_NAME,
+        AUDIO_TRANSCRIBER_NAME,
+        VISION_ANALYZER_NAME,
+        VIDEO_ANALYZER_NAME,
     ],
     version="1.0",
 )

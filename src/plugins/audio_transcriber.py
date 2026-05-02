@@ -4,6 +4,7 @@ import asyncio
 from faster_whisper import WhisperModel
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME, AUDIO_TRANSCRIBER_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ async def get_whisper_model():
         return model
 
 
-@register_analyzer(name="audio_transcriber", depends_on=[], version="1.0")
+@register_analyzer(name=AUDIO_TRANSCRIBER_NAME, depends_on=[], version="1.0")
 class AudioTranscriberPlugin(AnalyzerBase):
     """
     Extracts audio transcripts from audio and video files using faster-whisper.
@@ -40,8 +41,7 @@ class AudioTranscriberPlugin(AnalyzerBase):
         self, file_path: str, mime_type: str, context: Dict[str, Any]
     ) -> bool:
         # Avoid running if we somehow already have text (though we shouldn't unless cached)
-        # Fix: Using "TextExtractor" to match the registered name in src/plugins/text_extractor.py
-        if "text" in context.get("TextExtractor", {}):
+        if "text" in context.get(TEXT_EXTRACTOR_NAME, {}):
             return False
 
         return mime_type.startswith("audio/") or mime_type.startswith("video/")
@@ -75,7 +75,7 @@ class AudioTranscriberPlugin(AnalyzerBase):
                 "text": transcript.strip(),
                 "extracted": bool(transcript.strip()),
                 "language": language,
-                "source": "audio_transcriber",
+                "source": AUDIO_TRANSCRIBER_NAME,
             }
 
         except Exception as e:

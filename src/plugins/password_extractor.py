@@ -3,12 +3,19 @@ from typing import Dict, Any
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
 from src.llm.factory import get_llm_provider
+from src.core.analyzer_names import (
+    TEXT_EXTRACTOR_NAME,
+    PASSWORD_EXTRACTOR_NAME,
+    ROUTER_NAME,
+)
 
 logger = logging.getLogger(__name__)
 
 
 @register_analyzer(
-    name="PasswordExtractor", depends_on=["TextExtractor", "Router"], version="1.0"
+    name=PASSWORD_EXTRACTOR_NAME,
+    depends_on=[TEXT_EXTRACTOR_NAME, ROUTER_NAME],
+    version="1.0",
 )
 class PasswordExtractorPlugin(AnalyzerBase):
     """
@@ -19,7 +26,7 @@ class PasswordExtractorPlugin(AnalyzerBase):
     def should_run(
         self, file_path: str, mime_type: str, context: Dict[str, Any]
     ) -> bool:
-        category = context.get("Router", {}).get("category", "")
+        category = context.get(ROUTER_NAME, {}).get("category", "")
         # Don't run on media files
         if category in ["Image", "Video", "Audio"]:
             return False

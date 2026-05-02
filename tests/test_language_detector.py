@@ -1,5 +1,6 @@
 import pytest
 from src.plugins.language_detector import LanguageDetectorPlugin
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
 
 
 @pytest.mark.asyncio
@@ -7,7 +8,7 @@ async def test_language_detector_english():
     plugin = LanguageDetectorPlugin()
 
     context = {
-        "TextExtractor": {
+        TEXT_EXTRACTOR_NAME: {
             "text": "The quick brown fox jumps over the lazy dog. This is a common English sentence used for testing."
         }
     }
@@ -24,7 +25,7 @@ async def test_language_detector_spanish():
     plugin = LanguageDetectorPlugin()
 
     context = {
-        "TextExtractor": {
+        TEXT_EXTRACTOR_NAME: {
             "text": "El rápido zorro marrón salta sobre el perro perezoso. Esta es una oración común en español."
         }
     }
@@ -40,7 +41,7 @@ async def test_language_detector_french():
     plugin = LanguageDetectorPlugin()
 
     context = {
-        "TextExtractor": {
+        TEXT_EXTRACTOR_NAME: {
             "text": "Le renard brun rapide saute par-dessus le chien paresseux. Ceci est une phrase française courante."
         }
     }
@@ -55,11 +56,11 @@ async def test_language_detector_should_run_skips_short_text():
     plugin = LanguageDetectorPlugin()
 
     assert not plugin.should_run(
-        "/a.txt", "text/plain", {"TextExtractor": {"text": "Hi"}}
+        "/a.txt", "text/plain", {TEXT_EXTRACTOR_NAME: {"text": "Hi"}}
     )
 
     assert not plugin.should_run(
-        "/a.txt", "text/plain", {"TextExtractor": {"text": ""}}
+        "/a.txt", "text/plain", {TEXT_EXTRACTOR_NAME: {"text": ""}}
     )
 
 
@@ -70,7 +71,11 @@ async def test_language_detector_should_run_accepts_long_text():
     assert plugin.should_run(
         "/a.txt",
         "text/plain",
-        {"TextExtractor": {"text": "This is a sufficiently long text for detection."}},
+        {
+            TEXT_EXTRACTOR_NAME: {
+                "text": "This is a sufficiently long text for detection."
+            }
+        },
     )
 
 
@@ -79,7 +84,7 @@ async def test_language_detector_all_languages_list():
     plugin = LanguageDetectorPlugin()
 
     context = {
-        "TextExtractor": {
+        TEXT_EXTRACTOR_NAME: {
             "text": "The quick brown fox jumps over the lazy dog. This is a long English sentence for testing purposes."
         }
     }
