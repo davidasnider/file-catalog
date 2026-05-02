@@ -46,12 +46,12 @@
 - [ ] Support dark mode toggle in the Streamlit UI.
 
 ## Infrastructure & Reliability
-- [ ] Add a retry mechanism with exponential backoff for failed analysis tasks (the `RETRIES` status exists in the schema but isn't implemented).
+- [x] Add a retry mechanism with exponential backoff for failed analysis tasks.
 - [x] Add a CLI progress report / summary that runs after scanning completes (total processed, failed, skipped, time elapsed).
 - [x] Implement a rich, multi-pane scanner interface with live log tailing and plugin stats.
 - [x] Fix database locking issues by implementing WAL mode and FTS write serialization.
 - [ ] Implement incremental scanning — detect changed files (via mtime or hash comparison) and only re-process modified files.
-- [ ] Add a configuration file (`config.yaml` or `.env`) to centralize settings: target directory, model paths, concurrency limits, RAM thresholds.
+- [x] Add a configuration file (`config.yaml` or `.env`) to centralize settings: target directory, model paths, concurrency limits, RAM thresholds.
 - [ ] Separate dev dependencies (`pytest`, `ruff`, `pre-commit`) from runtime dependencies in `pyproject.toml` using `[project.optional-dependencies]`.
 - [ ] Add structured logging with JSON output option for production use and easier log aggregation.
 - [ ] Add a `--dry-run` mode to the scanner that reports what would be processed without actually running analysis.
@@ -60,7 +60,7 @@
 - [ ] Add integration tests that run the full pipeline on a small test corpus with known expected outputs.
 - [ ] Add test coverage reporting and set a minimum coverage threshold in CI.
 - [ ] Add tests for the Streamlit dashboard (e.g., using `streamlit.testing` or snapshot tests).
-- [ ] Add tests for the `LlamaCppProvider` and `ModelManager` (mocked inference, LRU eviction behavior, memory monitoring).
+- [x] Add tests for the `LlamaCppProvider` and `ModelManager` (mocked inference, LRU eviction behavior, memory monitoring).
 
 ## Documentation
 - [ ] Write a contributor guide explaining how to create a new plugin (step-by-step with the `@register_analyzer` decorator pattern).
