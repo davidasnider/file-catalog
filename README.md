@@ -67,7 +67,7 @@ The project includes several utilities in `src/scripts/` to help manage archives
 ### Development
 Dev dependencies (`pytest`, `ruff`, `pre-commit`) are separated from runtime dependencies and managed as optional dependencies in `pyproject.toml`. To install them for development, run:
 ```bash
-uv sync --all-extras --dev
+uv sync --all-extras
 ```
 
 ### Retry Mechanism
