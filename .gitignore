@@ -13,3 +13,6 @@ models/
 file_catalog.db*
 .DS_Store
 scanner.log
+scratch_response.json
+threads_debug.json
+*.json

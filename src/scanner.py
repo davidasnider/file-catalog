@@ -4,7 +4,7 @@ import hashlib
 import logging
 import os
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 from rich.progress import (
@@ -152,7 +152,7 @@ async def ingest_directory(
     id_to_path: dict = None,
     id_to_mime: dict = None,
     docs_to_process: list = None,
-) -> List[int]:
+) -> Tuple[List[int], List[int]]:
     """
     Walk directory, compute hashes, and insert/update documents.
 
@@ -179,15 +179,20 @@ async def ingest_directory(
             )
         else:
             logger.error(f"Directory {directory} does not exist or is not a directory.")
-        return []
+        return [], []
 
-    # 1. Bulk load existing document metadata to avoid one-by-one queries
+    # 1. Bulk load existing document metadata for the target directory to avoid one-by-one queries
     if progress and task_id is not None:
         progress.update(
             task_id, description="[yellow]Loading existing document metadata..."
         )
 
-    result = await session.execute(select(Document))
+    base_path_resolved = base_path.resolve()
+    # Filter documents in DB by path prefix to avoid loading the entire database
+    search_pattern = f"{base_path_resolved}%"
+    result = await session.execute(
+        select(Document).where(Document.path.like(search_pattern))
+    )
     existing_docs: Dict[str, Document] = {
         doc.path: doc for doc in result.scalars().all()
     }
@@ -196,7 +201,7 @@ async def ingest_directory(
     if progress and task_id is not None:
         progress.update(task_id, description="[yellow]Discovering files...")
 
-    files_on_disk = []
+    seen_paths = set()
 
     def walk_disk():
         for root, _, files in os.walk(base_path):
@@ -205,7 +210,9 @@ async def ingest_directory(
                     continue
                 if has_ignored_extension(filename):
                     continue
-                yield str((Path(root) / filename).resolve())
+                file_path = str((Path(root) / filename).resolve())
+                seen_paths.add(file_path)
+                yield file_path
 
     # Discovery is now incremental via a generator
     files_on_disk = walk_disk()
@@ -338,7 +345,7 @@ async def ingest_directory(
             from sqlalchemy.exc import SQLAlchemyError
 
             if isinstance(e, SQLAlchemyError):
-                logger.error(f"Database error during ingestion, rolling back: {e}")
+                logger.exception(f"Database error during ingestion, rolling back: {e}")
                 await session.rollback()
                 # Reset buffers (Copilot Fix: Atomic Sets)
                 batch_ids_to_queue = []
@@ -346,7 +353,7 @@ async def ingest_directory(
                 batch_queued_ids = []
                 pending_updates = 0
             else:
-                logger.error(f"Error ingesting {file_path}: {e}")
+                logger.exception(f"Error ingesting {file_path}: {e}")
 
         if progress and task_id is not None:
             # We don't have a fixed total yet, so we just advance
@@ -374,7 +381,35 @@ async def ingest_directory(
                 docs_to_process.append(bid)
             await doc_queue.put(bid)
 
-    return processed_doc_ids
+    # 5. Final pass: Mark documents that exist in DB but are missing on disk
+    # This only checks documents that are under the 'directory' being scanned.
+    missing_count = 0
+    missing_doc_ids = []
+    processed_doc_ids_set = set(processed_doc_ids)
+
+    for path, doc in existing_docs.items():
+        if doc.id not in processed_doc_ids_set:
+            try:
+                # Ensure we compare against the resolved base path
+                p = Path(path)
+                if p.is_relative_to(base_path_resolved):
+                    # Check against seen_paths first (O(1)), then verify with filesystem (O(disk))
+                    # if limit or filters were used.
+                    if path not in seen_paths:
+                        exists = await asyncio.to_thread(os.path.exists, path)
+                        if not exists:
+                            if doc.status != DocumentStatus.NOT_PRESENT:
+                                doc.status = DocumentStatus.NOT_PRESENT
+                                missing_count += 1
+                                missing_doc_ids.append(doc.id)
+            except (ValueError, OSError):
+                continue
+
+    if missing_count > 0:
+        logger.info(f"Marked {missing_count} missing files as NOT_PRESENT")
+        await session.commit()
+
+    return processed_doc_ids, missing_doc_ids
 
 
 async def _load_and_queue_existing_docs(
@@ -395,6 +430,7 @@ async def _load_and_queue_existing_docs(
         )
         # Fetch all so we can modify and commit missing ones
         docs = result.scalars().all()
+        missing_doc_ids = []
         for doc in docs:
             # Verify file still exists on disk before queueing
             if not os.path.exists(doc.path):
@@ -402,12 +438,23 @@ async def _load_and_queue_existing_docs(
                     f"File missing on disk during startup, marking as NOT_PRESENT: {doc.path}"
                 )
                 doc.status = DocumentStatus.NOT_PRESENT
+                missing_doc_ids.append(doc.id)
                 continue
             docs_to_process.append(doc.id)
             queued_docs.add(doc.id)
             id_to_path[doc.id] = doc.path
             id_to_mime[doc.id] = doc.mime_type
             doc_queue.put_nowait(doc.id)
+
+        if missing_doc_ids:
+            from src.db.fts import remove_documents_from_fts
+
+            try:
+                await remove_documents_from_fts(session, missing_doc_ids)
+            except Exception:
+                logger.exception(
+                    f"Failed to remove {len(missing_doc_ids)} missing docs from FTS"
+                )
         await session.commit()
 
 
@@ -767,7 +814,7 @@ async def run_scanner(
 
         async def run_background_ingest():
             async with async_session_maker() as session:
-                ingested_ids = await ingest_directory(
+                ingested_ids, missing_ids = await ingest_directory(
                     directory,
                     session,
                     progress,
@@ -782,9 +829,20 @@ async def run_scanner(
                 )
                 progress.update(
                     ingest_task,
-                    description=f"[green]Ingestion complete! Found {len(ingested_ids)} valid files.",
+                    description=f"[green]Ingestion complete! Found {len(ingested_ids)} files. ({len(missing_ids)} missing)",
                     completed=True,
                 )
+
+                # Sync missing files to FTS to ensure they are removed from search results
+                if missing_ids:
+                    from src.db.fts import remove_documents_from_fts
+
+                    try:
+                        await remove_documents_from_fts(session, missing_ids)
+                    except Exception:
+                        logger.exception(
+                            f"Failed to remove {len(missing_ids)} missing docs from FTS"
+                        )
 
         ingest_bg_task = asyncio.create_task(run_background_ingest())
 
