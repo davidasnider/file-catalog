@@ -179,7 +179,7 @@ async def ingest_directory(
             )
         else:
             logger.error(f"Directory {directory} does not exist or is not a directory.")
-        return []
+        return [], []
 
     # 1. Bulk load existing document metadata to avoid one-by-one queries
     if progress and task_id is not None:
@@ -196,7 +196,7 @@ async def ingest_directory(
     if progress and task_id is not None:
         progress.update(task_id, description="[yellow]Discovering files...")
 
-    files_on_disk = []
+    seen_paths = set()
 
     def walk_disk():
         for root, _, files in os.walk(base_path):
@@ -205,7 +205,9 @@ async def ingest_directory(
                     continue
                 if has_ignored_extension(filename):
                     continue
-                yield str((Path(root) / filename).resolve())
+                file_path = str((Path(root) / filename).resolve())
+                seen_paths.add(file_path)
+                yield file_path
 
     # Discovery is now incremental via a generator
     files_on_disk = walk_disk()
@@ -338,7 +340,7 @@ async def ingest_directory(
             from sqlalchemy.exc import SQLAlchemyError
 
             if isinstance(e, SQLAlchemyError):
-                logger.error(f"Database error during ingestion, rolling back: {e}")
+                logger.exception(f"Database error during ingestion, rolling back: {e}")
                 await session.rollback()
                 # Reset buffers (Copilot Fix: Atomic Sets)
                 batch_ids_to_queue = []
@@ -346,7 +348,7 @@ async def ingest_directory(
                 batch_queued_ids = []
                 pending_updates = 0
             else:
-                logger.error(f"Error ingesting {file_path}: {e}")
+                logger.exception(f"Error ingesting {file_path}: {e}")
 
         if progress and task_id is not None:
             # We don't have a fixed total yet, so we just advance
@@ -378,16 +380,22 @@ async def ingest_directory(
     # This only checks documents that are under the 'directory' being scanned.
     missing_count = 0
     missing_doc_ids = []
+    processed_doc_ids_set = set(processed_doc_ids)
+    base_path_resolved = base_path.resolve()
+
     for path, doc in existing_docs.items():
-        if doc.id not in processed_doc_ids:
+        if doc.id not in processed_doc_ids_set:
             try:
                 # Ensure we compare against the resolved base path
                 p = Path(path)
-                if p.is_relative_to(base_path.resolve()):
-                    if doc.status != DocumentStatus.NOT_PRESENT:
-                        doc.status = DocumentStatus.NOT_PRESENT
-                        missing_count += 1
-                        missing_doc_ids.append(doc.id)
+                if p.is_relative_to(base_path_resolved):
+                    # Check against seen_paths first (O(1)), then verify with filesystem (O(disk))
+                    # if limit or filters were used.
+                    if path not in seen_paths and not os.path.exists(path):
+                        if doc.status != DocumentStatus.NOT_PRESENT:
+                            doc.status = DocumentStatus.NOT_PRESENT
+                            missing_count += 1
+                            missing_doc_ids.append(doc.id)
             except (ValueError, OSError):
                 continue
 
@@ -416,6 +424,7 @@ async def _load_and_queue_existing_docs(
         )
         # Fetch all so we can modify and commit missing ones
         docs = result.scalars().all()
+        missing_doc_ids = []
         for doc in docs:
             # Verify file still exists on disk before queueing
             if not os.path.exists(doc.path):
@@ -423,19 +432,23 @@ async def _load_and_queue_existing_docs(
                     f"File missing on disk during startup, marking as NOT_PRESENT: {doc.path}"
                 )
                 doc.status = DocumentStatus.NOT_PRESENT
-                # Sync to FTS to ensure it is removed from search results
-                from src.db.fts import sync_document_to_fts
-
-                try:
-                    await sync_document_to_fts(session, doc.id)
-                except Exception as e:
-                    logger.error(f"Failed to remove missing doc {doc.id} from FTS: {e}")
+                missing_doc_ids.append(doc.id)
                 continue
             docs_to_process.append(doc.id)
             queued_docs.add(doc.id)
             id_to_path[doc.id] = doc.path
             id_to_mime[doc.id] = doc.mime_type
             doc_queue.put_nowait(doc.id)
+
+        if missing_doc_ids:
+            from src.db.fts import remove_documents_from_fts
+
+            try:
+                await remove_documents_from_fts(session, missing_doc_ids)
+            except Exception:
+                logger.exception(
+                    f"Failed to remove {len(missing_doc_ids)} missing docs from FTS"
+                )
         await session.commit()
 
 
@@ -816,15 +829,14 @@ async def run_scanner(
 
                 # Sync missing files to FTS to ensure they are removed from search results
                 if missing_ids:
-                    from src.db.fts import sync_document_to_fts
+                    from src.db.fts import remove_documents_from_fts
 
-                    for mid in missing_ids:
-                        try:
-                            await sync_document_to_fts(session, mid)
-                        except Exception as e:
-                            logger.error(
-                                f"Failed to remove missing doc {mid} from FTS: {e}"
-                            )
+                    try:
+                        await remove_documents_from_fts(session, missing_ids)
+                    except Exception:
+                        logger.exception(
+                            f"Failed to remove {len(missing_ids)} missing docs from FTS"
+                        )
 
         ingest_bg_task = asyncio.create_task(run_background_ingest())
 

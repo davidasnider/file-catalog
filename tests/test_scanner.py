@@ -221,9 +221,9 @@ async def test_ingest_directory_atomic_queueing(db_session, temp_dir):
             # When an item is put in the queue, it MUST be visible to a new session
             async with async_session_maker() as session:
                 doc = await session.get(Document, item)
-                assert doc is not None, (
-                    f"Document {item} was enqueued before it was committed to the DB!"
-                )
+                assert (
+                    doc is not None
+                ), f"Document {item} was enqueued before it was committed to the DB!"
             await real_put(item)
 
         doc_queue.put = wrapped_put
@@ -286,3 +286,55 @@ async def test_run_scanner_handles_missing_files(db_session, temp_dir):
     assert updated_doc.status == DocumentStatus.NOT_PRESENT
     assert updated_doc.id not in docs_to_process
     assert doc_queue.empty()
+
+
+@pytest.mark.asyncio
+async def test_ingest_directory_marks_missing_files_as_not_present(
+    db_session, temp_dir
+):
+    """Verify that ingest_directory marks files missing on disk as NOT_PRESENT."""
+    # 1. First ingestion to populate DB
+    processed_ids, missing_ids = await ingest_directory(str(temp_dir), db_session)
+    assert len(processed_ids) == 2
+    assert len(missing_ids) == 0
+
+    # 2. Delete one file from disk
+    file1_path = temp_dir / "doc1.txt"
+    file1_path.unlink()
+
+    # 3. Second ingestion
+    processed_ids, missing_ids = await ingest_directory(str(temp_dir), db_session)
+
+    # 4. Verify results
+    assert len(processed_ids) == 1
+    assert len(missing_ids) == 1
+
+    # Reload doc1 from DB
+    result = await db_session.execute(
+        select(Document).where(Document.path == str(file1_path))
+    )
+    doc1 = result.scalars().first()
+    assert doc1.status == DocumentStatus.NOT_PRESENT
+
+
+@pytest.mark.asyncio
+async def test_ingest_directory_avoids_false_positives_on_filters(db_session, temp_dir):
+    """Verify that filtered or limited files are NOT marked as NOT_PRESENT if they still exist."""
+    # 1. First ingestion
+    await ingest_directory(str(temp_dir), db_session)
+
+    # 2. Run ingestion with a filter that excludes some existing files
+    # We use a non-existent MIME filter to ensure everything is skipped by the ingestion loop
+    processed_ids, missing_ids = await ingest_directory(
+        str(temp_dir), db_session, mime_type_filter="application/pdf"
+    )
+
+    # 3. Verify no files were marked missing
+    assert len(processed_ids) == 0
+    assert len(missing_ids) == 0
+
+    # Verify docs still have their original status in DB
+    result = await db_session.execute(select(Document))
+    docs = result.scalars().all()
+    for doc in docs:
+        assert doc.status != DocumentStatus.NOT_PRESENT

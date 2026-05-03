@@ -176,6 +176,23 @@ async def sync_document_to_fts(session: AsyncSession, document_id: int):
     logger.info(f"Synced document {document_id} to FTS")
 
 
+async def remove_documents_from_fts(session: AsyncSession, document_ids: list[int]):
+    """
+    Remove multiple documents from the search index in a single batch.
+    """
+    if not document_ids:
+        return
+
+    async with get_fts_semaphore():
+        await session.execute(
+            text("DELETE FROM document_fts WHERE rowid IN :doc_ids"),
+            {"doc_ids": tuple(document_ids)},
+        )
+        await session.commit()
+
+    logger.info(f"Removed {len(document_ids)} missing documents from FTS")
+
+
 async def search_fts(session: AsyncSession, query: str, limit: int = 50):
     """
     Search the FTS5 table and return results with snippets.
