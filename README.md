@@ -57,7 +57,7 @@ Configuration is centrally managed via `pydantic-settings`.
 - `LOG_FORMAT`: Set to `json` for structured logging or `standard` for human-readable logs.
 
 ### Performance: Incremental Scanning
-The system implements a **Quick Skip** mechanism. It tracks the `file_size` and `mtime` of every ingested file. On subsequent runs, if a file's metadata hasn't changed and its status is `COMPLETED`, the scanner skips the entire analysis pipeline for that file, significantly reducing processing time for large, stable archives. The system also handles deleted or moved files by utilizing the core `DocumentStatus.NOT_PRESENT` state, ensuring accurate filesystem synchronization.
+The system implements a **Quick Skip** mechanism. It tracks the `file_size` and `mtime` of every ingested file. On subsequent runs, if a file's metadata hasn't changed and its status is `COMPLETED`, the scanner skips the entire analysis pipeline for that file, significantly reducing processing time for large, stable archives. The system tracks deleted or moved files by utilizing the `DocumentStatus.NOT_PRESENT` state. If a file is missing during a scan, its record is preserved but marked as not present. Moved files are treated as a deletion at the old path and a new ingestion at the new path, with incremental scanning ensuring that previously computed analysis results are not lost if the file content remains identical (via hash-based lookups).
 
 ---
 *Built with Python, SQLite (SQLModel), Streamlit, and Llama.cpp.*

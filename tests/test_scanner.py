@@ -221,9 +221,9 @@ async def test_ingest_directory_atomic_queueing(db_session, temp_dir):
             # When an item is put in the queue, it MUST be visible to a new session
             async with async_session_maker() as session:
                 doc = await session.get(Document, item)
-                assert doc is not None, (
-                    f"Document {item} was enqueued before it was committed to the DB!"
-                )
+                assert (
+                    doc is not None
+                ), f"Document {item} was enqueued before it was committed to the DB!"
             await real_put(item)
 
         doc_queue.put = wrapped_put
