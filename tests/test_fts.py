@@ -193,3 +193,49 @@ async def test_sync_not_present_document_removes_from_fts(fts_setup):
         {"doc_id": doc.id},
     )
     assert result.fetchone() is None
+
+
+@pytest.mark.asyncio
+async def test_remove_documents_from_fts_batch(fts_setup):
+    """Test that remove_documents_from_fts correctly removes multiple documents in a batch."""
+    from src.db.fts import remove_documents_from_fts
+
+    session = fts_setup
+
+    # 1. Create two documents and sync them to FTS
+    doc_ids = []
+    for i in range(2):
+        doc = Document(path=f"/test/batch_{i}.txt", status=DocumentStatus.COMPLETED)
+        session.add(doc)
+        await session.commit()
+        await session.refresh(doc)
+        doc_ids.append(doc.id)
+
+        task = AnalysisTask(
+            document_id=doc.id,
+            task_name=TEXT_EXTRACTOR_NAME,
+            status=TaskStatus.COMPLETED,
+            result_data=json.dumps({"text": f"Content for doc {i}"}),
+        )
+        session.add(task)
+        await session.commit()
+        await sync_document_to_fts(session, doc.id)
+
+    # Verify they are in FTS
+    for doc_id in doc_ids:
+        result = await session.execute(
+            text("SELECT * FROM document_fts WHERE document_id = :doc_id"),
+            {"doc_id": doc_id},
+        )
+        assert result.fetchone() is not None
+
+    # 2. Call batch removal
+    await remove_documents_from_fts(session, doc_ids)
+
+    # 3. Verify both are removed
+    for doc_id in doc_ids:
+        result = await session.execute(
+            text("SELECT * FROM document_fts WHERE document_id = :doc_id"),
+            {"doc_id": doc_id},
+        )
+        assert result.fetchone() is None

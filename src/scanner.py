@@ -181,13 +181,18 @@ async def ingest_directory(
             logger.error(f"Directory {directory} does not exist or is not a directory.")
         return [], []
 
-    # 1. Bulk load existing document metadata to avoid one-by-one queries
+    # 1. Bulk load existing document metadata for the target directory to avoid one-by-one queries
     if progress and task_id is not None:
         progress.update(
             task_id, description="[yellow]Loading existing document metadata..."
         )
 
-    result = await session.execute(select(Document))
+    base_path_resolved = base_path.resolve()
+    # Filter documents in DB by path prefix to avoid loading the entire database
+    search_pattern = f"{base_path_resolved}%"
+    result = await session.execute(
+        select(Document).where(Document.path.like(search_pattern))
+    )
     existing_docs: Dict[str, Document] = {
         doc.path: doc for doc in result.scalars().all()
     }
@@ -381,7 +386,6 @@ async def ingest_directory(
     missing_count = 0
     missing_doc_ids = []
     processed_doc_ids_set = set(processed_doc_ids)
-    base_path_resolved = base_path.resolve()
 
     for path, doc in existing_docs.items():
         if doc.id not in processed_doc_ids_set:
@@ -391,11 +395,13 @@ async def ingest_directory(
                 if p.is_relative_to(base_path_resolved):
                     # Check against seen_paths first (O(1)), then verify with filesystem (O(disk))
                     # if limit or filters were used.
-                    if path not in seen_paths and not os.path.exists(path):
-                        if doc.status != DocumentStatus.NOT_PRESENT:
-                            doc.status = DocumentStatus.NOT_PRESENT
-                            missing_count += 1
-                            missing_doc_ids.append(doc.id)
+                    if path not in seen_paths:
+                        exists = await asyncio.to_thread(os.path.exists, path)
+                        if not exists:
+                            if doc.status != DocumentStatus.NOT_PRESENT:
+                                doc.status = DocumentStatus.NOT_PRESENT
+                                missing_count += 1
+                                missing_doc_ids.append(doc.id)
             except (ValueError, OSError):
                 continue
 
