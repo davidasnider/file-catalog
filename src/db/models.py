@@ -11,7 +11,7 @@ class DocumentStatus(str, Enum):
     ANALYZING = "ANALYZING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
-    NOT_PRESENT = "NOT_PRESENT"
+    NOT_PRESENT = "NOT_PRESENT"  # Core status used for filesystem synchronization
 
 
 class TaskStatus(str, Enum):
