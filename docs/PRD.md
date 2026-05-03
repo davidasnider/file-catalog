@@ -28,7 +28,7 @@ Rebuild the application from the ground up to address robustness, extensibility,
 - **Problem:** The current JSON manifest easily gets corrupted or out-of-sync during multithreaded operations.
 - **Solution:** Use **SQLite** via `SQLModel` (or `SQLAlchemy`).
 - **Schema Design:**
-  - `Document`: Tracks path, robustly detected MIME type, file hash (to prevent duplicate processing if moved), and overall status (`PENDING`, `EXTRACTING`, `ANALYZING`, `COMPLETED`, `FAILED`, `NOT_PRESENT`). The `NOT_PRESENT` status is used to mark files that have been deleted or moved, maintaining a historical record while ensuring the search index remains synchronized with the current filesystem state.
+  - `Document`: Tracks path, robustly detected MIME type, file hash (to detect content changes), and overall status (`PENDING`, `EXTRACTING`, `ANALYZING`, `COMPLETED`, `FAILED`, `NOT_PRESENT`). The `NOT_PRESENT` status is used to mark files that have been deleted or moved from their original location, maintaining a historical record while ensuring the search index reflects the current filesystem state.
   - `AnalysisTask`: Each document has multiple linked tasks (e.g., OCR, Text Splitting, Summarization, Estate Analysis). Each task has its own status (`PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `RETRIES`).
 
 ### 2.2 Advanced File Type Detection
@@ -47,7 +47,7 @@ Rebuild the application from the ground up to address robustness, extensibility,
 - **Solution:** Implement a dynamic plugin loader.
   - Create an `AnalyzerBase` class.
   - Developers simply create a new file in `src/plugins/` and decorate their class with `@register_analyzer(name=ESTATE_ANALYZER_NAME, depends_on=[TEXT_EXTRACTOR_NAME])`.
-  - Analyzer names are centralized as exported constants (e.g., `ESTATE_ANALYZER_NAME` in `src/core/analyzer_names.py`) to maintain consistency across the codebase.
+  - Analyzer names are centralized as exported constants in `src/core/analyzer_names.py` (e.g., `ESTATE_ANALYZER_NAME`, `TEXT_EXTRACTOR_NAME`) to maintain consistency and provide clear import paths for plugin developers.
   - The core engine and the UI automatically discover, run, and render these plugins without any core code changes.
 
 ### 2.5 LLM Abstraction Layer
