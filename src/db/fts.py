@@ -50,6 +50,17 @@ async def sync_document_to_fts(session: AsyncSession, document_id: int):
 
     path, status = doc
 
+    # If the document is missing from the filesystem, remove it from the search index
+    if status == DocumentStatus.NOT_PRESENT:
+        async with get_fts_semaphore():
+            await session.execute(
+                text("DELETE FROM document_fts WHERE rowid = :doc_id"),
+                {"doc_id": document_id},
+            )
+            await session.commit()
+        logger.info(f"Removed missing document {document_id} from FTS")
+        return
+
     # We only want to index documents that have attempted processing
     if status in (DocumentStatus.PENDING, DocumentStatus.EXTRACTING):
         return

@@ -31,7 +31,7 @@ def test_compute_file_hash(temp_dir):
 
 @pytest.mark.asyncio
 async def test_ingest_directory_new_files(db_session, temp_dir):
-    processed_ids = await ingest_directory(str(temp_dir), db_session)
+    processed_ids, _ = await ingest_directory(str(temp_dir), db_session)
     assert len(processed_ids) == 2
 
     result = await db_session.execute(select(Document))
@@ -55,7 +55,7 @@ async def test_ingest_directory_modified_files(db_session, temp_dir):
         f.write("Appended content")
 
     # Second ingestion
-    processed_ids = await ingest_directory(str(temp_dir), db_session)
+    processed_ids, _ = await ingest_directory(str(temp_dir), db_session)
     assert len(processed_ids) == 2
 
     # Reload mapping
@@ -78,7 +78,7 @@ async def test_ingest_directory_unchanged_files_skips_reset(db_session, temp_dir
     await db_session.commit()
 
     # Second ingestion (no files changed)
-    processed_ids = await ingest_directory(str(temp_dir), db_session)
+    processed_ids, _ = await ingest_directory(str(temp_dir), db_session)
     assert len(processed_ids) == 2
 
     # Reload mapping
@@ -108,7 +108,7 @@ async def test_ingest_directory_excludes_noise_files(db_session, temp_dir):
     source_file.write_text("int main() { return 0; }")
 
     # Ingest directory
-    processed_ids = await ingest_directory(str(temp_dir), db_session)
+    processed_ids, _ = await ingest_directory(str(temp_dir), db_session)
 
     # Should only process the original 2 .txt files, as .js, .py, and .css are in IGNORED_EXTENSIONS
     assert len(processed_ids) == 2
@@ -132,7 +132,7 @@ async def test_ingest_directory_with_queue(db_session, temp_dir):
     docs_to_process = []
 
     # Ingest directory using the queue feature
-    processed_ids = await ingest_directory(
+    processed_ids, _ = await ingest_directory(
         str(temp_dir),
         db_session,
         doc_queue=doc_queue,

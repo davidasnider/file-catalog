@@ -4,7 +4,7 @@ import hashlib
 import logging
 import os
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 from rich.progress import (
@@ -152,7 +152,7 @@ async def ingest_directory(
     id_to_path: dict = None,
     id_to_mime: dict = None,
     docs_to_process: list = None,
-) -> List[int]:
+) -> Tuple[List[int], List[int]]:
     """
     Walk directory, compute hashes, and insert/update documents.
 
@@ -374,7 +374,28 @@ async def ingest_directory(
                 docs_to_process.append(bid)
             await doc_queue.put(bid)
 
-    return processed_doc_ids
+    # 5. Final pass: Mark documents that exist in DB but are missing on disk
+    # This only checks documents that are under the 'directory' being scanned.
+    missing_count = 0
+    missing_doc_ids = []
+    for path, doc in existing_docs.items():
+        if doc.id not in processed_doc_ids:
+            try:
+                # Ensure we compare against the resolved base path
+                p = Path(path)
+                if p.is_relative_to(base_path.resolve()):
+                    if doc.status != DocumentStatus.NOT_PRESENT:
+                        doc.status = DocumentStatus.NOT_PRESENT
+                        missing_count += 1
+                        missing_doc_ids.append(doc.id)
+            except (ValueError, OSError):
+                continue
+
+    if missing_count > 0:
+        logger.info(f"Marked {missing_count} missing files as NOT_PRESENT")
+        await session.commit()
+
+    return processed_doc_ids, missing_doc_ids
 
 
 async def _load_and_queue_existing_docs(
@@ -402,6 +423,13 @@ async def _load_and_queue_existing_docs(
                     f"File missing on disk during startup, marking as NOT_PRESENT: {doc.path}"
                 )
                 doc.status = DocumentStatus.NOT_PRESENT
+                # Sync to FTS to ensure it is removed from search results
+                from src.db.fts import sync_document_to_fts
+
+                try:
+                    await sync_document_to_fts(session, doc.id)
+                except Exception as e:
+                    logger.error(f"Failed to remove missing doc {doc.id} from FTS: {e}")
                 continue
             docs_to_process.append(doc.id)
             queued_docs.add(doc.id)
@@ -767,7 +795,7 @@ async def run_scanner(
 
         async def run_background_ingest():
             async with async_session_maker() as session:
-                ingested_ids = await ingest_directory(
+                ingested_ids, missing_ids = await ingest_directory(
                     directory,
                     session,
                     progress,
@@ -782,9 +810,21 @@ async def run_scanner(
                 )
                 progress.update(
                     ingest_task,
-                    description=f"[green]Ingestion complete! Found {len(ingested_ids)} valid files.",
+                    description=f"[green]Ingestion complete! Found {len(ingested_ids)} files. ({len(missing_ids)} missing)",
                     completed=True,
                 )
+
+                # Sync missing files to FTS to ensure they are removed from search results
+                if missing_ids:
+                    from src.db.fts import sync_document_to_fts
+
+                    for mid in missing_ids:
+                        try:
+                            await sync_document_to_fts(session, mid)
+                        except Exception as e:
+                            logger.error(
+                                f"Failed to remove missing doc {mid} from FTS: {e}"
+                            )
 
         ingest_bg_task = asyncio.create_task(run_background_ingest())
 
