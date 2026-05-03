@@ -374,25 +374,6 @@ async def ingest_directory(
                 docs_to_process.append(bid)
             await doc_queue.put(bid)
 
-    # 5. Final pass: Mark documents that exist in DB but are missing on disk
-    # This only checks documents that are under the 'directory' being scanned.
-    missing_count = 0
-    for path, doc in existing_docs.items():
-        if doc.id not in processed_doc_ids:
-            try:
-                # Ensure we compare against the resolved base path
-                p = Path(path)
-                if p.is_relative_to(base_path.resolve()):
-                    if doc.status != DocumentStatus.NOT_PRESENT:
-                        doc.status = DocumentStatus.NOT_PRESENT
-                        missing_count += 1
-            except (ValueError, OSError):
-                continue
-
-    if missing_count > 0:
-        logger.info(f"Marked {missing_count} missing files as NOT_PRESENT")
-        await session.commit()
-
     return processed_doc_ids
 
 
@@ -407,7 +388,10 @@ async def _load_and_queue_existing_docs(
     """Helper to load non-COMPLETED docs from DB and queue those present on disk."""
     async with async_session_maker() as session:
         result = await session.execute(
-            select(Document).where(Document.status != DocumentStatus.NOT_PRESENT)
+            select(Document).where(
+                (Document.status != DocumentStatus.COMPLETED)
+                & (Document.status != DocumentStatus.NOT_PRESENT)
+            )
         )
         # Fetch all so we can modify and commit missing ones
         docs = result.scalars().all()
@@ -418,9 +402,6 @@ async def _load_and_queue_existing_docs(
                     f"File missing on disk during startup, marking as NOT_PRESENT: {doc.path}"
                 )
                 doc.status = DocumentStatus.NOT_PRESENT
-                continue
-
-            if doc.status == DocumentStatus.COMPLETED:
                 continue
             docs_to_process.append(doc.id)
             queued_docs.add(doc.id)
