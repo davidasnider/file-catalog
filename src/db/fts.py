@@ -183,10 +183,14 @@ async def remove_documents_from_fts(session: AsyncSession, document_ids: list[in
     if not document_ids:
         return
 
+    from sqlalchemy import bindparam
+
     async with get_fts_semaphore():
         await session.execute(
-            text("DELETE FROM document_fts WHERE rowid IN :doc_ids"),
-            {"doc_ids": tuple(document_ids)},
+            text("DELETE FROM document_fts WHERE rowid IN :doc_ids").bindparams(
+                bindparam("doc_ids", expanding=True)
+            ),
+            {"doc_ids": list(document_ids)},
         )
         await session.commit()
 
