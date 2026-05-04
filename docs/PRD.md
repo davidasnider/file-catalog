@@ -49,6 +49,7 @@ Rebuild the application from the ground up to address robustness, extensibility,
   - Developers simply create a new file in `src/plugins/` and decorate their class with `@register_analyzer(name=ESTATE_ANALYZER_NAME, depends_on=[TEXT_EXTRACTOR_NAME])`.
   - Analyzer names are centralized as exported constants (e.g., `ESTATE_ANALYZER_NAME` in `src/core/analyzer_names.py`) to maintain consistency across the codebase.
   - The core engine and the UI automatically discover, run, and render these plugins without any core code changes.
+  - Plugins use the `get_all_extracted_text` utility function from `src.core.text_utils` as the standard way to aggregate text results from all upstream analyzers stored in the execution context.
 
 ### 2.5 LLM Abstraction Layer
 - **Problem:** Hardcoded Ollama dependencies limit performance tuning and cloud fallback capabilities.
