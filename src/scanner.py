@@ -444,7 +444,7 @@ async def _load_and_queue_existing_docs(
             # Priority 2: Failed files
             if doc.status == DocumentStatus.FAILED:
                 return 2
-            # Priority 3: Everything else (retries, resumed scans)
+            # Priority 3: Everything else (partially processed, resumed scans)
             return 3
 
         # Sort by priority, then by id for stable ordering
