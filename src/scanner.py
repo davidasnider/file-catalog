@@ -5,6 +5,7 @@ import logging
 import os
 from pathlib import Path
 from typing import Dict, List, Tuple
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 from rich.progress import (
@@ -422,16 +423,35 @@ async def _load_and_queue_existing_docs(
 ):
     """Helper to load non-COMPLETED docs from DB and queue those present on disk."""
     async with async_session_maker() as session:
+        # Query with task counts to determine priority
         result = await session.execute(
-            select(Document).where(
+            select(Document, func.count(AnalysisTask.id))
+            .outerjoin(AnalysisTask, AnalysisTask.document_id == Document.id)
+            .where(
                 (Document.status != DocumentStatus.COMPLETED)
                 & (Document.status != DocumentStatus.NOT_PRESENT)
             )
+            .group_by(Document.id)
         )
-        # Fetch all so we can modify and commit missing ones
-        docs = result.scalars().all()
+        # Fetch all into memory to apply priority sorting
+        docs_with_counts = list(result.all())
+
+        def get_priority(item):
+            doc, task_count = item
+            # Priority 1: Zero processing (PENDING with no tasks)
+            if doc.status == DocumentStatus.PENDING and task_count == 0:
+                return 1
+            # Priority 2: Failed files
+            if doc.status == DocumentStatus.FAILED:
+                return 2
+            # Priority 3: Everything else (retries, resumed scans)
+            return 3
+
+        # Sort by priority, then by id for stable ordering
+        docs_with_counts.sort(key=lambda x: (get_priority(x), x[0].id))
+
         missing_doc_ids = []
-        for doc in docs:
+        for doc, _ in docs_with_counts:
             # Verify file still exists on disk before queueing
             if not os.path.exists(doc.path):
                 logger.warning(
@@ -1210,9 +1230,8 @@ def main():
             args.concurrency,
             args.clean,
             args.limit,
-            args.recursive,
-            args.force,
             mime_type,
+            args.concurrency_limit_ratio,
         )
     )
 
