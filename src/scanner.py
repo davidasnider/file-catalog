@@ -5,6 +5,7 @@ import logging
 import os
 from pathlib import Path
 from typing import Dict, List, Tuple
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 from rich.progress import (
@@ -421,9 +422,6 @@ async def _load_and_queue_existing_docs(
     doc_queue,
 ):
     """Helper to load non-COMPLETED docs from DB and queue those present on disk."""
-    from sqlalchemy import func
-    from src.db.models import AnalysisTask
-
     async with async_session_maker() as session:
         # Query with task counts to determine priority
         result = await session.execute(

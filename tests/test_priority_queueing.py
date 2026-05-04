@@ -1,6 +1,6 @@
 import asyncio
 import pytest
-from src.db.models import Document, DocumentStatus, AnalysisTask
+from src.db.models import AnalysisTask, Document, DocumentStatus, TaskStatus
 from src.scanner import _load_and_queue_existing_docs
 
 
@@ -43,7 +43,9 @@ async def test_priority_queueing_order(db_session, tmp_path):
     await db_session.refresh(doc3)
 
     # Add a task to doc3 to make it "partially processed"
-    task = AnalysisTask(document_id=doc3.id, task_name="test_task", status="PENDING")
+    task = AnalysisTask(
+        document_id=doc3.id, task_name="test_task", status=TaskStatus.PENDING
+    )
     db_session.add(task)
     await db_session.commit()
 
