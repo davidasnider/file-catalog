@@ -41,6 +41,7 @@ Rebuild the application from the ground up to address robustness, extensibility,
   1. Safe concurrency.
   2. Immediate exception bubbling and capture.
   3. Clean shutdown behavior via cancellation.
+  4. Robust resuming of interrupted scans through priority-based queue hydration (prioritizing unprocessed files first, then failed files, then partially processed/retrying files).
 
 ### 2.4 Dynamic Plugin Registry
 - **Problem:** "Multiple touchpoints" required to add a new analyzer.
