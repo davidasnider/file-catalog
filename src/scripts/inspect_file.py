@@ -105,7 +105,12 @@ async def main():
         mime = info["document"]["mime_type"]
         path = info["document"]["path"]
 
+        if not mime:
+            print("\n(No MIME type detected for this file, skipping visual preview)")
+            return
+
         term = os.environ.get("TERM_PROGRAM", "")
+
         is_iterm = term == "iTerm.app"
 
         if is_iterm:

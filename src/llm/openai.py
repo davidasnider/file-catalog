@@ -66,6 +66,9 @@ class OpenAIProvider(LLMProvider):
         self, image_path: str | list[str], prompt: str, **kwargs
     ) -> str:
         """Run multimodal (vision) analysis asynchronously."""
+        from PIL import Image
+        import io
+
         image_paths = [image_path] if isinstance(image_path, str) else image_path
 
         content = [{"type": "text", "text": prompt}]
@@ -75,15 +78,42 @@ class OpenAIProvider(LLMProvider):
             if not mime_type:
                 mime_type = "image/jpeg"
 
-            with open(path, "rb") as image_file:
-                base64_image = base64.b64encode(image_file.read()).decode("utf-8")
+            try:
+                with Image.open(path) as img:
+                    # Convert to RGB (standard for most VLMs)
+                    image = img.convert("RGB")
 
-            content.append(
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:{mime_type};base64,{base64_image}"},
-                }
-            )
+                    # Prevent memory explosion and request payload limits
+                    max_pixels = config.vision_max_pixels
+                    w, h = image.size
+                    if w * h > max_pixels:
+                        scale = (max_pixels / (w * h)) ** 0.5
+                        new_size = (max(1, int(w * scale)), max(1, int(h * scale)))
+                        image.thumbnail(new_size, Image.Resampling.LANCZOS)
+                        logger.info(
+                            f"Resized image for OpenAI vision processing: {w}x{h} -> {image.size} "
+                            f"(Max allowed: {max_pixels} pixels)"
+                        )
+
+                    # Encode to base64 from the potentially resized image
+                    buffer = io.BytesIO()
+                    image.save(buffer, format="JPEG")
+                    base64_image = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+                    content.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            },
+                        }
+                    )
+            except Exception as e:
+                logger.error(f"Failed to process image {path} in OpenAIProvider: {e}")
+                continue
+
+        if len(content) == 1:
+            raise ValueError("No images were successfully processed.")
 
         messages = [{"role": "user", "content": content}]
 

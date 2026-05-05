@@ -316,16 +316,6 @@ class TextExtractorPlugin(AnalyzerBase):
                         f"WordPerfect raw extraction failed for {file_path}: {e}"
                     )
                     extracted_text = ""
-            elif self._is_untextable(mime_type):
-                logger.debug(
-                    f"Gracefully skipping text extraction for binary/untextable type: {mime_type}"
-                )
-                return {
-                    "text": "",
-                    "extracted": False,
-                    "reason": "untextable_binary_type",
-                    "source": TEXT_EXTRACTOR_NAME,
-                }
             else:
                 # We log the unsupported type. The extraction will be empty,
                 # causing the ValueError below to mark the task as FAILED.
@@ -346,29 +336,3 @@ class TextExtractorPlugin(AnalyzerBase):
         except Exception as e:
             logger.error(f"Failed to extract text from {file_path}: {e}")
             raise
-
-    def _is_untextable(self, mime_type: str) -> bool:
-        """Check if a MIME type is known to be binary or untextable."""
-        if not mime_type:
-            return False
-
-        untextable_prefixes = {
-            "application/x-executable",
-            "application/x-sharedlib",
-            "application/x-object",
-            "font/",
-        }
-        if any(mime_type.startswith(p) for p in untextable_prefixes):
-            return True
-
-        untextable_mimes = {
-            "application/octet-stream",
-            "application/x-mach-binary",
-            "application/zip",
-            "application/x-7z-compressed",
-            "application/x-rar-compressed",
-            "application/x-tar",
-            "application/gzip",
-            "application/x-bzip2",
-        }
-        return mime_type in untextable_mimes

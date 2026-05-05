@@ -21,8 +21,12 @@ async def test_openai_generate():
 
 @pytest.mark.asyncio
 async def test_openai_process_image(tmp_path):
+    from PIL import Image
+
     image_path = tmp_path / "test.jpg"
-    image_path.write_bytes(b"fake image data")
+    # Create a real 1x1 image
+    img = Image.new("RGB", (1, 1), color="white")
+    img.save(image_path, "JPEG")
 
     with patch("src.llm.openai.AsyncOpenAI") as mock_openai_class:
         mock_client = mock_openai_class.return_value

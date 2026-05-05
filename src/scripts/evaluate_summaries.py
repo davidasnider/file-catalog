@@ -15,6 +15,11 @@ from src.core.text_utils import get_all_extracted_text, repair_and_load_json
 from src.core.analyzer_names import (
     SUMMARIZER_NAME,
     DEEP_SUMMARIZER_NAME,
+    TEXT_EXTRACTOR_NAME,
+    VISION_ANALYZER_NAME,
+    AUDIO_TRANSCRIBER_NAME,
+    VIDEO_ANALYZER_NAME,
+    DOCUMENT_AI_EXTRACTOR_NAME,
 )
 
 # Set up logging
@@ -48,13 +53,28 @@ Return your evaluation in the following JSON format:
 """
 
 
+def normalize_task_name(name: str) -> str:
+    """Map legacy snake_case names to current PascalCase constants."""
+    mapping = {
+        "text_extractor": TEXT_EXTRACTOR_NAME,
+        "vision_analyzer": VISION_ANALYZER_NAME,
+        "audio_transcriber": AUDIO_TRANSCRIBER_NAME,
+        "video_analyzer": VIDEO_ANALYZER_NAME,
+        "summarizer": SUMMARIZER_NAME,
+        "deep_summarizer": DEEP_SUMMARIZER_NAME,
+        "document_ai_extractor": DOCUMENT_AI_EXTRACTOR_NAME,
+    }
+    return mapping.get(name.lower(), name)
+
+
 def build_context_from_tasks(tasks: List[AnalysisTask]) -> Dict[str, Any]:
     """Reconstruct a partial plugin context from database tasks."""
     context = {}
     for task in tasks:
         if task.status == TaskStatus.COMPLETED and task.result_data:
             try:
-                context[task.task_name] = json.loads(task.result_data)
+                normalized_name = normalize_task_name(task.task_name)
+                context[normalized_name] = json.loads(task.result_data)
             except json.JSONDecodeError:
                 continue
     return context
@@ -64,11 +84,19 @@ async def get_summary_pairs(session: AsyncSession, limit: int) -> List[Dict[str,
     """Fetch random pairs of (extracted_text, summary) from the database."""
     logger.info("Querying database for completed summaries...")
 
+    # Include legacy names in the search
+    summary_task_names = [
+        SUMMARIZER_NAME,
+        DEEP_SUMMARIZER_NAME,
+        "summarizer",
+        "deep_summarizer",
+    ]
+
     summary_stmt = (
         select(AnalysisTask.document_id)
         .where(
             and_(
-                AnalysisTask.task_name.in_([SUMMARIZER_NAME, DEEP_SUMMARIZER_NAME]),
+                AnalysisTask.task_name.in_(summary_task_names),
                 AnalysisTask.status == TaskStatus.COMPLETED,
             )
         )

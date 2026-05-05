@@ -9,7 +9,7 @@ from src.core.analyzer_names import VIDEO_ANALYZER_NAME, AUDIO_TRANSCRIBER_NAME
 
 # Conditional import as PyAV might not be installed yet during tests
 try:
-    import av
+    import av  # noqa: F401
 
     HAS_AV = True
 except ImportError:
@@ -37,6 +37,8 @@ class VideoAnalyzerPlugin(AnalyzerBase):
         if not HAS_AV:
             raise ImportError("PyAV (av library) is not installed.")
 
+        import av
+
         temp_paths = []
         consecutive_failures = 0
         max_consecutive_failures = 5
@@ -51,15 +53,21 @@ class VideoAnalyzerPlugin(AnalyzerBase):
                 logger.warning(f"No video stream found in {file_path}")
                 return []
 
+            # Use stream duration if available, else convert container duration (microseconds) to stream base
             duration = video_stream.duration
-            if duration is None:
-                # Fallback to container duration if stream duration is missing
-                duration = container.duration
+            if duration is None or duration <= 0:
+                if container.duration:
+                    duration = int(
+                        container.duration
+                        * (video_stream.time_base.denominator / av.time_base)
+                    )
+                else:
+                    duration = None
 
             if duration:
                 # Calculate timestamps for uniform sampling
-                start_offset = duration * 0.05
-                end_offset = duration * 0.95
+                start_offset = int(duration * 0.05)
+                end_offset = int(duration * 0.95)
                 usable_duration = end_offset - start_offset
 
                 interval = usable_duration / max(1, count - 1)
@@ -110,7 +118,10 @@ class VideoAnalyzerPlugin(AnalyzerBase):
 
             container.close()
             if not temp_paths:
-                raise Exception("No video frames could be decoded.")
+                logger.warning(
+                    f"No video frames could be decoded for {file_path}. This may be an audio-only container misidentified as video."
+                )
+                return []
             return temp_paths
 
         except Exception as e:
@@ -151,7 +162,13 @@ class VideoAnalyzerPlugin(AnalyzerBase):
             if isinstance(llm, str):
                 raise Exception(f"Failed to load vision LLM: {llm}")
 
-            batch_size = 20
+            # Check if provider supports multi-image processing (OpenAIProvider does)
+            from src.llm.openai import OpenAIProvider
+
+            supports_multi_image = isinstance(llm, OpenAIProvider)
+
+            # If not OpenAI, we must process one by one to avoid errors
+            batch_size = 20 if supports_multi_image else 1
             partial_descriptions = []
 
             for i in range(0, len(temp_img_paths), batch_size):
@@ -160,7 +177,7 @@ class VideoAnalyzerPlugin(AnalyzerBase):
                 total_batches = (len(temp_img_paths) + batch_size - 1) // batch_size
 
                 logger.info(
-                    f"Processing video batch {batch_num}/{total_batches} for {file_path}"
+                    f"Processing video batch {batch_num}/{total_batches} for {file_path} (Images: {len(batch)})"
                 )
 
                 batch_prompt = (
@@ -171,8 +188,10 @@ class VideoAnalyzerPlugin(AnalyzerBase):
 
                 # We don't use JSON mode here to keep descriptions dense and avoid schema overhead
                 try:
+                    # Pass either list or single path based on support
+                    path_to_process = batch if supports_multi_image else batch[0]
                     desc = await llm.process_image(
-                        image_path=batch,
+                        image_path=path_to_process,
                         prompt=batch_prompt,
                         max_tokens=300,
                         temperature=0.2,
@@ -191,8 +210,24 @@ class VideoAnalyzerPlugin(AnalyzerBase):
             # 4. Synthesize partial descriptions into a final JSON response
             # We use the text-only LLM for synthesis to save VRAM and handle the aggregated text
             text_llm = get_llm_provider(is_vision=False)
-            if isinstance(text_llm, str):
-                text_llm = llm  # Fallback to vision model if text model is same
+
+            # Handle cases where text initialization fails or is unsafe
+            if isinstance(text_llm, str) or (
+                hasattr(llm, "is_vision") and llm.is_vision
+            ):
+                # If we are using MLX, we can't use the vision instance for generate()
+                from src.llm.mlx_provider import MLXProvider
+
+                if isinstance(llm, MLXProvider):
+                    logger.warning(
+                        "MLX Vision provider cannot perform text synthesis. Skipping synthesis."
+                    )
+                    return {
+                        "visual_description": " ".join(partial_descriptions),
+                        "model": getattr(llm, "model_name", "Unknown Model"),
+                        "source": VIDEO_ANALYZER_NAME,
+                    }
+                text_llm = llm  # Fallback to vision model for OpenAI/Gemini which support both on one instance
 
             combined_segments = "\n\n".join(partial_descriptions)
 

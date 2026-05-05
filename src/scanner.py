@@ -244,6 +244,19 @@ async def ingest_directory(
 
             doc = existing_docs.get(file_path)
 
+            # FIX: Re-detect MIME type for .wma files misidentified as video.
+            # This MUST run even for COMPLETED files to ensure they are correctly re-classified.
+            current_mime = doc.mime_type if doc else None
+            if file_path.lower().endswith(".wma") and (
+                not current_mime or current_mime.startswith("video/")
+            ):
+                current_mime = await asyncio.to_thread(detect_file_type, file_path)
+                if doc and current_mime != doc.mime_type:
+                    logger.info(
+                        f"Correcting misidentified MIME type for {file_path}: {doc.mime_type} -> {current_mime}"
+                    )
+                    doc.mime_type = current_mime
+
             # Skip if metadata matches and status is COMPLETED
             if (
                 doc
@@ -251,13 +264,22 @@ async def ingest_directory(
                 and doc.mtime == mtime
                 and doc.status == DocumentStatus.COMPLETED
             ):
+                # Even if completed, we must respect the filter
+                if mime_type_filter and not (
+                    current_mime and current_mime.startswith(mime_type_filter)
+                ):
+                    continue
+
                 processed_doc_ids.append(doc.id)
                 if progress and task_id is not None:
                     progress.advance(task_id)
                 continue
 
             # 4. Content-based ingestion (only if needed)
-            mime_type = await asyncio.to_thread(detect_file_type, file_path)
+            if not current_mime:
+                mime_type = await asyncio.to_thread(detect_file_type, file_path)
+            else:
+                mime_type = current_mime
 
             if mime_type in IGNORED_MIME_TYPES:
                 if progress and task_id is not None:
@@ -468,19 +490,22 @@ async def _load_and_queue_existing_docs(
                 missing_doc_ids.append(doc.id)
                 continue
 
-            # FIX: Re-detect MIME type for .wma files misidentified as video
+            # FIX: Re-detect MIME type for .wma files misidentified as video.
+            # This MUST run before the MIME filter check below.
             mtype = doc.mime_type
             if doc.path.lower().endswith(".wma") and (
                 not mtype or mtype.startswith("video/")
             ):
-                from src.core.file_type import detect_file_type
-
                 mtype = detect_file_type(doc.path)
                 if mtype != doc.mime_type:
                     logger.info(
                         f"Correcting misidentified MIME type for {doc.path}: {doc.mime_type} -> {mtype}"
                     )
                     doc.mime_type = mtype
+
+            # Apply MIME filter if provided
+            if mime_type_filter and not (mtype and mtype.startswith(mime_type_filter)):
+                continue
 
             docs_to_process.append(doc.id)
             queued_docs.add(doc.id)
