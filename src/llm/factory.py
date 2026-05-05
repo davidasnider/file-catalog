@@ -68,6 +68,16 @@ def _instantiate_provider(
         except Exception as e:
             logger.error(f"Failed to instantiate MLXProvider: {e}")
             return "PROVIDER_INIT_FAILED"
+    elif provider_type == "openai":
+        try:
+            from src.llm.openai import OpenAIProvider
+
+            return OpenAIProvider(model_name=model_path, **kwargs)
+        except ImportError:
+            return "MISSING_LIBRARY"
+        except Exception as e:
+            logger.error(f"Failed to instantiate OpenAIProvider: {e}")
+            return "PROVIDER_INIT_FAILED"
     else:
         logger.error(f"Unknown provider type: {provider_type}")
         return "UNKNOWN_PROVIDER"

@@ -80,27 +80,7 @@ class RouterPlugin(AnalyzerBase):
 
         try:
             response = await llm.generate(
-                prompt,
-                max_tokens=64,
-                temperature=0.0,
-                response_format={
-                    "type": "json_object",
-                    "schema": {
-                        "type": "object",
-                        "properties": {
-                            "category": {
-                                "type": "string",
-                                "enum": [
-                                    "Legal/Estate",
-                                    "Financial",
-                                    "Technical",
-                                    "GenericText",
-                                ],
-                            }
-                        },
-                        "required": ["category"],
-                    },
-                },
+                prompt, max_tokens=64, temperature=0.0, response_format="json"
             )
 
             from src.core.text_utils import repair_and_load_json

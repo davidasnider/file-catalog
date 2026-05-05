@@ -338,3 +338,67 @@ async def test_ingest_directory_avoids_false_positives_on_filters(db_session, te
     docs = result.scalars().all()
     for doc in docs:
         assert doc.status != DocumentStatus.NOT_PRESENT
+
+
+@pytest.mark.asyncio
+async def test_scanner_wma_reclassification(db_session, temp_dir):
+    """Verify that .wma files misidentified as video are corrected."""
+    # 1. Create a .wma file and a matching DB record with INCORRECT mime_type (video/x-ms-asf)
+    wma_path = temp_dir / "music.wma"
+    wma_path.write_text("dummy wma content")
+
+    doc = Document(
+        path=str(wma_path),
+        mime_type="video/x-ms-asf",
+        file_hash="wmahash",
+        file_size=wma_path.stat().st_size,
+        mtime=wma_path.stat().st_mtime,
+        status=DocumentStatus.COMPLETED,
+    )
+    db_session.add(doc)
+    await db_session.commit()
+
+    # 2. Run ingestion
+    await ingest_directory(str(temp_dir), db_session)
+
+    # 3. Verify the record is now corrected to audio
+    result = await db_session.execute(select(Document).where(Document.id == doc.id))
+    updated_doc = result.scalars().first()
+    assert updated_doc.mime_type == "audio/x-ms-wma"
+
+
+@pytest.mark.asyncio
+async def test_startup_wma_reclassification(db_session, temp_dir):
+    """Verify that .wma files are corrected during scanner startup."""
+    from src.scanner import _load_and_queue_existing_docs
+
+    # 1. Create a .wma file and a matching DB record with INCORRECT mime_type (video/x-ms-asf)
+    wma_path = temp_dir / "music_startup.wma"
+    wma_path.write_text("dummy wma content")
+
+    doc = Document(
+        path=str(wma_path),
+        mime_type="video/x-ms-asf",
+        file_hash="wmahash_startup",
+        file_size=wma_path.stat().st_size,
+        mtime=wma_path.stat().st_mtime,
+        status=DocumentStatus.PENDING,
+    )
+    db_session.add(doc)
+    await db_session.commit()
+
+    # 2. Run startup logic
+    from unittest.mock import AsyncMock, MagicMock
+
+    mock_session_cm = AsyncMock()
+    mock_session_cm.__aenter__.return_value = db_session
+    mock_session_maker = MagicMock(return_value=mock_session_cm)
+
+    await _load_and_queue_existing_docs(
+        mock_session_maker, [], set(), {}, {}, asyncio.Queue()
+    )
+
+    # 3. Verify the record is now corrected to audio
+    result = await db_session.execute(select(Document).where(Document.id == doc.id))
+    updated_doc = result.scalars().first()
+    assert updated_doc.mime_type == "audio/x-ms-wma"

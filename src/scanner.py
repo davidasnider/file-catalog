@@ -238,11 +238,46 @@ async def ingest_directory(
     for file_path in files_on_disk:
         try:
             # 3. Quick Metadata Check
-            stat = await asyncio.to_thread(os.stat, file_path)
-            file_size = stat.st_size
-            mtime = stat.st_mtime
+            try:
+                stat = await asyncio.to_thread(os.stat, file_path)
+                file_size = stat.st_size
+                mtime = stat.st_mtime
+            except PermissionError as pe:
+                logger.error(f"Permission denied accessing {file_path}: {pe}")
+                if progress and task_id is not None:
+                    progress.advance(task_id)
+                continue
+            except Exception as e:
+                logger.error(f"Error stating {file_path}: {e}")
+                if progress and task_id is not None:
+                    progress.advance(task_id)
+                continue
 
             doc = existing_docs.get(file_path)
+
+            # FIX: Re-detect MIME type for .wma files misidentified as video.
+            # This MUST run even for COMPLETED files to ensure they are correctly re-classified.
+            current_mime = doc.mime_type if doc else None
+            if file_path.lower().endswith(".wma") and (
+                not current_mime or current_mime.startswith("video/")
+            ):
+                try:
+                    current_mime = await asyncio.to_thread(detect_file_type, file_path)
+                except PermissionError as pe:
+                    logger.error(
+                        f"Permission denied detecting type for {file_path}: {pe}"
+                    )
+                    if progress and task_id is not None:
+                        progress.advance(task_id)
+                    continue
+
+                if doc and current_mime != doc.mime_type:
+                    logger.info(
+                        f"Correcting misidentified MIME type for {file_path}: {doc.mime_type} -> {current_mime}"
+                    )
+                    doc.mime_type = current_mime
+                    # Track as updated to ensure commit
+                    pending_updates += 1
 
             # Skip if metadata matches and status is COMPLETED
             if (
@@ -251,13 +286,30 @@ async def ingest_directory(
                 and doc.mtime == mtime
                 and doc.status == DocumentStatus.COMPLETED
             ):
+                # Even if completed, we must respect the filter
+                if mime_type_filter and not (
+                    current_mime and current_mime.startswith(mime_type_filter)
+                ):
+                    continue
+
                 processed_doc_ids.append(doc.id)
                 if progress and task_id is not None:
                     progress.advance(task_id)
                 continue
 
             # 4. Content-based ingestion (only if needed)
-            mime_type = await asyncio.to_thread(detect_file_type, file_path)
+            if not current_mime:
+                try:
+                    mime_type = await asyncio.to_thread(detect_file_type, file_path)
+                except PermissionError as pe:
+                    logger.error(
+                        f"Permission denied detecting type for {file_path}: {pe}"
+                    )
+                    if progress and task_id is not None:
+                        progress.advance(task_id)
+                    continue
+            else:
+                mime_type = current_mime
 
             if mime_type in IGNORED_MIME_TYPES:
                 if progress and task_id is not None:
@@ -271,7 +323,13 @@ async def ingest_directory(
                     progress.advance(task_id)
                 continue
 
-            file_hash = await asyncio.to_thread(compute_file_hash, file_path)
+            try:
+                file_hash = await asyncio.to_thread(compute_file_hash, file_path)
+            except PermissionError as pe:
+                logger.error(f"Permission denied hashing {file_path}: {pe}")
+                if progress and task_id is not None:
+                    progress.advance(task_id)
+                continue
 
             if doc:
                 # Document exists, check if hash changed or we just need to update metadata
@@ -420,19 +478,26 @@ async def _load_and_queue_existing_docs(
     id_to_path,
     id_to_mime,
     doc_queue,
+    mime_type_filter: str | None = None,
 ):
     """Helper to load non-COMPLETED docs from DB and queue those present on disk."""
     async with async_session_maker() as session:
         # Query with task counts to determine priority
-        result = await session.execute(
-            select(Document, func.count(AnalysisTask.id))
-            .outerjoin(AnalysisTask, AnalysisTask.document_id == Document.id)
-            .where(
-                (Document.status != DocumentStatus.COMPLETED)
-                & (Document.status != DocumentStatus.NOT_PRESENT)
-            )
-            .group_by(Document.id)
+        stmt = select(Document, func.count(AnalysisTask.id)).outerjoin(
+            AnalysisTask, AnalysisTask.document_id == Document.id
         )
+
+        # NOTE: We do NOT apply mime_type_filter in the SQL query here.
+        # If we did, misclassified files (e.g. .wma stored as video/) would be
+        # filtered out before they could reach the re-detection logic below.
+        filters = [
+            Document.status != DocumentStatus.COMPLETED,
+            Document.status != DocumentStatus.NOT_PRESENT,
+        ]
+
+        stmt = stmt.where(*filters).group_by(Document.id)
+
+        result = await session.execute(stmt)
         # Fetch all into memory to apply priority sorting
         docs_with_counts = list(result.all())
 
@@ -460,10 +525,28 @@ async def _load_and_queue_existing_docs(
                 doc.status = DocumentStatus.NOT_PRESENT
                 missing_doc_ids.append(doc.id)
                 continue
+
+            # FIX: Re-detect MIME type for .wma files misidentified as video.
+            # This MUST run before the MIME filter check below.
+            mtype = doc.mime_type
+            if doc.path.lower().endswith(".wma") and (
+                not mtype or mtype.startswith("video/")
+            ):
+                mtype = detect_file_type(doc.path)
+                if mtype != doc.mime_type:
+                    logger.info(
+                        f"Correcting misidentified MIME type for {doc.path}: {doc.mime_type} -> {mtype}"
+                    )
+                    doc.mime_type = mtype
+
+            # Apply MIME filter if provided
+            if mime_type_filter and not (mtype and mtype.startswith(mime_type_filter)):
+                continue
+
             docs_to_process.append(doc.id)
             queued_docs.add(doc.id)
             id_to_path[doc.id] = doc.path
-            id_to_mime[doc.id] = doc.mime_type
+            id_to_mime[doc.id] = mtype
             doc_queue.put_nowait(doc.id)
 
         if missing_doc_ids:
@@ -824,6 +907,7 @@ async def run_scanner(
             id_to_path,
             id_to_mime,
             doc_queue,
+            mime_type_filter=mime_type_filter,
         )
 
         # Update total docs early for the progress bar
@@ -1158,14 +1242,14 @@ def main():
         "--llm-provider",
         type=str,
         default=config.llm_provider,
-        choices=["llama_cpp", "mlx", "gemini"],
+        choices=["llama_cpp", "mlx", "gemini", "openai"],
         help="Provider for text generation models.",
     )
     parser.add_argument(
         "--vision-provider",
         type=str,
         default=config.vision_provider,
-        choices=["llama_cpp", "mlx", "gemini"],
+        choices=["llama_cpp", "mlx", "gemini", "openai"],
         help="Provider for vision models.",
     )
     parser.add_argument(

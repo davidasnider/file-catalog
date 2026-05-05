@@ -8,7 +8,7 @@ from src.core.analyzer_names import VISION_ANALYZER_NAME
 logger = logging.getLogger(__name__)
 
 
-@register_analyzer(name=VISION_ANALYZER_NAME, depends_on=[], version="1.0")
+@register_analyzer(name=VISION_ANALYZER_NAME, depends_on=[], version="1.1")
 class VisionAnalyzerPlugin(AnalyzerBase):
     """
     Uses a multimodal local LLM (LLaVA) to describe images and categorize them as SFW/NSFW.
@@ -49,6 +49,7 @@ class VisionAnalyzerPlugin(AnalyzerBase):
                 prompt=prompt,
                 max_tokens=256,  # Sufficient for JSON without excessive repetition
                 temperature=0.0,
+                response_format="json",
             )
 
             try:
@@ -82,6 +83,7 @@ class VisionAnalyzerPlugin(AnalyzerBase):
                     or "No description provided (possible safety refusal).",
                     "is_sfw": is_sfw,
                     "adult_content_score": score,
+                    "model": getattr(llm, "model_name", "Unknown Model"),
                     "source": VISION_ANALYZER_NAME,
                 }
                 logger.info(

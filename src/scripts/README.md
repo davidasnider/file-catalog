@@ -64,5 +64,29 @@ python -m src.scripts.perf_test_llms
 python -m src.scripts.perf_test_llms --model-path "mlx-community/Meta-Llama-3.1-8B-Instruct-4bit"
 ```
 
+---
+
+### 5. Summary Evaluation (`evaluate_summaries.py`)
+Uses an LLM-as-a-judge to evaluate the accuracy, coverage, and hallucination rate of generated document summaries by comparing them against the original extracted text.
+
+**Examples:**
+```bash
+# Randomly sample 10 documents and evaluate their summaries
+python -m src.scripts.evaluate_summaries --samples 10
+
+# Save detailed evaluation results to a JSON file
+python -m src.scripts.evaluate_summaries --samples 5 --output eval_results.json
+
+---
+
+### 6. Inspect File (`inspect_file.py`)
+Retrieves and displays all database metadata and analysis results for a specific file in YAML format. If using iTerm2, it will also display a visual preview of the image or a video thumbnail.
+
+**Example:**
+```bash
+python -m src.scripts.inspect_file "/path/to/your/document.pdf"
+```
+```
+
 ## General Usage Note
 All scripts should be run from the root of the project using the `python -m src.scripts.<script_name>` syntax to ensure that internal imports and the `PYTHONPATH` are handled correctly.

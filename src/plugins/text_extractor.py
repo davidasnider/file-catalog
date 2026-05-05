@@ -11,14 +11,22 @@ from hachoir.metadata import extractMetadata
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
 from src.core.config import config
-from src.core.analyzer_names import TEXT_EXTRACTOR_NAME, AUDIO_TRANSCRIBER_NAME
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/bmp", "image/tiff"}
+SUPPORTED_IMAGE_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/bmp",
+    "image/tiff",
+    "image/gif",
+    "image/webp",
+    "image/vnd.adobe.photoshop",
+}
 
 
-@register_analyzer(name=TEXT_EXTRACTOR_NAME, depends_on=[], version="1.6")
+@register_analyzer(name=TEXT_EXTRACTOR_NAME, depends_on=[], version="1.7")
 class TextExtractorPlugin(AnalyzerBase):
     """
     Extracts raw text from common document types (PDFs, docs) and images (OCR).
@@ -27,6 +35,10 @@ class TextExtractorPlugin(AnalyzerBase):
     def should_run(
         self, file_path: str, mime_type: str, context: Dict[str, Any]
     ) -> bool:
+        # Audio and Video are handled by specialized transcribers/analyzers
+        if mime_type.startswith(("audio/", "video/")):
+            return False
+
         if config.use_document_ai:
             supported_docai_prefixes = {
                 "application/pdf",
@@ -150,11 +162,6 @@ class TextExtractorPlugin(AnalyzerBase):
 
                 with extract_msg.openMsg(file_path) as msg:
                     extracted_text = msg.body if msg.body else ""
-            elif mime_type == "audio/x-wav":
-                logger.debug(
-                    f"Skipping text extraction for WAV audio; "
-                    f"audio transcription should be handled by the {AUDIO_TRANSCRIBER_NAME} analyzer."
-                )
             elif mime_type == "chemical/x-cdx":
                 import re
 
