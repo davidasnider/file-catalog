@@ -200,6 +200,10 @@ async def main():
     )
     args = parser.parse_args()
 
+    if args.samples < 0:
+        logger.error("The --samples argument must be a non-negative integer.")
+        return
+
     llm = get_llm_provider()
     if not llm or isinstance(llm, str):
         logger.error(f"Failed to initialize LLM provider: {llm}")

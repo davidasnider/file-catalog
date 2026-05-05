@@ -118,7 +118,7 @@ async def main():
                 print("\n--- Visual Preview ---")
                 display_image_iterm2(path)
             elif mime.startswith("video/"):
-                print("\n--- Video Thumbnail (Middle Frame) ---")
+                print("\n--- Video Thumbnail (5% Start Offset) ---")
                 try:
                     plugin = VideoAnalyzerPlugin()
                     temp_thumb = plugin.extract_keyframes(path, count=1)

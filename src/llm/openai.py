@@ -32,10 +32,10 @@ class OpenAIProvider(LLMProvider):
         rf = kwargs.get("response_format")
         if rf == "json":
             response_format = {"type": "json_object"}
-        elif isinstance(rf, dict) and "type" in rf:
-            # Pass through complex response formats (like json_schema) if the endpoint supports it.
-            # Many OpenAI-compatible local servers (vLLM/Ollama) now support basic json_object.
-            response_format = rf
+        elif isinstance(rf, dict):
+            # Standardize complex formats (like those with "schema") to basic "json_object"
+            # for the OpenAI chat completion API.
+            response_format = {"type": "json_object"}
 
         response = await self.client.chat.completions.create(
             model=self.model_name,

@@ -59,7 +59,10 @@ class VideoAnalyzerPlugin(AnalyzerBase):
                 if container.duration:
                     duration = int(
                         container.duration
-                        * (video_stream.time_base.denominator / av.time_base)
+                        * (
+                            video_stream.time_base.denominator
+                            / (video_stream.time_base.numerator * av.time_base)
+                        )
                     )
                 else:
                     duration = None
@@ -136,13 +139,25 @@ class VideoAnalyzerPlugin(AnalyzerBase):
     ) -> Dict[str, Any]:
         logger.info(f"Running Video Analysis on {file_path}")
 
+        # 1. Grab transcript from our dependency plugin if it successfully ran
+        transcript = context.get(AUDIO_TRANSCRIBER_NAME, {}).get("text", "")
+
+        # 2. Initialize LLM and determine sampling density
+        llm = get_llm_provider(is_vision=True)
+        if isinstance(llm, str):
+            raise Exception(f"Failed to load vision LLM: {llm}")
+
+        from src.llm.openai import OpenAIProvider
+
+        supports_multi_image = isinstance(llm, OpenAIProvider)
+
+        # High-density analysis (100 frames) only if we can batch them safely (OpenAIProvider)
+        # Otherwise, fall back to v1.0 behavior (single frame) to avoid extreme slowness.
+        frame_count = 100 if supports_multi_image else 1
+
         temp_img_paths = []
         try:
-            # 1. Grab transcript from our dependency plugin if it successfully ran
-            transcript = context.get(AUDIO_TRANSCRIBER_NAME, {}).get("text", "")
-
-            # 2. Extract Keyframes (100 as requested)
-            temp_img_paths = self.extract_keyframes(file_path, count=100)
+            temp_img_paths = self.extract_keyframes(file_path, count=frame_count)
 
             if not temp_img_paths:
                 logger.info(
@@ -155,19 +170,7 @@ class VideoAnalyzerPlugin(AnalyzerBase):
                     "source": VIDEO_ANALYZER_NAME,
                 }
 
-            # 3. Process the frames with Vision LLM in batches
-            # Processing 100 images at once exceeds the context window of most local models.
-            # We use a batch size of 20 to balance detail and token limits.
-            llm = get_llm_provider(is_vision=True)
-            if isinstance(llm, str):
-                raise Exception(f"Failed to load vision LLM: {llm}")
-
-            # Check if provider supports multi-image processing (OpenAIProvider does)
-            from src.llm.openai import OpenAIProvider
-
-            supports_multi_image = isinstance(llm, OpenAIProvider)
-
-            # If not OpenAI, we must process one by one to avoid errors
+            # 3. Process the frames
             batch_size = 20 if supports_multi_image else 1
             partial_descriptions = []
 
@@ -177,29 +180,26 @@ class VideoAnalyzerPlugin(AnalyzerBase):
                 total_batches = (len(temp_img_paths) + batch_size - 1) // batch_size
 
                 logger.info(
-                    f"Processing video batch {batch_num}/{total_batches} for {file_path} (Images: {len(batch)})"
+                    f"Processing video segment {batch_num}/{total_batches} for {file_path}"
                 )
 
                 batch_prompt = (
-                    f"Analyze these {len(batch)} keyframes from a video segment. "
-                    "Describe the visual content, actions, and any notable changes in this specific segment. "
+                    f"Analyze {'these' if len(batch) > 1 else 'this'} keyframe{'s' if len(batch) > 1 else ''} from a video. "
+                    "Describe the visual content, actions, and any notable changes. "
                     "Return ONLY a concise paragraph description."
                 )
 
-                # We don't use JSON mode here to keep descriptions dense and avoid schema overhead
                 try:
-                    # Pass either list or single path based on support
-                    path_to_process = batch if supports_multi_image else batch[0]
                     desc = await llm.process_image(
-                        image_path=path_to_process,
+                        image_path=batch if supports_multi_image else batch[0],
                         prompt=batch_prompt,
                         max_tokens=300,
                         temperature=0.2,
                     )
-                    partial_descriptions.append(f"Segment {batch_num}: {desc.strip()}")
+                    partial_descriptions.append(desc.strip())
                 except Exception as e:
                     logger.warning(
-                        f"Failed to process video batch {batch_num} for {file_path}: {e}"
+                        f"Failed to process video segment {batch_num} for {file_path}: {e}"
                     )
 
             if not partial_descriptions:
@@ -207,29 +207,38 @@ class VideoAnalyzerPlugin(AnalyzerBase):
                     "Failed to generate any partial descriptions for the video."
                 )
 
-            # 4. Synthesize partial descriptions into a final JSON response
-            # We use the text-only LLM for synthesis to save VRAM and handle the aggregated text
+            # 4. Synthesize or Return
+            if len(partial_descriptions) == 1:
+                # Single frame flow (v1.0 compatibility)
+                return {
+                    "visual_description": partial_descriptions[0],
+                    "model": getattr(llm, "model_name", "Unknown Model"),
+                    "source": VIDEO_ANALYZER_NAME,
+                }
+
+            # Map-Reduce Synthesis (OpenAI/v2.0 flow)
             text_llm = get_llm_provider(is_vision=False)
 
-            # Handle cases where text initialization fails or is unsafe
-            if isinstance(text_llm, str) or (
-                hasattr(llm, "is_vision") and llm.is_vision
-            ):
-                # If we are using MLX, we can't use the vision instance for generate()
-                from src.llm.mlx_provider import MLXProvider
+            # More robustly check if the vision provider is MLX which we know is unsafe
+            from src.llm.mlx_provider import MLXProvider
 
-                if isinstance(llm, MLXProvider):
+            is_mlx_vision = isinstance(llm, MLXProvider)
+
+            if isinstance(text_llm, str):
+                if is_mlx_vision:
                     logger.warning(
-                        "MLX Vision provider cannot perform text synthesis. Skipping synthesis."
+                        "Synthesis failed: Vision model is MLX and no text model available."
                     )
                     return {
-                        "visual_description": " ".join(partial_descriptions),
+                        "visual_description": "\n\n".join(partial_descriptions),
                         "model": getattr(llm, "model_name", "Unknown Model"),
                         "source": VIDEO_ANALYZER_NAME,
                     }
-                text_llm = llm  # Fallback to vision model for OpenAI/Gemini which support both on one instance
+                text_llm = llm
 
-            combined_segments = "\n\n".join(partial_descriptions)
+            combined_segments = "\n\n".join(
+                [f"Segment {i+1}: {d}" for i, d in enumerate(partial_descriptions)]
+            )
 
             final_prompt = (
                 "You are finalizing a video analysis task. Below are descriptions of sequential segments of a video. "
@@ -258,13 +267,14 @@ class VideoAnalyzerPlugin(AnalyzerBase):
                 if not result or "description" not in result:
                     return {
                         "visual_description": response_text,
+                        "model": getattr(text_llm, "model_name", "Unknown Model"),
                         "source": VIDEO_ANALYZER_NAME,
                         "parse_error": True,
                     }
 
                 return {
                     "visual_description": result["description"],
-                    "model": getattr(llm, "model_name", "Unknown Model"),
+                    "model": getattr(text_llm, "model_name", "Unknown Model"),
                     "source": VIDEO_ANALYZER_NAME,
                 }
             except Exception:
@@ -273,6 +283,7 @@ class VideoAnalyzerPlugin(AnalyzerBase):
                 )
                 return {
                     "visual_description": response_text,
+                    "model": getattr(text_llm, "model_name", "Unknown Model"),
                     "source": VIDEO_ANALYZER_NAME,
                     "parse_error": True,
                 }

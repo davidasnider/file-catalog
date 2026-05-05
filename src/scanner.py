@@ -256,6 +256,8 @@ async def ingest_directory(
                         f"Correcting misidentified MIME type for {file_path}: {doc.mime_type} -> {current_mime}"
                     )
                     doc.mime_type = current_mime
+                    # Track as updated to ensure commit
+                    pending_updates += 1
 
             # Skip if metadata matches and status is COMPLETED
             if (
@@ -451,13 +453,13 @@ async def _load_and_queue_existing_docs(
             AnalysisTask, AnalysisTask.document_id == Document.id
         )
 
+        # NOTE: We do NOT apply mime_type_filter in the SQL query here.
+        # If we did, misclassified files (e.g. .wma stored as video/) would be
+        # filtered out before they could reach the re-detection logic below.
         filters = [
             Document.status != DocumentStatus.COMPLETED,
             Document.status != DocumentStatus.NOT_PRESENT,
         ]
-
-        if mime_type_filter:
-            filters.append(Document.mime_type.like(f"{mime_type_filter}%"))
 
         stmt = stmt.where(*filters).group_by(Document.id)
 

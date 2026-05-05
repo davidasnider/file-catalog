@@ -62,6 +62,7 @@ python -m src.scripts.perf_test_llms
 
 # Benchmark a specific model path
 python -m src.scripts.perf_test_llms --model-path "mlx-community/Meta-Llama-3.1-8B-Instruct-4bit"
+```
 
 ---
 
