@@ -75,6 +75,7 @@ class AudioTranscriberPlugin(AnalyzerBase):
                 "text": transcript.strip(),
                 "extracted": bool(transcript.strip()),
                 "language": language,
+                "model": f"faster-whisper-{MODEL_SIZE}",
                 "source": AUDIO_TRANSCRIBER_NAME,
             }
 

@@ -11,11 +11,19 @@ from hachoir.metadata import extractMetadata
 
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
 from src.core.config import config
-from src.core.analyzer_names import TEXT_EXTRACTOR_NAME, AUDIO_TRANSCRIBER_NAME
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/bmp", "image/tiff"}
+SUPPORTED_IMAGE_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/bmp",
+    "image/tiff",
+    "image/gif",
+    "image/webp",
+    "image/vnd.adobe.photoshop",
+}
 
 
 @register_analyzer(name=TEXT_EXTRACTOR_NAME, depends_on=[], version="1.6")
@@ -27,6 +35,10 @@ class TextExtractorPlugin(AnalyzerBase):
     def should_run(
         self, file_path: str, mime_type: str, context: Dict[str, Any]
     ) -> bool:
+        # Audio and Video are handled by specialized transcribers/analyzers
+        if mime_type.startswith(("audio/", "video/")):
+            return False
+
         if config.use_document_ai:
             supported_docai_prefixes = {
                 "application/pdf",
@@ -150,11 +162,6 @@ class TextExtractorPlugin(AnalyzerBase):
 
                 with extract_msg.openMsg(file_path) as msg:
                     extracted_text = msg.body if msg.body else ""
-            elif mime_type == "audio/x-wav":
-                logger.debug(
-                    f"Skipping text extraction for WAV audio; "
-                    f"audio transcription should be handled by the {AUDIO_TRANSCRIBER_NAME} analyzer."
-                )
             elif mime_type == "chemical/x-cdx":
                 import re
 
@@ -309,6 +316,16 @@ class TextExtractorPlugin(AnalyzerBase):
                         f"WordPerfect raw extraction failed for {file_path}: {e}"
                     )
                     extracted_text = ""
+            elif self._is_untextable(mime_type):
+                logger.debug(
+                    f"Gracefully skipping text extraction for binary/untextable type: {mime_type}"
+                )
+                return {
+                    "text": "",
+                    "extracted": False,
+                    "reason": "untextable_binary_type",
+                    "source": TEXT_EXTRACTOR_NAME,
+                }
             else:
                 # We log the unsupported type. The extraction will be empty,
                 # causing the ValueError below to mark the task as FAILED.
@@ -329,3 +346,29 @@ class TextExtractorPlugin(AnalyzerBase):
         except Exception as e:
             logger.error(f"Failed to extract text from {file_path}: {e}")
             raise
+
+    def _is_untextable(self, mime_type: str) -> bool:
+        """Check if a MIME type is known to be binary or untextable."""
+        if not mime_type:
+            return False
+
+        untextable_prefixes = {
+            "application/x-executable",
+            "application/x-sharedlib",
+            "application/x-object",
+            "font/",
+        }
+        if any(mime_type.startswith(p) for p in untextable_prefixes):
+            return True
+
+        untextable_mimes = {
+            "application/octet-stream",
+            "application/x-mach-binary",
+            "application/zip",
+            "application/x-7z-compressed",
+            "application/x-rar-compressed",
+            "application/x-tar",
+            "application/gzip",
+            "application/x-bzip2",
+        }
+        return mime_type in untextable_mimes

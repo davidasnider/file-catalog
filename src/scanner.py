@@ -420,19 +420,26 @@ async def _load_and_queue_existing_docs(
     id_to_path,
     id_to_mime,
     doc_queue,
+    mime_type_filter: str | None = None,
 ):
     """Helper to load non-COMPLETED docs from DB and queue those present on disk."""
     async with async_session_maker() as session:
         # Query with task counts to determine priority
-        result = await session.execute(
-            select(Document, func.count(AnalysisTask.id))
-            .outerjoin(AnalysisTask, AnalysisTask.document_id == Document.id)
-            .where(
-                (Document.status != DocumentStatus.COMPLETED)
-                & (Document.status != DocumentStatus.NOT_PRESENT)
-            )
-            .group_by(Document.id)
+        stmt = select(Document, func.count(AnalysisTask.id)).outerjoin(
+            AnalysisTask, AnalysisTask.document_id == Document.id
         )
+
+        filters = [
+            Document.status != DocumentStatus.COMPLETED,
+            Document.status != DocumentStatus.NOT_PRESENT,
+        ]
+
+        if mime_type_filter:
+            filters.append(Document.mime_type.like(f"{mime_type_filter}%"))
+
+        stmt = stmt.where(*filters).group_by(Document.id)
+
+        result = await session.execute(stmt)
         # Fetch all into memory to apply priority sorting
         docs_with_counts = list(result.all())
 
@@ -460,10 +467,25 @@ async def _load_and_queue_existing_docs(
                 doc.status = DocumentStatus.NOT_PRESENT
                 missing_doc_ids.append(doc.id)
                 continue
+
+            # FIX: Re-detect MIME type for .wma files misidentified as video
+            mtype = doc.mime_type
+            if doc.path.lower().endswith(".wma") and (
+                not mtype or mtype.startswith("video/")
+            ):
+                from src.core.file_type import detect_file_type
+
+                mtype = detect_file_type(doc.path)
+                if mtype != doc.mime_type:
+                    logger.info(
+                        f"Correcting misidentified MIME type for {doc.path}: {doc.mime_type} -> {mtype}"
+                    )
+                    doc.mime_type = mtype
+
             docs_to_process.append(doc.id)
             queued_docs.add(doc.id)
             id_to_path[doc.id] = doc.path
-            id_to_mime[doc.id] = doc.mime_type
+            id_to_mime[doc.id] = mtype
             doc_queue.put_nowait(doc.id)
 
         if missing_doc_ids:
@@ -824,6 +846,7 @@ async def run_scanner(
             id_to_path,
             id_to_mime,
             doc_queue,
+            mime_type_filter=mime_type_filter,
         )
 
         # Update total docs early for the progress bar
@@ -1158,14 +1181,14 @@ def main():
         "--llm-provider",
         type=str,
         default=config.llm_provider,
-        choices=["llama_cpp", "mlx", "gemini"],
+        choices=["llama_cpp", "mlx", "gemini", "openai"],
         help="Provider for text generation models.",
     )
     parser.add_argument(
         "--vision-provider",
         type=str,
         default=config.vision_provider,
-        choices=["llama_cpp", "mlx", "gemini"],
+        choices=["llama_cpp", "mlx", "gemini", "openai"],
         help="Provider for vision models.",
     )
     parser.add_argument(

@@ -62,6 +62,9 @@ python -m src.scripts.extract_and_cleanup_mbox /path/to/mailboxes
 
 # Manually sync Full-Text Search index
 python -m src.scripts.sync_fts
+
+# Evaluate generated summaries using an LLM-as-a-judge
+python -m src.scripts.evaluate_summaries --samples 10
 ```
 
 ## 📝 Development Conventions

@@ -35,6 +35,10 @@ def detect_file_type(file_path: str) -> str:
         if mime_type == "application/mbox" and file_path.lower().endswith(".txt"):
             mime_type = "text/plain"
 
+        # libmagic sometimes misidentifies .wma audio files as video/x-ms-asf
+        if file_path.lower().endswith(".wma"):
+            return "audio/x-ms-wma"
+
         # libmagic sometimes returns text/plain for things that are more specific
         if mime_type != "text/plain" and mime_type != "application/octet-stream":
             return mime_type

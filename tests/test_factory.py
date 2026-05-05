@@ -39,6 +39,13 @@ def test_get_llm_provider_gemini(mock_config):
         mock_gemini.assert_called_once()
 
 
+def test_get_llm_provider_openai(mock_config):
+    config.llm_provider = "openai"
+    with patch("src.llm.openai.OpenAIProvider") as mock_openai:
+        get_llm_provider(is_vision=False)
+        mock_openai.assert_called_once()
+
+
 def test_get_llm_provider_fallback(mock_config):
     config.llm_provider = "mlx"
     config.use_cloud_fallback = True
