@@ -8,7 +8,7 @@ from src.core.analyzer_names import VISION_ANALYZER_NAME
 logger = logging.getLogger(__name__)
 
 
-@register_analyzer(name=VISION_ANALYZER_NAME, depends_on=[], version="1.0")
+@register_analyzer(name=VISION_ANALYZER_NAME, depends_on=[], version="1.1")
 class VisionAnalyzerPlugin(AnalyzerBase):
     """
     Uses a multimodal local LLM (LLaVA) to describe images and categorize them as SFW/NSFW.

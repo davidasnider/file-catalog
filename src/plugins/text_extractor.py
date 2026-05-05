@@ -26,7 +26,7 @@ SUPPORTED_IMAGE_TYPES = {
 }
 
 
-@register_analyzer(name=TEXT_EXTRACTOR_NAME, depends_on=[], version="1.6")
+@register_analyzer(name=TEXT_EXTRACTOR_NAME, depends_on=[], version="1.7")
 class TextExtractorPlugin(AnalyzerBase):
     """
     Extracts raw text from common document types (PDFs, docs) and images (OCR).

@@ -69,12 +69,18 @@ class VideoAnalyzerPlugin(AnalyzerBase):
 
             if duration:
                 # Calculate timestamps for uniform sampling
-                start_offset = int(duration * 0.05)
-                end_offset = int(duration * 0.95)
-                usable_duration = end_offset - start_offset
-
-                interval = usable_duration / max(1, count - 1)
-                timestamps = [int(start_offset + i * interval) for i in range(count)]
+                if count > 1:
+                    # High-density sampling: avoid absolute beginning/end
+                    start_offset = int(duration * 0.05)
+                    end_offset = int(duration * 0.95)
+                    usable_duration = end_offset - start_offset
+                    interval = usable_duration / max(1, count - 1)
+                    timestamps = [
+                        int(start_offset + i * interval) for i in range(count)
+                    ]
+                else:
+                    # Single-frame fallback (v1.0): Use midpoint
+                    timestamps = [int(duration / 2)]
 
                 for ts in timestamps:
                     try:

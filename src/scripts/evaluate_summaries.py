@@ -8,7 +8,7 @@ from typing import List, Dict, Any
 from sqlalchemy import select, and_
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from src.db.engine import async_session_maker
+from src.db.engine import async_session_maker, init_db
 from src.db.models import Document, AnalysisTask, TaskStatus
 from src.llm.factory import get_llm_provider
 from src.core.text_utils import get_all_extracted_text, repair_and_load_json
@@ -74,6 +74,10 @@ def build_context_from_tasks(tasks: List[AnalysisTask]) -> Dict[str, Any]:
         if task.status == TaskStatus.COMPLETED and task.result_data:
             try:
                 normalized_name = normalize_task_name(task.task_name)
+                # Avoid overwriting a modern PascalCase key with a legacy snake_case row
+                # if both exist (unlikely after migration, but safer logic).
+                if normalized_name in context and task.task_name != normalized_name:
+                    continue
                 context[normalized_name] = json.loads(task.result_data)
             except json.JSONDecodeError:
                 continue
@@ -199,6 +203,9 @@ async def main():
         "--output", type=str, help="Path to save evaluation results as JSON."
     )
     args = parser.parse_args()
+
+    # Initialize database
+    await init_db()
 
     if args.samples < 0:
         logger.error("The --samples argument must be a non-negative integer.")

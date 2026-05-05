@@ -31,7 +31,7 @@ async def get_whisper_model():
         return model
 
 
-@register_analyzer(name=AUDIO_TRANSCRIBER_NAME, depends_on=[], version="1.0")
+@register_analyzer(name=AUDIO_TRANSCRIBER_NAME, depends_on=[], version="1.1")
 class AudioTranscriberPlugin(AnalyzerBase):
     """
     Extracts audio transcripts from audio and video files using faster-whisper.

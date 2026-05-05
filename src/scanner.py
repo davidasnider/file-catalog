@@ -238,9 +238,20 @@ async def ingest_directory(
     for file_path in files_on_disk:
         try:
             # 3. Quick Metadata Check
-            stat = await asyncio.to_thread(os.stat, file_path)
-            file_size = stat.st_size
-            mtime = stat.st_mtime
+            try:
+                stat = await asyncio.to_thread(os.stat, file_path)
+                file_size = stat.st_size
+                mtime = stat.st_mtime
+            except PermissionError as pe:
+                logger.error(f"Permission denied accessing {file_path}: {pe}")
+                if progress and task_id is not None:
+                    progress.advance(task_id)
+                continue
+            except Exception as e:
+                logger.error(f"Error stating {file_path}: {e}")
+                if progress and task_id is not None:
+                    progress.advance(task_id)
+                continue
 
             doc = existing_docs.get(file_path)
 
@@ -250,7 +261,16 @@ async def ingest_directory(
             if file_path.lower().endswith(".wma") and (
                 not current_mime or current_mime.startswith("video/")
             ):
-                current_mime = await asyncio.to_thread(detect_file_type, file_path)
+                try:
+                    current_mime = await asyncio.to_thread(detect_file_type, file_path)
+                except PermissionError as pe:
+                    logger.error(
+                        f"Permission denied detecting type for {file_path}: {pe}"
+                    )
+                    if progress and task_id is not None:
+                        progress.advance(task_id)
+                    continue
+
                 if doc and current_mime != doc.mime_type:
                     logger.info(
                         f"Correcting misidentified MIME type for {file_path}: {doc.mime_type} -> {current_mime}"
@@ -279,7 +299,15 @@ async def ingest_directory(
 
             # 4. Content-based ingestion (only if needed)
             if not current_mime:
-                mime_type = await asyncio.to_thread(detect_file_type, file_path)
+                try:
+                    mime_type = await asyncio.to_thread(detect_file_type, file_path)
+                except PermissionError as pe:
+                    logger.error(
+                        f"Permission denied detecting type for {file_path}: {pe}"
+                    )
+                    if progress and task_id is not None:
+                        progress.advance(task_id)
+                    continue
             else:
                 mime_type = current_mime
 
@@ -295,7 +323,13 @@ async def ingest_directory(
                     progress.advance(task_id)
                 continue
 
-            file_hash = await asyncio.to_thread(compute_file_hash, file_path)
+            try:
+                file_hash = await asyncio.to_thread(compute_file_hash, file_path)
+            except PermissionError as pe:
+                logger.error(f"Permission denied hashing {file_path}: {pe}")
+                if progress and task_id is not None:
+                    progress.advance(task_id)
+                continue
 
             if doc:
                 # Document exists, check if hash changed or we just need to update metadata

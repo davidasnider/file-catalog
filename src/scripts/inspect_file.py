@@ -10,7 +10,7 @@ from typing import Dict, Any, Optional
 import yaml
 from sqlalchemy import select
 
-from src.db.engine import async_session_maker
+from src.db.engine import async_session_maker, init_db
 from src.db.models import Document, AnalysisTask
 from src.plugins.video_analyzer import VideoAnalyzerPlugin
 
@@ -91,6 +91,9 @@ async def main():
     )
     args = parser.parse_args()
 
+    # Initialize database
+    await init_db()
+
     info = await get_file_info(args.path)
 
     if not info:
@@ -110,7 +113,6 @@ async def main():
             return
 
         term = os.environ.get("TERM_PROGRAM", "")
-
         is_iterm = term == "iTerm.app"
 
         if is_iterm:

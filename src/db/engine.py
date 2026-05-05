@@ -66,6 +66,26 @@ async def init_db():
                 ");"
             )
         )
+
+        # Standardize legacy task names
+        migrations = [
+            ("vision_analyzer", "VisionAnalyzer"),
+            ("audio_transcriber", "AudioTranscriber"),
+            ("video_analyzer", "VideoAnalyzer"),
+            ("summarizer", "Summarizer"),
+            ("deep_summarizer", "DeepSummarizer"),
+            ("document_ai_extractor", "DocumentAIExtractor"),
+            ("text_extractor", "TextExtractor"),
+        ]
+
+        for old_name, new_name in migrations:
+            await conn.execute(
+                text(
+                    "UPDATE analysistask SET task_name = :new_name "
+                    "WHERE task_name = :old_name"
+                ).bindparams(old_name=old_name, new_name=new_name)
+            )
+
     logger.info("Database initialization complete.")
 
 
