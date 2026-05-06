@@ -5,7 +5,7 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 ## Core Features
 
 ### 1. Multi-Model Orchestration & Memory Management
-- **Multi-Backend Python LLM Management**: Directly manages models using `llama-cpp-python` (GGUF), `mlx-lm` (Apple Silicon), `google-genai` (Cloud Fallback), or `OpenAIProvider` for local LLM inference (e.g. vLLM/Ollama) without external proxy bloat.
+- **Multi-Backend Python LLM Management**: Directly manages models using `llama-cpp-python` (GGUF), `mlx-lm` (Apple Silicon), `google-genai` (Cloud Fallback), or `openai` for local LLM inference via any OpenAI-compatible endpoint (e.g. vLLM/Ollama) without external proxy bloat.
 - **LRU Cache & RAM Monitoring**: For the `llama-cpp` backend, actively monitors system RAM (via `psutil`). Models are cached "hot" in unified memory for maximum speed between tasks, and gracefully evicted using an LRU strategy only when memory drops below 2GB.
 - **Dynamic Model Fetching**: For the `llama-cpp` backend, automatically downloads and manages localized GGUF models directly from HuggingFace (e.g., `Llama-3.1-8B-Instruct`, `Phi-4-mini`) upon first request.
 
