@@ -5,7 +5,7 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 ## Core Features
 
 ### 1. Multi-Model Orchestration & Memory Management
-- **Multi-Backend Python LLM Management**: Directly manages models using `llama-cpp-python` (GGUF), `mlx-lm` (Apple Silicon), or `google-genai` (Cloud Fallback) without external proxy bloat.
+- **Multi-Backend Python LLM Management**: Directly manages models using `llama-cpp-python` (GGUF), `mlx-lm` (Apple Silicon), `google-genai` (Cloud Fallback), or `openai` for local LLM inference via any OpenAI-compatible endpoint (e.g. vLLM/Ollama) without external proxy bloat.
 - **LRU Cache & RAM Monitoring**: For the `llama-cpp` backend, actively monitors system RAM (via `psutil`). Models are cached "hot" in unified memory for maximum speed between tasks, and gracefully evicted using an LRU strategy only when memory drops below 2GB.
 - **Dynamic Model Fetching**: For the `llama-cpp` backend, automatically downloads and manages localized GGUF models directly from HuggingFace (e.g., `Llama-3.1-8B-Instruct`, `Phi-4-mini`) upon first request.
 
@@ -18,6 +18,7 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 - **Skip Irrelevant Work**: The `TaskEngine` seamlessly evaluates `should_run()` conditions for every plugin. Heavy analytical models (like the Estate Analyzer) only trigger if the Router tags the document appropriately, saving immense compute time and context bloat.
 
 ### 4. Specialized Analytical Pipelines
+- **Audio & Video Analysis**: Features an `AudioTranscriberPlugin` to extract transcripts from audio files and a `VideoAnalyzerPlugin` (v2.0) that performs 100-frame uniform sampling, batching, and synthesis to provide detailed video content descriptions.
 - **Metadata & Language Detection**: Features a `LanguageDetectorPlugin` to tag document language and a `DuplicateDetectorPlugin` to find exact-duplicate files using hashes.
 - **Two-Tier Summarization**:
   - **Universal Short Summary**: A lightning-fast, 3-sentence summary generated for *every* standard document.
@@ -49,7 +50,10 @@ The scanner can be configured via environment variables (in a `.env` file) or CL
 
 ### Key Configuration Options:
 Configuration is centrally managed via `pydantic-settings`.
-- `LLM_PROVIDER` / `VISION_PROVIDER`: Choose `mlx`, `llama_cpp`, or `gemini` (defaults to `mlx`).
+- `LLM_PROVIDER` / `VISION_PROVIDER`: Choose `openai`, `mlx`, `llama_cpp`, or `gemini` (defaults to `openai`).
+- `OPENAI_BASE_URL`: Base URL of the OpenAI-compatible endpoint when using the `openai` provider (default: `http://127.0.0.1:8000/v1`). Point this at your local vLLM, Ollama, or LM Studio server.
+- `OPENAI_API_KEY`: API key sent with each request to the OpenAI-compatible endpoint (default: `sk-no-key-required`). Most local servers accept any non-empty value.
+- `LLM_MODEL_PATH` / `VISION_MODEL_PATH`: When using the `openai` provider these values are passed as the model name in the API request (e.g. `qwen3`, `llava`). For `llama_cpp` they are treated as file-system paths to GGUF weights; for `mlx` they are HuggingFace model identifiers.
 - `MAX_CONCURRENT`: Number of documents to process in parallel (default: 4).
 - `INGEST_BATCH_SIZE`: Number of files to commit to the database in a single transaction (default: 100).
 - `MAX_RETRIES`: Number of times to retry a failed plugin task with exponential backoff (default: 3).
