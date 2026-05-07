@@ -43,6 +43,7 @@ IGNORED_EXTENSIONS = {
     ".map",
     ".jsx",
     ".tsx",
+    ".xml",
     # Mailbox files should be exploded into individual .eml files first
     # using extract_and_cleanup_mbox.py before scanning.
     ".mbox",
@@ -73,6 +74,8 @@ IGNORED_EXTENSIONS = {
 IGNORED_MIME_TYPES = {
     "text/x-c",
     "text/xml",
+    "application/xml",
+    "application/xhtml+xml",
     "application/vnd.microsoft.portable-executable",
     "text/x-c++",
 }

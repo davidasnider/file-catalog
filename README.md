@@ -26,7 +26,7 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 - **PII Harvesting**: A specialized `PIIHarvesterPlugin` leverages strict JSON-Schema enforcement to extract named entities (Names, Emails, Addresses) into the database.
 - **Credential Detection**: A high-precision `PasswordExtractorPlugin` specifically identifies authentication passwords, PINs, and secrets with advanced hallucination filtering.
 - **Estate & Legal Analysis**: `EstateAnalyzerPlugin` identifies critical documents for estate planning (Wills, Trusts, Financial Assets) using forensic-level reasoning.
-- **Data Parsing & Spreadsheets**: An `EmailParserPlugin` accurately parses `.eml` and `.mbox` files (note: `.mbox` files are ignored by the scanner by default and must be extracted into `.eml` format first to be parsed), while the `SpreadsheetAnalyzerPlugin` extracts and summarizes tabular data from `.xlsx`, `.csv`, and `.ods`.
+- **Data Parsing & Spreadsheets**: An `EmailParserPlugin` accurately parses `.eml` and `.mbox` files (note: `.mbox` and `.xml` files are ignored by the scanner by default; `.mbox` must be extracted into `.eml` format first to be parsed), while the `SpreadsheetAnalyzerPlugin` extracts and summarizes tabular data from `.xlsx`, `.csv`, and `.ods`.
 
 ### 5. Rich Text & Metadata Extraction
 - **Broad File Support**: Extract metadata and content from PDFs (`pdfplumber`), Word Docs (`python-docx`), HTML web pages (`BeautifulSoup4`), and standard text/code files.
