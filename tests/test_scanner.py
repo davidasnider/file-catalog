@@ -167,11 +167,13 @@ async def test_ingest_directory_allows_xhtml_mime(db_session, temp_dir, monkeypa
     monkeypatch.setattr("src.scanner.detect_file_type", fake_detect_file_type)
 
     processed_ids, _ = await ingest_directory(str(temp_dir), db_session)
-    assert len(processed_ids) == 3
 
     result = await db_session.execute(select(Document.path))
     paths = result.scalars().all()
-    assert any(path.endswith("page.xhtml") for path in paths)
+    basenames = {path.rsplit("/", 1)[-1] for path in paths}
+
+    assert len(processed_ids) == len(paths)
+    assert basenames == {"doc1.txt", "doc2.txt", "page.xhtml"}
 
 
 @pytest.mark.asyncio
