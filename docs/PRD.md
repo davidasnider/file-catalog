@@ -33,7 +33,7 @@ Rebuild the application from the ground up to address robustness, extensibility,
 
 ### 2.2 Advanced File Type Detection
 - **Problem:** Current detection depends largely on file extensions, failing on extensionless files or spoofed files.
-- **Solution:** Use the `python-magic` library (libmagic) combined with header sniffing and `mimetypes` as a fallback to guarantee accurate file type detection globally.
+- **Solution:** Use the `python-magic` library (libmagic) combined with header sniffing and `mimetypes` as a fallback to guarantee accurate file type detection globally. Additionally, specific noise files and MIME types (such as `.xml`, `.css`, and `.js`) are explicitly ignored during directory ingestion to prevent clutter and database bloat.
 
 ### 2.3 `asyncio` Task Engine
 - **Problem:** Raw threaded queues (`queue.Queue`) frequently swallow exceptions, leave zombie threads, and fail to map state reliably.
