@@ -4,7 +4,7 @@ import pytest
 from sqlmodel import select
 
 from src.db.models import Document, DocumentStatus
-from src.scanner import compute_file_hash, ingest_directory
+from src.scanner import IGNORED_MIME_TYPES, compute_file_hash, ingest_directory
 
 
 @pytest.fixture
@@ -127,6 +127,8 @@ async def test_ingest_directory_excludes_noise_files(db_session, temp_dir):
         assert "main.c" not in doc.path
         assert "data.xml" not in doc.path
         assert doc.path.endswith(".txt")
+
+    assert "application/xhtml+xml" not in IGNORED_MIME_TYPES
 
 
 @pytest.mark.asyncio
