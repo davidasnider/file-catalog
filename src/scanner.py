@@ -75,7 +75,6 @@ IGNORED_MIME_TYPES = {
     "text/x-c",
     "text/xml",
     "application/xml",
-    "application/xhtml+xml",
     "application/vnd.microsoft.portable-executable",
     "text/x-c++",
 }
