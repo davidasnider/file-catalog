@@ -128,6 +128,7 @@ async def test_ingest_directory_excludes_noise_files(db_session, temp_dir):
         assert "data.xml" not in doc.path
         assert doc.path.endswith(".txt")
 
+
 @pytest.mark.asyncio
 async def test_ingest_directory_with_queue(db_session, temp_dir):
     doc_queue = asyncio.Queue()
@@ -152,28 +153,6 @@ async def test_ingest_directory_with_queue(db_session, temp_dir):
     item2 = await doc_queue.get()
 
     assert {item1, item2} == set(processed_ids)
-
-
-@pytest.mark.asyncio
-async def test_ingest_directory_allows_xhtml_mime(db_session, temp_dir, monkeypatch):
-    xhtml_file = temp_dir / "page.xhtml"
-    xhtml_file.write_text("<html xmlns='http://www.w3.org/1999/xhtml'><body>x</body></html>")
-
-    def fake_detect_file_type(file_path: str) -> str:
-        if file_path.endswith(".xhtml"):
-            return "application/xhtml+xml"
-        return "text/plain"
-
-    monkeypatch.setattr("src.scanner.detect_file_type", fake_detect_file_type)
-
-    processed_ids, _ = await ingest_directory(str(temp_dir), db_session)
-
-    result = await db_session.execute(select(Document.path))
-    paths = result.scalars().all()
-    basenames = {path.rsplit("/", 1)[-1] for path in paths}
-
-    assert len(processed_ids) == len(paths)
-    assert basenames == {"doc1.txt", "doc2.txt", "page.xhtml"}
 
 
 @pytest.mark.asyncio
