@@ -107,10 +107,13 @@ async def test_ingest_directory_excludes_noise_files(db_session, temp_dir):
     source_file = temp_dir / "main.c"
     source_file.write_text("int main() { return 0; }")
 
+    xml_file = temp_dir / "data.xml"
+    xml_file.write_text("<root><data>hello</data></root>")
+
     # Ingest directory
     processed_ids, _ = await ingest_directory(str(temp_dir), db_session)
 
-    # Should only process the original 2 .txt files, as .js, .py, and .css are in IGNORED_EXTENSIONS
+    # Should only process the original 2 .txt files, as .js, .py, .css, and .xml are in IGNORED_EXTENSIONS
     assert len(processed_ids) == 2
 
     result = await db_session.execute(select(Document))
@@ -122,6 +125,7 @@ async def test_ingest_directory_excludes_noise_files(db_session, temp_dir):
         assert "styles.css" not in doc.path
         assert "font.ttf" not in doc.path
         assert "main.c" not in doc.path
+        assert "data.xml" not in doc.path
         assert doc.path.endswith(".txt")
 
 
