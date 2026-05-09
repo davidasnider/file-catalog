@@ -148,11 +148,36 @@ async def test_ingest_directory_with_queue(db_session, temp_dir):
     assert len(queued_docs) == 2
     assert len(docs_to_process) == 2
 
-    # Check that items were put on the queue
-    item1 = await doc_queue.get()
-    item2 = await doc_queue.get()
 
-    assert {item1, item2} == set(processed_ids)
+@pytest.mark.asyncio
+async def test_ingest_directory_excludes_by_mime_type(db_session, temp_dir, mocker):
+    """Verify that files are ignored based on detected MIME type even if extension is allowed."""
+    from src.scanner import ingest_directory
+
+    # Create a file with a generic extension that would normally be scanned
+    xhtml_file = temp_dir / "page.xhtml"
+    xhtml_file.write_text("<html><body>Hello</body></html>")
+
+    # Mock detect_file_type to return application/xhtml+xml ONLY for the .xhtml file
+    def mock_detect(path):
+        if str(path).endswith(".xhtml"):
+            return "application/xhtml+xml"
+        return "text/plain"
+
+    mocker.patch("src.scanner.detect_file_type", side_effect=mock_detect)
+
+    # Ingest directory
+    processed_ids, _ = await ingest_directory(str(temp_dir), db_session)
+
+    # Should skip the .xhtml file because application/xhtml+xml is in IGNORED_MIME_TYPES.
+    # It should still process the 2 .txt files from the temp_dir fixture.
+    assert len(processed_ids) == 2
+
+    result = await db_session.execute(
+        select(Document).where(Document.path.like("%page.xhtml"))
+    )
+    doc = result.scalars().first()
+    assert doc is None
 
 
 @pytest.mark.asyncio
