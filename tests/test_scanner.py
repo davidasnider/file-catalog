@@ -148,6 +148,12 @@ async def test_ingest_directory_with_queue(db_session, temp_dir):
     assert len(queued_docs) == 2
     assert len(docs_to_process) == 2
 
+    # Check that items were put on the queue
+    item1 = await doc_queue.get()
+    item2 = await doc_queue.get()
+
+    assert {item1, item2} == set(processed_ids)
+
 
 @pytest.mark.asyncio
 async def test_ingest_directory_excludes_by_mime_type(db_session, temp_dir, mocker):
@@ -359,9 +365,10 @@ async def test_ingest_directory_avoids_false_positives_on_filters(db_session, te
     )
 
     # 3. Verify no files were marked missing
-    assert len(processed_ids) == 0
+    # NOTE: COMPLETED files that match metadata but are skipped by filter
+    # are still added to processed_ids to ensure they aren't marked NOT_PRESENT.
+    assert len(processed_ids) == 2
     assert len(missing_ids) == 0
-
     # Verify docs still have their original status in DB
     result = await db_session.execute(select(Document))
     docs = result.scalars().all()
