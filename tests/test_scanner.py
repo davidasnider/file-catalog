@@ -113,7 +113,7 @@ async def test_ingest_directory_excludes_noise_files(db_session, temp_dir):
     # Ingest directory
     processed_ids, _ = await ingest_directory(str(temp_dir), db_session)
 
-    # Should only process the original 2 .txt files, as .js, .py, .css, and .xml are in IGNORED_EXTENSIONS
+    # Should only process the original 2 .txt files, as .js, .py, .css, .ttf, .c, and .xml are in IGNORED_EXTENSIONS
     assert len(processed_ids) == 2
 
     result = await db_session.execute(select(Document))
