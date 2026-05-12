@@ -86,6 +86,15 @@ Retrieves and displays all database metadata and analysis results for a specific
 ```bash
 python -m src.scripts.inspect_file "/path/to/your/document.pdf"
 ```
+
+---
+
+### 7. Remove XML Records (`remove_xml_records.py`)
+Finds and removes all XML-related documents (such as `.xml` or `.xhtml` files or MIME types `text/xml`, `application/xml`, `application/xhtml+xml`) and their associated analysis tasks from the database. It also removes the corresponding Full-Text Search (FTS) records. This is useful for purging noise files that were ingested prior to being added to the ignore list.
+
+**Example:**
+```bash
+python -m src.scripts.remove_xml_records
 ```
 
 ## General Usage Note
