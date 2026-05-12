@@ -76,6 +76,7 @@ python -m src.scripts.evaluate_summaries --samples 10
 
 # Save detailed evaluation results to a JSON file
 python -m src.scripts.evaluate_summaries --samples 5 --output eval_results.json
+```
 
 ---
 
