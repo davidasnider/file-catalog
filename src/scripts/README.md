@@ -76,6 +76,7 @@ python -m src.scripts.evaluate_summaries --samples 10
 
 # Save detailed evaluation results to a JSON file
 python -m src.scripts.evaluate_summaries --samples 5 --output eval_results.json
+```
 
 ---
 
@@ -86,6 +87,15 @@ Retrieves and displays all database metadata and analysis results for a specific
 ```bash
 python -m src.scripts.inspect_file "/path/to/your/document.pdf"
 ```
+
+---
+
+### 7. Remove XML Records (`remove_xml_records.py`)
+Finds and removes XML-related documents that match `.xml` file paths or XML/XHTML MIME types such as `text/xml`, `application/xml`, and `application/xhtml+xml`, along with their associated analysis tasks from the database. It also removes the corresponding Full-Text Search (FTS) records. This is useful for purging noise files that were ingested prior to being added to the ignore list.
+
+**Example:**
+```bash
+python -m src.scripts.remove_xml_records
 ```
 
 ## General Usage Note
