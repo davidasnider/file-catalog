@@ -98,5 +98,39 @@ Finds and removes XML-related documents that match `.xml` file paths or XML/XHTM
 python -m src.scripts.remove_xml_records
 ```
 
+---
+
+### 8. Report Failures (`report_failures.py`)
+Generate a report of pipeline failures from the database.
+
+**Examples:**
+```bash
+# Output failures in a table format (default)
+python -m src.scripts.report_failures
+
+# Output failures in JSON format
+python -m src.scripts.report_failures --format json
+
+# Filter by specific task name
+python -m src.scripts.report_failures --task TextExtractor
+
+# Filter by file extension
+python -m src.scripts.report_failures --ext .pdf
+```
+
+---
+
+### 9. Scan Text Extraction Failures (`scan_text_failures.py`)
+Scan a directory to identify files that fail text extraction, allowing you to test out the extraction logic locally on specific directories without running the full ingest pipeline.
+
+**Examples:**
+```bash
+# Scan a directory
+python -m src.scripts.scan_text_failures "/path/to/directory"
+
+# Scan a directory with a limit on the number of files
+python -m src.scripts.scan_text_failures "/path/to/directory" --limit 10
+```
+
 ## General Usage Note
 All scripts should be run from the root of the project using the `python -m src.scripts.<script_name>` syntax to ensure that internal imports and the `PYTHONPATH` are handled correctly.
