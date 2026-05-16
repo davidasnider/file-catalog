@@ -107,10 +107,13 @@ async def test_ingest_directory_excludes_noise_files(db_session, temp_dir):
     source_file = temp_dir / "main.c"
     source_file.write_text("int main() { return 0; }")
 
+    xml_file = temp_dir / "data.xml"
+    xml_file.write_text("<root><data>hello</data></root>")
+
     # Ingest directory
     processed_ids, _ = await ingest_directory(str(temp_dir), db_session)
 
-    # Should only process the original 2 .txt files, as these noise files are in IGNORED_EXTENSIONS
+    # Should only process the original 2 .txt files, as .js, .py, .css, .ttf, .c, and .xml are in IGNORED_EXTENSIONS
     assert len(processed_ids) == 2
 
     result = await db_session.execute(select(Document))
@@ -122,6 +125,7 @@ async def test_ingest_directory_excludes_noise_files(db_session, temp_dir):
         assert "styles.css" not in doc.path
         assert "font.ttf" not in doc.path
         assert "main.c" not in doc.path
+        assert "data.xml" not in doc.path
         assert doc.path.endswith(".txt")
 
 
@@ -149,6 +153,37 @@ async def test_ingest_directory_with_queue(db_session, temp_dir):
     item2 = await doc_queue.get()
 
     assert {item1, item2} == set(processed_ids)
+
+
+@pytest.mark.asyncio
+async def test_ingest_directory_excludes_by_mime_type(db_session, temp_dir, mocker):
+    """Verify that files are ignored based on detected MIME type even if extension is allowed."""
+    from src.scanner import ingest_directory
+
+    # Create a file with a generic extension that would normally be scanned
+    xhtml_file = temp_dir / "page.xhtml"
+    xhtml_file.write_text("<html><body>Hello</body></html>")
+
+    # Mock detect_file_type to return application/xhtml+xml ONLY for the .xhtml file
+    def mock_detect(path):
+        if str(path).endswith(".xhtml"):
+            return "application/xhtml+xml"
+        return "text/plain"
+
+    mocker.patch("src.scanner.detect_file_type", side_effect=mock_detect)
+
+    # Ingest directory
+    processed_ids, _ = await ingest_directory(str(temp_dir), db_session)
+
+    # Should skip the .xhtml file because application/xhtml+xml is in IGNORED_MIME_TYPES.
+    # It should still process the 2 .txt files from the temp_dir fixture.
+    assert len(processed_ids) == 2
+
+    result = await db_session.execute(
+        select(Document).where(Document.path.like("%page.xhtml"))
+    )
+    doc = result.scalars().first()
+    assert doc is None
 
 
 @pytest.mark.asyncio
@@ -330,9 +365,10 @@ async def test_ingest_directory_avoids_false_positives_on_filters(db_session, te
     )
 
     # 3. Verify no files were marked missing
-    assert len(processed_ids) == 0
+    # NOTE: COMPLETED files that match metadata but are skipped by filter
+    # are still added to processed_ids to ensure they aren't marked NOT_PRESENT.
+    assert len(processed_ids) == 2
     assert len(missing_ids) == 0
-
     # Verify docs still have their original status in DB
     result = await db_session.execute(select(Document))
     docs = result.scalars().all()

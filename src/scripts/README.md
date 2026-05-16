@@ -76,6 +76,7 @@ python -m src.scripts.evaluate_summaries --samples 10
 
 # Save detailed evaluation results to a JSON file
 python -m src.scripts.evaluate_summaries --samples 5 --output eval_results.json
+```
 
 ---
 
@@ -86,6 +87,49 @@ Retrieves and displays all database metadata and analysis results for a specific
 ```bash
 python -m src.scripts.inspect_file "/path/to/your/document.pdf"
 ```
+
+---
+
+### 7. Remove XML Records (`remove_xml_records.py`)
+Finds and removes XML-related documents that match `.xml` file paths or XML/XHTML MIME types such as `text/xml`, `application/xml`, and `application/xhtml+xml`, along with their associated analysis tasks from the database. It also removes the corresponding Full-Text Search (FTS) records. This is useful for purging noise files that were ingested prior to being added to the ignore list.
+
+**Example:**
+```bash
+python -m src.scripts.remove_xml_records
+```
+
+---
+
+### 8. Report Failures (`report_failures.py`)
+Generate a report of pipeline failures from the database.
+
+**Examples:**
+```bash
+# Output failures in a table format (default)
+python -m src.scripts.report_failures
+
+# Output failures in JSON format
+python -m src.scripts.report_failures --format json
+
+# Filter by specific task name
+python -m src.scripts.report_failures --task TextExtractor
+
+# Filter by file extension
+python -m src.scripts.report_failures --ext .pdf
+```
+
+---
+
+### 9. Scan Text Extraction Failures (`scan_text_failures.py`)
+Scan a directory to identify files that fail text extraction, allowing you to test out the extraction logic locally on specific directories without running the full ingest pipeline.
+
+**Examples:**
+```bash
+# Scan a directory
+python -m src.scripts.scan_text_failures "/path/to/directory"
+
+# Scan a directory with a limit on the number of files
+python -m src.scripts.scan_text_failures "/path/to/directory" --limit 10
 ```
 
 ## General Usage Note

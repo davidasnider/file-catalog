@@ -43,6 +43,7 @@ IGNORED_EXTENSIONS = {
     ".map",
     ".jsx",
     ".tsx",
+    ".xml",
     # Mailbox files should be exploded into individual .eml files first
     # using extract_and_cleanup_mbox.py before scanning.
     ".mbox",
@@ -73,6 +74,8 @@ IGNORED_EXTENSIONS = {
 IGNORED_MIME_TYPES = {
     "text/x-c",
     "text/xml",
+    "application/xml",
+    "application/xhtml+xml",
     "application/vnd.microsoft.portable-executable",
     "text/x-c++",
 }
@@ -279,26 +282,6 @@ async def ingest_directory(
                     # Track as updated to ensure commit
                     pending_updates += 1
 
-            # Skip if metadata matches and status is COMPLETED
-            if (
-                doc
-                and doc.file_size == file_size
-                and doc.mtime == mtime
-                and doc.status == DocumentStatus.COMPLETED
-            ):
-                # Even if completed, we must respect the filter
-                if mime_type_filter and not (
-                    current_mime and current_mime.startswith(mime_type_filter)
-                ):
-                    if progress and task_id is not None:
-                        progress.advance(task_id)
-                    continue
-
-                processed_doc_ids.append(doc.id)
-                if progress and task_id is not None:
-                    progress.advance(task_id)
-                continue
-
             # 4. Content-based ingestion (only if needed)
             if not current_mime:
                 try:
@@ -313,14 +296,27 @@ async def ingest_directory(
             else:
                 mime_type = current_mime
 
+            # Skip if MIME type is in the ignored list.
+            # This handles both newly discovered files and existing files (ensuring consistency).
             if mime_type in IGNORED_MIME_TYPES:
                 if progress and task_id is not None:
                     progress.advance(task_id)
                 continue
 
-            if mime_type_filter and not (
-                mime_type and mime_type.startswith(mime_type_filter)
+            # Skip if metadata matches and status is COMPLETED
+            if (
+                doc
+                and doc.file_size == file_size
+                and doc.mtime == mtime
+                and doc.status == DocumentStatus.COMPLETED
             ):
+                # Even if completed, we must respect the filter
+                if mime_type_filter and not (
+                    mime_type and mime_type.startswith(mime_type_filter)
+                ):
+                    continue
+
+                processed_doc_ids.append(doc.id)
                 if progress and task_id is not None:
                     progress.advance(task_id)
                 continue
@@ -540,6 +536,10 @@ async def _load_and_queue_existing_docs(
                         f"Correcting misidentified MIME type for {doc.path}: {doc.mime_type} -> {mtype}"
                     )
                     doc.mime_type = mtype
+
+            # Skip if MIME type is in the ignored list.
+            if mtype in IGNORED_MIME_TYPES:
+                continue
 
             # Apply MIME filter if provided
             if mime_type_filter and not (mtype and mtype.startswith(mime_type_filter)):

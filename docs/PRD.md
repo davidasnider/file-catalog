@@ -4,7 +4,7 @@ This document outlines the requirements and architectural plan for completely re
 
 ## Core Technical Decisions
 - **Frontend Architecture:** Streamlit (Retained for rapid UI development and Python data integration).
-- **LLM Engine:** OpenAI-compatible endpoints, `llama-cpp-python` for local ML inference, `mlx-lm` for Apple Silicon, and `google-genai` for cloud fallback. Because we built an `LLMProvider` interface, we successfully implemented support for Cloud APIs and local backends.
+- **LLM Engine:** `llama-cpp-python` for local ML inference, `mlx-lm` for Apple Silicon, `google-genai` for cloud fallback, and OpenAI-compatible endpoints (e.g. vLLM/Ollama). Because we built an `LLMProvider` interface, we successfully implemented support for Cloud APIs and MLX.
 - **State Management:** SQLite via `SQLModel` to guarantee atomic state transitions, avoiding current multi-threaded JSON corruption issues.
 - **Backend Orchestration:** Pure Python using `asyncio` for robust, high-performance concurrency.
 
@@ -33,7 +33,7 @@ Rebuild the application from the ground up to address robustness, extensibility,
 
 ### 2.2 Advanced File Type Detection
 - **Problem:** Current detection depends largely on file extensions, failing on extensionless files or spoofed files.
-- **Solution:** Use the `python-magic` library (libmagic) combined with header sniffing and `mimetypes` as a fallback to guarantee accurate file type detection globally.
+- **Solution:** Use the `python-magic` library (libmagic) combined with header sniffing and `mimetypes` as a fallback to guarantee accurate file type detection globally. Additionally, specific noise extensions (such as `.xml`, `.css`, and `.js`) and MIME types (like `application/xml`) are explicitly ignored during directory ingestion to prevent clutter and database bloat.
 
 ### 2.3 `asyncio` Task Engine
 - **Problem:** Raw threaded queues (`queue.Queue`) frequently swallow exceptions, leave zombie threads, and fail to map state reliably.
@@ -55,7 +55,7 @@ Rebuild the application from the ground up to address robustness, extensibility,
 ### 2.5 LLM Abstraction Layer
 - **Problem:** Hardcoded Ollama dependencies limit performance tuning and cloud fallback capabilities.
 - **Solution:** Defined an `LLMProvider` interface.
-  - Implemented multiple adapters: `OpenAIProvider` (default), `MLXProvider`, `LlamaCppProvider`, and Cloud Providers (`GeminiProvider`).
+  - Implemented multiple adapters: `MLXProvider`, `LlamaCppProvider`, Cloud Providers (`GeminiProvider`), and `OpenAIProvider` for OpenAI-compatible endpoints.
   - This allows falling back to robust cloud models for heavy reasoning while keeping local options for privacy.
 
 ---
