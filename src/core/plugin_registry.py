@@ -48,14 +48,16 @@ class AnalyzerBase(ABC):
         Removes common LLM 'thinking process' blocks or XML tags before returning the final text.
         """
         import re
-        import html
 
-        # 1. Unescape HTML entities first (e.g., &lt;think&gt; -> <think>)
-        clean_str = html.unescape(response.strip())
+        clean_str = response.strip()
 
-        # 2. Remove <think> ... </think> blocks (case-insensitive)
+        # 1. Remove <think> ... </think> blocks (handle both escaped and unescaped tags)
+        # Regex matches <think>...</think> or &lt;think&gt;...&lt;/think&gt;
         clean_str = re.sub(
-            r"<think>.*?</think>", "", clean_str, flags=re.DOTALL | re.IGNORECASE
+            r"(?:<|&lt;)think(?:>|&gt;).*?(?:<|&lt;)/think(?:>|&gt;)",
+            "",
+            clean_str,
+            flags=re.DOTALL | re.IGNORECASE,
         ).strip()
 
         # 3. Remove common "thinking process" preambles.
