@@ -12,6 +12,7 @@ from src.core.analyzer_names import (
     AUDIO_TRANSCRIBER_NAME,
     VISION_ANALYZER_NAME,
     VIDEO_ANALYZER_NAME,
+    EMAIL_PARSER_NAME,
 )
 
 logger = logging.getLogger(__name__)
@@ -25,8 +26,9 @@ logger = logging.getLogger(__name__)
         AUDIO_TRANSCRIBER_NAME,
         VISION_ANALYZER_NAME,
         VIDEO_ANALYZER_NAME,
+        EMAIL_PARSER_NAME,
     ],
-    version="1.2",
+    version="1.4",
 )
 class SummarizerPlugin(AnalyzerBase):
     """
@@ -108,18 +110,28 @@ class SummarizerPlugin(AnalyzerBase):
         prompt = f"""
 You are an expert document summarizer analyzing a local digital archive. Read the following text extracted from a file and provide a concise, 3-sentence summary of the core content.
 
-CRITICAL INSTRUCTION: Return ONLY the 3-sentence summary. Do NOT include any conversational filler, preambles, or introductory text like "Here is a summary". Begin exactly with the first sentence of the summary.
+CRITICAL INSTRUCTION: Return ONLY the 3-sentence summary.
+DO NOT output any thinking process. NO <think> tags. NO "Here is a thinking process".
+Do NOT include any conversational filler, preambles, or introductory text.
+Begin exactly with the first sentence of the summary.
 
 Text:
 {extracted_text}
 """
 
         try:
+            # Query the model for its maximum output token limit
+            max_tokens = await llm.get_max_output_tokens()
+
             summary_response = await llm.generate(
-                prompt, max_tokens=150, temperature=0.3
+                prompt, max_tokens=max_tokens, temperature=0.3
             )
+
+            # Strip any leaked thinking blocks
+            cleaned_summary = self._strip_thinking(summary_response)
+
             return {
-                "summary": summary_response.strip(),
+                "summary": cleaned_summary,
                 "skipped": False,
                 "model": getattr(llm, "model_name", "Unknown Model"),
             }

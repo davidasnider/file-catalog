@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import Optional, List
-from sqlalchemy import String
+from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field, SQLModel, Relationship
 from datetime import datetime, timezone
 
@@ -39,10 +39,10 @@ class Document(SQLModel, table=True):
     mtime: Optional[float] = Field(
         default=None, description="Modification time of the file (POSIX timestamp)"
     )
-    # Use String for storage to avoid SQLite Enum CHECK constraints while keeping Python enum
+    # Use SAEnum with create_constraint=False to map to string storage while keeping Python enum
     status: DocumentStatus = Field(
         default=DocumentStatus.PENDING,
-        sa_type=String,  # Avoid SQLAlchemy Enum type on SQLite
+        sa_type=SAEnum(DocumentStatus, native_enum=False, create_constraint=False),
     )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -59,7 +59,10 @@ class AnalysisTask(SQLModel, table=True):
     plugin_version: str = Field(
         default="1.0", description="Version of the plugin that executed this task"
     )
-    status: TaskStatus = Field(default=TaskStatus.PENDING)
+    status: TaskStatus = Field(
+        default=TaskStatus.PENDING,
+        sa_type=SAEnum(TaskStatus, native_enum=False, create_constraint=False),
+    )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     error_message: Optional[str] = Field(

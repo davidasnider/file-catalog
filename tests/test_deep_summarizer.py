@@ -21,6 +21,9 @@ async def test_deep_summarizer_map_reduce(monkeypatch):
                 return "Final Synthesis"
             return ""
 
+        async def get_max_output_tokens(self):
+            return 4096
+
     mock_llm = MockLLM()
     monkeypatch.setattr(
         "src.plugins.deep_summarizer.get_llm_provider", lambda **kwargs: mock_llm

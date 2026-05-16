@@ -59,16 +59,20 @@ st.markdown(
 )
 
 
-async def fetch_all_data():
-    """Fetch all documents and tasks asynchronously to avoid N+1 queries."""
+async def fetch_documents():
+    """Fetch all documents asynchronously."""
     async with async_session_maker() as session:
-        docs = (
+        return (
             (await session.execute(select(Document).order_by(Document.id.desc())))
             .scalars()
             .all()
         )
-        tasks = (await session.execute(select(AnalysisTask))).scalars().all()
-        return docs, tasks
+
+
+async def fetch_tasks():
+    """Fetch all tasks asynchronously."""
+    async with async_session_maker() as session:
+        return (await session.execute(select(AnalysisTask))).scalars().all()
 
 
 def get_status_color(status_str: str) -> str:
@@ -108,21 +112,45 @@ def main():
     st.markdown("Analyze and interact with your digitally archived documents.")
 
     # Fetch data
-    with st.spinner("Loading database records..."):
+    with st.status("Loading database records...", expanded=True) as status:
         try:
-            documents, all_tasks = asyncio.run(fetch_all_data())
+            status.write("Fetching documents...")
+            documents = asyncio.run(fetch_documents())
+            status.write(f"✅ Loaded {len(documents)} documents.")
+
+            status.write("Fetching analysis tasks...")
+            all_tasks = asyncio.run(fetch_tasks())
+            status.write(f"✅ Loaded {len(all_tasks)} analysis tasks.")
+
+            status.update(label="Data loaded. Preparing dashboard...", state="running")
+
+            # Map tasks
+            tasks_by_doc = {}
+            if all_tasks:
+                progress_text = "Mapping tasks to documents..."
+                mapping_progress = st.progress(0, text=progress_text)
+                total_tasks = len(all_tasks)
+                for i, t in enumerate(all_tasks):
+                    tasks_by_doc.setdefault(t.document_id, []).append(t)
+                    if i % 1000 == 0 or i == total_tasks - 1:
+                        mapping_progress.progress(
+                            (i + 1) / total_tasks,
+                            text=f"Mapping task {i+1}/{total_tasks}...",
+                        )
+                mapping_progress.empty()
+
+            status.update(
+                label=f"Dashboard ready: {len(documents)} docs, {len(all_tasks)} tasks",
+                state="complete",
+            )
         except Exception as e:
+            status.update(label="Database connection failed", state="error")
             st.error(f"Failed to connect to database: {e}")
             return
 
     if not documents:
         st.info("No documents found in the database. Run the scanner CLI first!")
         return
-
-    # Map tasks
-    tasks_by_doc = {}
-    for t in all_tasks:
-        tasks_by_doc.setdefault(t.document_id, []).append(t)
 
     # Sidebar Filters
     with st.sidebar:
@@ -389,11 +417,7 @@ def main():
             ]
 
             # 1. AI Summary Section (Top)
-            if (
-                summarizer_task
-                and summarizer_task.status.name != "FAILED"
-                and summarizer_task.result_data
-            ):
+            if summarizer_task and summarizer_task.result_data:
                 try:
                     data = json.loads(summarizer_task.result_data)
                     if not data.get("skipped"):
@@ -409,6 +433,15 @@ def main():
                         st.divider()
                 except (json.JSONDecodeError, TypeError):
                     pass
+            elif summarizer_task:
+                st.subheader("AI Summary")
+                if summarizer_task.status.name == "FAILED":
+                    st.error(f"Summarization failed: {summarizer_task.error_message}")
+                else:
+                    st.warning(
+                        f"Summarization is in progress or pending (Status: {summarizer_task.status.name})"
+                    )
+                st.divider()
 
             # 2. Image Viewer Section (Middle)
             import os

@@ -7,6 +7,9 @@ class MockLLM:
     async def generate(self, prompt, **kwargs):
         return "This is a mocked 3-sentence summary of the document."
 
+    async def get_max_output_tokens(self):
+        return 4096
+
 
 @pytest.fixture
 def mock_get_llm_provider(monkeypatch):

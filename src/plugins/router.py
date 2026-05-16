@@ -11,6 +11,7 @@ from src.core.analyzer_names import (
     AUDIO_TRANSCRIBER_NAME,
     VISION_ANALYZER_NAME,
     VIDEO_ANALYZER_NAME,
+    EMAIL_PARSER_NAME,
 )
 
 logger = logging.getLogger(__name__)
@@ -24,8 +25,9 @@ logger = logging.getLogger(__name__)
         AUDIO_TRANSCRIBER_NAME,
         VISION_ANALYZER_NAME,
         VIDEO_ANALYZER_NAME,
+        EMAIL_PARSER_NAME,
     ],
-    version="1.0",
+    version="1.1",
 )
 class RouterPlugin(AnalyzerBase):
     """

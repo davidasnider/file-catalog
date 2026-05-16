@@ -49,3 +49,11 @@ class LLMProvider(ABC):
             The generated text response.
         """
         pass
+
+    @abstractmethod
+    async def get_max_output_tokens(self) -> int:
+        """
+        Returns the maximum number of output tokens supported by the current model.
+        Used for dynamic request sizing.
+        """
+        pass

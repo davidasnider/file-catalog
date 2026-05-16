@@ -43,6 +43,34 @@ class AnalyzerBase(ABC):
 
         return clean_str
 
+    def _strip_thinking(self, response: str) -> str:
+        """
+        Removes common LLM 'thinking process' blocks or XML tags before returning the final text.
+        """
+        import re
+
+        clean_str = response.strip()
+
+        # 1. Remove <think> ... </think> blocks (common in DeepSeek-R1 and similar)
+        clean_str = re.sub(
+            r"<think>.*?</think>", "", clean_str, flags=re.DOTALL
+        ).strip()
+
+        # 2. Remove "Here's a thinking process:" type blocks.
+        # We look for common patterns where models narrate their logic.
+        thinking_patterns = [
+            r"^Here's a thinking process:.*?(?=\n\n|\n[A-Z]|$)",
+            r"^Thinking Process:.*?(?=\n\n|\n[A-Z]|$)",
+            r"^Analyze User Input:.*?(?=\n\n|\n[A-Z]|$)",
+        ]
+
+        for pattern in thinking_patterns:
+            clean_str = re.sub(
+                pattern, "", clean_str, flags=re.DOTALL | re.IGNORECASE
+            ).strip()
+
+        return clean_str
+
     @abstractmethod
     async def analyze(
         self, file_path: str, mime_type: str, context: Dict[str, Any]

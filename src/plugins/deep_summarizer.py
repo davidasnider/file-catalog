@@ -8,6 +8,7 @@ from src.core.analyzer_names import (
     DEEP_SUMMARIZER_NAME,
     ROUTER_NAME,
     SUMMARIZER_NAME,
+    EMAIL_PARSER_NAME,
 )
 
 logger = logging.getLogger(__name__)
@@ -17,8 +18,13 @@ logger = logging.getLogger(__name__)
 
 @register_analyzer(
     name=DEEP_SUMMARIZER_NAME,
-    depends_on=[TEXT_EXTRACTOR_NAME, ROUTER_NAME, SUMMARIZER_NAME],
-    version="1.0",
+    depends_on=[
+        TEXT_EXTRACTOR_NAME,
+        ROUTER_NAME,
+        SUMMARIZER_NAME,
+        EMAIL_PARSER_NAME,
+    ],
+    version="1.2",
 )
 class DeepSummarizerPlugin(AnalyzerBase):
     """
@@ -63,6 +69,9 @@ class DeepSummarizerPlugin(AnalyzerBase):
                 "error": "LLM Provider unavailable for deep summarization",
             }
 
+        # Query the model for its maximum output token limit
+        max_output_tokens = await llm.get_max_output_tokens()
+
         # 1. Chunking
         chunk_size = 15000  # Conservative size to fit ~3.5k tokens plus prompts
         chunks = [
@@ -80,15 +89,20 @@ class DeepSummarizerPlugin(AnalyzerBase):
             prompt = f"""
             You are analyzing a portion of a massive document. Read the following text chunk and summarize the main points, facts, and events within it. Do not miss any critical details.
 
+            CRITICAL INSTRUCTION: Output ONLY the summary.
+            DO NOT output any thinking process. NO <think> tags. NO "Here is a thinking process".
+            Do NOT include any conversational filler or preambles.
+
             TEXT CHUNK {i + 1}/{len(chunks)}:
             {chunk}
 
             SUMMARY:
             """
             try:
-                # Setting higher max_tokens to capture extensive details
-                response = await llm.generate(prompt, max_tokens=1200, temperature=0.2)
-                chunk_summaries.append(response.strip())
+                # Setting higher max_tokens to capture extensive details, but still bounded by model max
+                limit = min(1200, max_output_tokens)
+                response = await llm.generate(prompt, max_tokens=limit, temperature=0.2)
+                chunk_summaries.append(self._strip_thinking(response))
             except Exception as e:
                 logger.error(f"Error summarizing chunk {i + 1} for {file_path}: {e}")
                 # We can continue to reduce the chunks we successfully mapped
@@ -113,6 +127,10 @@ class DeepSummarizerPlugin(AnalyzerBase):
         Synthesize these parts into a single, cohesive, extensive summary that fully explains what this document is about, highlighting key terms, legal implications, financial data, or important narratives.
         Write a professional, comprehensive overview.
 
+        CRITICAL INSTRUCTION: Output ONLY the summary.
+        DO NOT output any thinking process. NO <think> tags. NO "Here is a thinking process".
+        Do NOT include any conversational filler or preambles.
+
         DOCUMENT PARTS:
         {combined_summaries}
 
@@ -120,12 +138,14 @@ class DeepSummarizerPlugin(AnalyzerBase):
         """
 
         try:
+            limit = min(3000, max_output_tokens)
             final_response = await llm.generate(
-                final_prompt, max_tokens=3000, temperature=0.3
+                final_prompt, max_tokens=limit, temperature=0.3
             )
+            cleaned_final = self._strip_thinking(final_response)
             return {
-                "extensive_summary": final_response.strip(),
-                "summary": final_response.strip(),  # duplicate for UI backward compatibility
+                "extensive_summary": cleaned_final,
+                "summary": cleaned_final,  # duplicate for UI backward compatibility
                 "skipped": False,
                 "chunks_processed": len(chunk_summaries),
                 "model": getattr(llm, "model_name", "Unknown Deep Model"),
