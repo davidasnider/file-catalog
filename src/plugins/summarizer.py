@@ -121,7 +121,9 @@ Text:
 
         try:
             # Query the model for its maximum output token limit
-            max_tokens = await llm.get_max_output_tokens()
+            model_max = await llm.get_max_output_tokens()
+            # For 3-sentence summaries, we clamp it to a safe target
+            max_tokens = min(500, model_max)
 
             summary_response = await llm.generate(
                 prompt, max_tokens=max_tokens, temperature=0.3

@@ -261,6 +261,12 @@ class LlamaCppProvider(LLMProvider):
 
         return await loop.run_in_executor(self.executor, _run_sync)
 
+    async def get_max_output_tokens(self) -> int:
+        """Query llama-cpp-python context window size."""
+        if not hasattr(self, "llm") or not self.llm:
+            return 2048
+        return self.llm.n_ctx()
+
 
 class ModelManager:
     _cache: OrderedDict[str, LLMProvider] = OrderedDict()

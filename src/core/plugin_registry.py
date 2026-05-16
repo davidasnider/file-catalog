@@ -48,16 +48,17 @@ class AnalyzerBase(ABC):
         Removes common LLM 'thinking process' blocks or XML tags before returning the final text.
         """
         import re
+        import html
 
-        clean_str = response.strip()
+        # 1. Unescape HTML entities first (e.g., &lt;think&gt; -> <think>)
+        clean_str = html.unescape(response.strip())
 
-        # 1. Remove <think> ... </think> blocks (common in DeepSeek-R1 and similar)
+        # 2. Remove <think> ... </think> blocks (case-insensitive)
         clean_str = re.sub(
-            r"<think>.*?</think>", "", clean_str, flags=re.DOTALL
+            r"<think>.*?</think>", "", clean_str, flags=re.DOTALL | re.IGNORECASE
         ).strip()
 
-        # 2. Remove "Here's a thinking process:" type blocks.
-        # We look for common patterns where models narrate their logic.
+        # 3. Remove common "thinking process" preambles.
         thinking_patterns = [
             r"^Here's a thinking process:.*?(?=\n\n|\n[A-Z]|$)",
             r"^Thinking Process:.*?(?=\n\n|\n[A-Z]|$)",

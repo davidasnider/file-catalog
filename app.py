@@ -59,20 +59,16 @@ st.markdown(
 )
 
 
-async def fetch_documents():
-    """Fetch all documents asynchronously."""
+async def fetch_all_data():
+    """Fetch all documents and tasks asynchronously in a single session."""
     async with async_session_maker() as session:
-        return (
+        docs = (
             (await session.execute(select(Document).order_by(Document.id.desc())))
             .scalars()
             .all()
         )
-
-
-async def fetch_tasks():
-    """Fetch all tasks asynchronously."""
-    async with async_session_maker() as session:
-        return (await session.execute(select(AnalysisTask))).scalars().all()
+        tasks = (await session.execute(select(AnalysisTask))).scalars().all()
+        return docs, tasks
 
 
 def get_status_color(status_str: str) -> str:
@@ -114,13 +110,11 @@ def main():
     # Fetch data
     with st.status("Loading database records...", expanded=True) as status:
         try:
-            status.write("Fetching documents...")
-            documents = asyncio.run(fetch_documents())
-            status.write(f"✅ Loaded {len(documents)} documents.")
-
-            status.write("Fetching analysis tasks...")
-            all_tasks = asyncio.run(fetch_tasks())
-            status.write(f"✅ Loaded {len(all_tasks)} analysis tasks.")
+            status.write("Connecting to database and fetching records...")
+            documents, all_tasks = asyncio.run(fetch_all_data())
+            status.write(
+                f"✅ Loaded {len(documents)} documents and {len(all_tasks)} tasks."
+            )
 
             status.update(label="Data loaded. Preparing dashboard...", state="running")
 
