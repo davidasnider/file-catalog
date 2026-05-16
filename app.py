@@ -411,7 +411,11 @@ def main():
             ]
 
             # 1. AI Summary Section (Top)
-            if summarizer_task and summarizer_task.result_data:
+            if (
+                summarizer_task
+                and summarizer_task.status.name != "FAILED"
+                and summarizer_task.result_data
+            ):
                 try:
                     data = json.loads(summarizer_task.result_data)
                     if not data.get("skipped"):

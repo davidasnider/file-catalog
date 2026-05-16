@@ -61,12 +61,17 @@ class DeepSummarizerPlugin(AnalyzerBase):
 
         # We pass n_ctx just in case the factory/manager respects it
         llm = get_llm_provider(is_vision=False, n_ctx=8192)
-        if not llm or llm in ("MISSING_MODEL", "MISSING_LIBRARY"):
+        if not llm or isinstance(llm, str):
+            error_msg = (
+                llm
+                if isinstance(llm, str)
+                else "LLM Provider unavailable for deep summarization"
+            )
             return {
                 "extensive_summary": "",
                 "skipped": True,
-                "model": getattr(llm, "model_name", "Unknown Model"),
-                "error": "LLM Provider unavailable for deep summarization",
+                "model": "Unknown Model",
+                "error": error_msg,
             }
 
         # Query the model for its maximum output token limit
