@@ -5,7 +5,7 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 ## Core Features
 
 ### 1. Multi-Model Orchestration & Memory Management
-- **Multi-Backend Python LLM Management**: Directly manages models using `llama-cpp-python` (GGUF), `mlx-lm` (Apple Silicon), or `google-genai` (Cloud Fallback) without external proxy bloat.
+- **Multi-Backend Python LLM Management**: Directly manages models using OpenAI-compatible endpoints, `llama-cpp-python` (GGUF), `mlx-lm` (Apple Silicon), or `google-genai` (Cloud Fallback) without external proxy bloat.
 - **LRU Cache & RAM Monitoring**: For the `llama-cpp` backend, actively monitors system RAM (via `psutil`). Models are cached "hot" in unified memory for maximum speed between tasks, and gracefully evicted using an LRU strategy only when memory drops below 2GB.
 - **Dynamic Model Fetching**: For the `llama-cpp` backend, automatically downloads and manages localized GGUF models directly from HuggingFace (e.g., `Llama-3.1-8B-Instruct`, `Phi-4-mini`) upon first request.
 
@@ -26,6 +26,7 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 - **Credential Detection**: A high-precision `PasswordExtractorPlugin` specifically identifies authentication passwords, PINs, and secrets with advanced hallucination filtering.
 - **Estate & Legal Analysis**: `EstateAnalyzerPlugin` identifies critical documents for estate planning (Wills, Trusts, Financial Assets) using forensic-level reasoning.
 - **Data Parsing & Spreadsheets**: An `EmailParserPlugin` accurately parses `.eml` and `.mbox` files (note: `.mbox` files are ignored by the scanner by default and must be extracted into `.eml` format first to be parsed), while the `SpreadsheetAnalyzerPlugin` extracts and summarizes tabular data from `.xlsx`, `.csv`, and `.ods`.
+- **Audio & Video Analysis**: `AudioTranscriberPlugin` transcribes supported audio formats (e.g., via Faster-Whisper), and `VideoAnalyzerPlugin` performs frame/audio-based analysis for video files.
 
 ### 5. Rich Text & Metadata Extraction
 - **Broad File Support**: Extract metadata and content from PDFs (`pdfplumber`), Word Docs (`python-docx`), HTML web pages (`BeautifulSoup4`), and standard text/code files.
@@ -49,7 +50,7 @@ The scanner can be configured via environment variables (in a `.env` file) or CL
 
 ### Key Configuration Options:
 Configuration is centrally managed via `pydantic-settings`.
-- `LLM_PROVIDER` / `VISION_PROVIDER`: Choose `mlx`, `llama_cpp`, or `gemini` (defaults to `mlx`).
+- `LLM_PROVIDER` / `VISION_PROVIDER`: Choose `openai`, `mlx`, `llama_cpp`, or `gemini` (defaults to `openai`).
 - `MAX_CONCURRENT`: Number of documents to process in parallel (default: 4).
 - `INGEST_BATCH_SIZE`: Number of files to commit to the database in a single transaction (default: 100).
 - `MAX_RETRIES`: Number of times to retry a failed plugin task with exponential backoff (default: 3).

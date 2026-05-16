@@ -290,6 +290,8 @@ async def ingest_directory(
                 if mime_type_filter and not (
                     current_mime and current_mime.startswith(mime_type_filter)
                 ):
+                    if progress and task_id is not None:
+                        progress.advance(task_id)
                     continue
 
                 processed_doc_ids.append(doc.id)
