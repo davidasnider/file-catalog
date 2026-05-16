@@ -11,6 +11,7 @@ from src.core.analyzer_names import (
     AUDIO_TRANSCRIBER_NAME,
     VISION_ANALYZER_NAME,
     VIDEO_ANALYZER_NAME,
+    EMAIL_PARSER_NAME,
 )
 
 logger = logging.getLogger(__name__)
@@ -24,8 +25,9 @@ logger = logging.getLogger(__name__)
         AUDIO_TRANSCRIBER_NAME,
         VISION_ANALYZER_NAME,
         VIDEO_ANALYZER_NAME,
+        EMAIL_PARSER_NAME,
     ],
-    version="1.0",
+    version="1.1",
 )
 class RouterPlugin(AnalyzerBase):
     """
@@ -57,7 +59,7 @@ class RouterPlugin(AnalyzerBase):
         sample_text = extracted_text[:max_chars]
 
         llm = get_llm_provider(is_vision=False)
-        if not llm or llm in ("MISSING_MODEL", "MISSING_LIBRARY"):
+        if not llm or isinstance(llm, str):
             logger.warning("LLM unavailable for routing, falling back to GenericText")
             return {"category": "GenericText", "method": "fallback_no_llm"}
 

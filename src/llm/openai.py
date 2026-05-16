@@ -132,3 +132,10 @@ class OpenAIProvider(LLMProvider):
             response_format=response_format,
         )
         return response.choices[0].message.content.strip()
+
+    async def get_max_output_tokens(self) -> int:
+        """
+        Returns the max output tokens. OpenAI doesn't expose this via the chat API,
+        so we return a generous default.
+        """
+        return 4096

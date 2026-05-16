@@ -7,6 +7,7 @@ from src.core.analyzer_names import (
     AUDIO_TRANSCRIBER_NAME,
     VISION_ANALYZER_NAME,
     VIDEO_ANALYZER_NAME,
+    EMAIL_PARSER_NAME,
 )
 
 
@@ -20,9 +21,10 @@ def get_all_extracted_text(context: Dict[str, Any]) -> str:
 
     1. ``TextExtractor["text"]`` (standard document / OCR text)
     2. ``DocumentAIExtractor["text"]`` (Document AI text)
-    3. ``audio_transcriber["text"]`` labeled as ``[Audio Transcript]``
-    4. ``vision_analyzer["description"]`` labeled as ``[Visual Description]``
-    5. ``video_analyzer["visual_description"]`` labeled as ``[Video Visual Description]``
+    3. ``EmailParser["emails"]`` (Extracted subject and body from emails)
+    4. ``audio_transcriber["text"]`` labeled as ``[Audio Transcript]``
+    5. ``vision_analyzer["description"]`` labeled as ``[Visual Description]``
+    6. ``video_analyzer["visual_description"]`` labeled as ``[Video Visual Description]``
 
     Empty or missing fields are ignored. Sections are separated by a blank line.
     """
@@ -40,19 +42,32 @@ def get_all_extracted_text(context: Dict[str, Any]) -> str:
         if docai_text:
             aggregated_parts.append(docai_text)
 
-    # 3. Audio Transcriber
+    # 3. Email Parser (robustly handles subjects and bodies)
+    if EMAIL_PARSER_NAME in context:
+        email_data = context[EMAIL_PARSER_NAME]
+        emails = email_data.get("emails", [])
+        for e in emails:
+            email_parts = []
+            if e.get("subject"):
+                email_parts.append(f"Subject: {e['subject']}")
+            if e.get("body_text"):
+                email_parts.append(e["body_text"])
+            if email_parts:
+                aggregated_parts.append("\n".join(email_parts))
+
+    # 4. Audio Transcriber
     if AUDIO_TRANSCRIBER_NAME in context:
         transcript = context[AUDIO_TRANSCRIBER_NAME].get("text", "").strip()
         if transcript:
             aggregated_parts.append(f"[Audio Transcript]\n{transcript}")
 
-    # 4. Vision Analyzer (Image Descriptions)
+    # 5. Vision Analyzer (Image Descriptions)
     if VISION_ANALYZER_NAME in context:
         img_desc = context[VISION_ANALYZER_NAME].get("description", "").strip()
         if img_desc:
             aggregated_parts.append(f"[Visual Description]\n{img_desc}")
 
-    # 5. Video Analyzer (Keyframe Descriptions)
+    # 6. Video Analyzer (Keyframe Descriptions)
     if VIDEO_ANALYZER_NAME in context:
         vid_desc = context[VIDEO_ANALYZER_NAME].get("visual_description", "").strip()
         if vid_desc:

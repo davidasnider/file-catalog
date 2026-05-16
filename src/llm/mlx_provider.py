@@ -353,6 +353,15 @@ class MLXProvider(LLMProvider):
         async with get_mlx_gpu_lock():
             return await loop.run_in_executor(None, _run_sync)
 
+    async def get_max_output_tokens(self) -> int:
+        """Query MLX model configuration for context limits."""
+        if not hasattr(self, "model") or not self.model:
+            return 4096
+        # max_position_embeddings is the standard context window for Transformer models.
+        # We subtract a conservative input budget (1024) to avoid OOM or context overflow.
+        total_ctx = getattr(self.model.config, "max_position_embeddings", 4096)
+        return max(512, total_ctx - 1024)
+
 
 class MLXModelManager:
     _cache = {}

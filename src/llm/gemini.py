@@ -45,6 +45,7 @@ class GeminiProvider(LLMProvider):
             )
 
         self.client = genai.Client(**client_kwargs)
+        self._max_output_tokens = None
 
         # Map model name to appropriate provider aliases
         if is_vision:
@@ -135,3 +136,21 @@ class GeminiProvider(LLMProvider):
             return response.text.strip()
 
         return await loop.run_in_executor(None, _run_sync)
+
+    async def get_max_output_tokens(self) -> int:
+        """Query Gemini model metadata for output token limits."""
+        if self._max_output_tokens is not None:
+            return self._max_output_tokens
+
+        loop = asyncio.get_running_loop()
+
+        def _get_limit():
+            try:
+                model_info = self.client.models.get(model=self.model_name)
+                return model_info.output_token_limit or 4096
+            except Exception as e:
+                logger.warning(f"Failed to query Gemini model limit: {e}")
+                return 4096
+
+        self._max_output_tokens = await loop.run_in_executor(None, _get_limit)
+        return self._max_output_tokens
