@@ -265,7 +265,8 @@ class LlamaCppProvider(LLMProvider):
         """Query llama-cpp-python context window size."""
         if not hasattr(self, "llm") or not self.llm:
             return 2048
-        return self.llm.n_ctx()
+        # Subtract conservative input budget to avoid context overflow
+        return max(256, self.llm.n_ctx() - 1024)
 
 
 class ModelManager:

@@ -61,13 +61,13 @@ def get_all_extracted_text(context: Dict[str, Any]) -> str:
         if transcript:
             aggregated_parts.append(f"[Audio Transcript]\n{transcript}")
 
-    # 4. Vision Analyzer (Image Descriptions)
+    # 5. Vision Analyzer (Image Descriptions)
     if VISION_ANALYZER_NAME in context:
         img_desc = context[VISION_ANALYZER_NAME].get("description", "").strip()
         if img_desc:
             aggregated_parts.append(f"[Visual Description]\n{img_desc}")
 
-    # 5. Video Analyzer (Keyframe Descriptions)
+    # 6. Video Analyzer (Keyframe Descriptions)
     if VIDEO_ANALYZER_NAME in context:
         vid_desc = context[VIDEO_ANALYZER_NAME].get("visual_description", "").strip()
         if vid_desc:
