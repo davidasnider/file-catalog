@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 @register_analyzer(
     name=ESTATE_ANALYZER_NAME,
     depends_on=[TEXT_EXTRACTOR_NAME, ROUTER_NAME],
-    version="1.8",
+    version="1.9",
 )
 class EstateAnalyzerPlugin(AnalyzerBase):
     """
@@ -129,10 +129,11 @@ Text:
 """
 
         try:
-            # We urge the LLM towards JSON. Advanced models support forced schemas.
+            # Cap output tokens to remaining context budget after the prompt
+            safe_tokens = await llm.get_safe_output_tokens(prompt)
             llm_response = await llm.generate(
                 prompt,
-                max_tokens=150,
+                max_tokens=safe_tokens,
                 temperature=0.0,
                 response_format={
                     "type": "json_object",

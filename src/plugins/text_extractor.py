@@ -26,7 +26,7 @@ SUPPORTED_IMAGE_TYPES = {
 }
 
 
-@register_analyzer(name=TEXT_EXTRACTOR_NAME, depends_on=[], version="1.7")
+@register_analyzer(name=TEXT_EXTRACTOR_NAME, depends_on=[], version="1.8")
 class TextExtractorPlugin(AnalyzerBase):
     """
     Extracts raw text from common document types (PDFs, docs) and images (OCR).
@@ -108,10 +108,11 @@ class TextExtractorPlugin(AnalyzerBase):
                                 "If there is no text, provide a concise, high-quality description of what is in the image "
                                 "so it can be indexed for search."
                             )
+                            model_max = await llm.get_max_output_tokens()
                             extracted_text = await llm.process_image(
                                 image_path=file_path,
                                 prompt=vision_prompt,
-                                max_tokens=300,
+                                max_tokens=model_max,
                             )
                             logger.info(
                                 f"Vision LLM successfully described/extracted text for {file_path}"

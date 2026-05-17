@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 @register_analyzer(
     name=PII_HARVESTER_NAME,
     depends_on=[TEXT_EXTRACTOR_NAME, ROUTER_NAME],
-    version="1.7",
+    version="1.8",
 )
 class PIIHarvesterPlugin(AnalyzerBase):
     """
@@ -78,9 +78,10 @@ class PIIHarvesterPlugin(AnalyzerBase):
         """
 
         try:
+            safe_tokens = await llm.get_safe_output_tokens(prompt)
             response = await llm.generate(
                 prompt,
-                max_tokens=250,
+                max_tokens=safe_tokens,
                 temperature=0.0,
                 response_format={
                     "type": "json_object",
@@ -116,7 +117,11 @@ class PIIHarvesterPlugin(AnalyzerBase):
                     valid_emails.append(email.strip())
             parsed["emails"] = valid_emails
 
-            return {"pii": parsed, "skipped": False, "method": "llm_json_expert"}
+            return {
+                "pii": parsed,
+                "skipped": False,
+                "method": "llm_json_expert",
+            }
         except Exception as e:
             logger.error(f"Failed to harvest PII for {file_path}: {e}")
             return {"pii": {}, "skipped": True, "error": str(e)}

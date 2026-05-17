@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 @register_analyzer(
     name=PASSWORD_EXTRACTOR_NAME,
     depends_on=[TEXT_EXTRACTOR_NAME, ROUTER_NAME],
-    version="1.0",
+    version="1.1",
 )
 class PasswordExtractorPlugin(AnalyzerBase):
     """
@@ -92,9 +92,10 @@ class PasswordExtractorPlugin(AnalyzerBase):
         """
 
         try:
+            safe_tokens = await llm.get_safe_output_tokens(prompt)
             response = await llm.generate(
                 prompt,
-                max_tokens=150,
+                max_tokens=safe_tokens,
                 temperature=0.0,
                 response_format={
                     "type": "json_object",

@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
         VIDEO_ANALYZER_NAME,
         EMAIL_PARSER_NAME,
     ],
-    version="1.1",
+    version="1.2",
 )
 class RouterPlugin(AnalyzerBase):
     """
@@ -81,8 +81,9 @@ class RouterPlugin(AnalyzerBase):
         """
 
         try:
+            safe_tokens = await llm.get_safe_output_tokens(prompt)
             response = await llm.generate(
-                prompt, max_tokens=64, temperature=0.0, response_format="json"
+                prompt, max_tokens=safe_tokens, temperature=0.0, response_format="json"
             )
 
             from src.core.text_utils import repair_and_load_json

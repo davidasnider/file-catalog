@@ -181,7 +181,8 @@ class LlamaCppProvider(LLMProvider):
                 ],
                 **chat_kwargs,
             )
-            return response["choices"][0]["message"]["content"].strip()
+            content = response["choices"][0]["message"]["content"]
+            return content.strip() if content else ""
 
         return await loop.run_in_executor(self.executor, _run_sync)
 
@@ -257,9 +258,16 @@ class LlamaCppProvider(LLMProvider):
                 ],
                 **gen_kwargs,
             )
-            return response["choices"][0]["message"]["content"].strip()
+            content = response["choices"][0]["message"]["content"]
+            return content.strip() if content else ""
 
         return await loop.run_in_executor(self.executor, _run_sync)
+
+    async def get_context_window(self) -> int:
+        """Query llama-cpp-python context window size."""
+        if not hasattr(self, "llm") or not self.llm:
+            return 2048
+        return self.llm.n_ctx()
 
     async def get_max_output_tokens(self) -> int:
         """Query llama-cpp-python context window size."""

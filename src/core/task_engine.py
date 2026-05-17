@@ -10,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlmodel import select
 from src.core.config import config
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -150,6 +151,7 @@ class TaskEngine:
                 logger.error(
                     f"Plugin {task_name} failed after {max_retries} retries on {document_path}: {e}"
                 )
+
                 # Ensure task is marked as failed
                 if task is not None:
                     task.status = TaskStatus.FAILED
