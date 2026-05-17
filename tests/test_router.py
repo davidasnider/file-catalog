@@ -28,6 +28,15 @@ async def test_router_llm_fallback(monkeypatch):
         async def generate(self, prompt, **kwargs):
             return '```json\n{"category": "Technical"}\n```'
 
+        async def get_max_output_tokens(self):
+            return 4096
+
+        async def get_safe_output_tokens(self, prompt, chars_per_token=3.5):
+            return 4096
+
+        async def get_context_window(self):
+            return 8192
+
     monkeypatch.setattr(
         "src.plugins.router.get_llm_provider", lambda **kwargs: MockLLM()
     )
@@ -50,6 +59,15 @@ async def test_router_llm_fallback_malformed(monkeypatch):
     class MockLLM:
         async def generate(self, prompt, **kwargs):
             return "I am an AI, the category is technical"
+
+        async def get_max_output_tokens(self):
+            return 4096
+
+        async def get_safe_output_tokens(self, prompt, chars_per_token=3.5):
+            return 4096
+
+        async def get_context_window(self):
+            return 8192
 
     monkeypatch.setattr(
         "src.plugins.router.get_llm_provider", lambda **kwargs: MockLLM()

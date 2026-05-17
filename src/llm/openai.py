@@ -44,7 +44,8 @@ class OpenAIProvider(LLMProvider):
             temperature=kwargs.get("temperature", 0.7),
             response_format=response_format,
         )
-        return response.choices[0].message.content.strip()
+        content = response.choices[0].message.content
+        return content.strip() if content else ""
 
     async def generate_stream(self, prompt: str, **kwargs) -> AsyncGenerator[str, None]:
         """Stream the generated response."""
@@ -131,7 +132,12 @@ class OpenAIProvider(LLMProvider):
             temperature=kwargs.get("temperature", 0.2),
             response_format=response_format,
         )
-        return response.choices[0].message.content.strip()
+        content = response.choices[0].message.content
+        return content.strip() if content else ""
+
+    async def get_context_window(self) -> int:
+        """Get the configured context window size for the OpenAI-compatible endpoint."""
+        return config.openai_context_window
 
     async def get_max_output_tokens(self) -> int:
         """

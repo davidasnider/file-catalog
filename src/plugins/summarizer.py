@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
         VIDEO_ANALYZER_NAME,
         EMAIL_PARSER_NAME,
     ],
-    version="1.4",
+    version="1.5",
 )
 class SummarizerPlugin(AnalyzerBase):
     """
@@ -110,27 +110,35 @@ class SummarizerPlugin(AnalyzerBase):
         prompt = f"""
 You are an expert document summarizer analyzing a local digital archive. Read the following text extracted from a file and provide a concise, 3-sentence summary of the core content.
 
-CRITICAL INSTRUCTION: Return ONLY the 3-sentence summary.
-DO NOT output any thinking process. NO <think> tags. NO "Here is a thinking process".
-Do NOT include any conversational filler, preambles, or introductory text.
-Begin exactly with the first sentence of the summary.
+CRITICAL INSTRUCTIONS:
+1. Return ONLY the 3-sentence summary.
+2. Accurately identify the roles of individuals (e.g., strictly distinguish between the customer/account holder and service providers/technicians). Do not conflate names with incorrect titles.
+3. Ensure absolute factual alignment with the source text. Do not make assumptions.
+4. DO NOT output any thinking process. NO <think> tags. NO "Here is a thinking process".
+5. Do NOT include any conversational filler, preambles, or introductory text.
+6. Begin exactly with the first sentence of the summary.
 
 Text:
 {extracted_text}
 """
 
         try:
-            # Query the model for its maximum output token limit
-            model_max = await llm.get_max_output_tokens()
-            # For 3-sentence summaries, we clamp it to a safe target
-            max_tokens = min(500, model_max)
-
+            # Cap output tokens to remaining context budget after the prompt
+            safe_tokens = await llm.get_safe_output_tokens(prompt)
             summary_response = await llm.generate(
-                prompt, max_tokens=max_tokens, temperature=0.3
+                prompt, max_tokens=safe_tokens, temperature=0.3
             )
+
+            if not summary_response:
+                raise ValueError("LLM returned an empty response during summarization.")
 
             # Strip any leaked thinking blocks
             cleaned_summary = self._strip_thinking(summary_response)
+
+            if not cleaned_summary:
+                raise ValueError(
+                    "LLM response was empty after stripping thinking blocks."
+                )
 
             return {
                 "summary": cleaned_summary,
@@ -138,6 +146,18 @@ Text:
                 "model": getattr(llm, "model_name", "Unknown Model"),
             }
 
+        except ValueError as e:
+            if "context window" in str(e) or "exceeds" in str(e):
+                logger.info(
+                    f"Prompt exceeds standard summarizer context size for {file_path}. Skipping in favor of DeepSummarizer."
+                )
+                return {
+                    "summary": "",
+                    "skipped": True,
+                    "reason": "text_too_large",
+                }
+            logger.error(f"Failed to generate summary for {file_path}: {e}")
+            raise Exception(f"Summarization execution failed: {str(e)}")
         except Exception as e:
             logger.error(f"Failed to generate summary for {file_path}: {e}")
             raise Exception(f"Summarization execution failed: {str(e)}")

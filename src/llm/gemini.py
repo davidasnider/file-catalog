@@ -137,6 +137,10 @@ class GeminiProvider(LLMProvider):
 
         return await loop.run_in_executor(None, _run_sync)
 
+    async def get_context_window(self) -> int:
+        """Gemini 1.5 Flash/Pro supports extremely large context windows (1M+ tokens)."""
+        return 1048576
+
     async def get_max_output_tokens(self) -> int:
         """Query Gemini model metadata for output token limits."""
         if self._max_output_tokens is not None:
