@@ -81,9 +81,9 @@ class RouterPlugin(AnalyzerBase):
         """
 
         try:
-            model_max = await llm.get_max_output_tokens()
+            safe_tokens = await llm.get_safe_output_tokens(prompt)
             response = await llm.generate(
-                prompt, max_tokens=model_max, temperature=0.0, response_format="json"
+                prompt, max_tokens=safe_tokens, temperature=0.0, response_format="json"
             )
 
             from src.core.text_utils import repair_and_load_json

@@ -10,6 +10,9 @@ class MockLLM:
     async def get_max_output_tokens(self):
         return 4096
 
+    async def get_safe_output_tokens(self, prompt, chars_per_token=3.5):
+        return 4096
+
 
 @pytest.fixture
 def mock_get_llm_provider(monkeypatch):

@@ -1255,6 +1255,22 @@ async def run_standalone_judge():
 
     console.print(f"Found {len(tasks_with_docs)} tasks to evaluate.")
 
+    # Pre-load all document contexts in a single query to avoid N+1
+    doc_ids = list({doc.id for _, doc in tasks_with_docs})
+    doc_contexts = {}
+    async with async_session_maker() as session:
+        all_tasks_res = await session.execute(
+            select(AnalysisTask).where(AnalysisTask.document_id.in_(doc_ids))
+        )
+        for t in all_tasks_res.scalars().all():
+            if t.result_data:
+                try:
+                    doc_contexts.setdefault(t.document_id, {})[t.task_name] = (
+                        json.loads(t.result_data)
+                    )
+                except Exception:
+                    pass
+
     failed_count = 0
     passed_count = 0
     skipped_count = 0
@@ -1265,18 +1281,7 @@ async def run_standalone_judge():
         except Exception:
             continue
 
-        # Build context from all completed tasks for this document
-        context = {}
-        async with async_session_maker() as session:
-            all_tasks_res = await session.execute(
-                select(AnalysisTask).where(AnalysisTask.document_id == doc.id)
-            )
-            for t in all_tasks_res.scalars().all():
-                if t.result_data:
-                    try:
-                        context[t.task_name] = json.loads(t.result_data)
-                    except Exception:
-                        pass
+        context = doc_contexts.get(doc.id, {})
 
         retry_count = 0
         max_retries = 1
@@ -1305,12 +1310,22 @@ async def run_standalone_judge():
                         f"🎉 [green]FIXED ON RETRY[/green] | Task: {task.task_name} | Doc: {doc.path}"
                     )
                     # Save the fixed result to the database
+                    from src.core.plugin_registry import ANALYZER_REGISTRY
+
+                    analyzer_cls = ANALYZER_REGISTRY.get(task.task_name)
+                    current_version = (
+                        getattr(analyzer_cls, "_analyzer_version", None)
+                        if analyzer_cls
+                        else None
+                    )
                     async with async_session_maker() as update_session:
                         db_task = await update_session.get(AnalysisTask, task.id)
                         if db_task:
                             db_task.result_data = json.dumps(result_data)
                             db_task.status = TaskStatus.COMPLETED
                             db_task.error_message = None
+                            if current_version:
+                                db_task.plugin_version = current_version
                             await update_session.commit()
                 break
             elif status == "SKIPPED":

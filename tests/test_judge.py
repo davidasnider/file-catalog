@@ -113,3 +113,20 @@ async def test_judge_failed(judge, mock_provider):
             )
             assert status == "FAILED"
             mock_handle.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_judge_missing_scores_fails(judge, mock_provider):
+    """A malformed response without required score fields should FAIL, not silently pass."""
+    with patch.object(config, "judge_enabled", True):
+        mock_provider.generate.return_value = '{"reasoning": "Some analysis"}'
+        with patch.object(
+            judge, "_handle_failure", new_callable=AsyncMock
+        ) as mock_handle:
+            context = {"TextExtractor": {"text": "some text"}}
+            result = {"summary": "some summary"}
+            status = await judge.judge_task(
+                SUMMARIZER_NAME, "test.txt", result, context
+            )
+            assert status == "FAILED"
+            mock_handle.assert_called_once()

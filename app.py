@@ -66,9 +66,10 @@ def fetch_documents(selected_statuses: list[str], search_query: str):
     async def _fetch():
         async with async_session_maker() as session:
             stmt = select(Document)
-            if selected_statuses:
-                # Map names back to enum if necessary, or just compare strings
-                stmt = stmt.where(Document.status.in_(selected_statuses))
+            if not selected_statuses:
+                # Empty selection means user deselected all — return nothing
+                return []
+            stmt = stmt.where(Document.status.in_(selected_statuses))
             if search_query:
                 stmt = stmt.where(Document.path.like(f"%{search_query}%"))
 
@@ -202,6 +203,25 @@ def main():
         )
 
         st.divider()
+        st.subheader("🔍 Task Status Filter")
+
+        @st.cache_data(ttl=3600)
+        def get_all_task_statuses():
+            async def _fetch():
+                async with async_session_maker() as session:
+                    res = await session.execute(select(AnalysisTask.status).distinct())
+                    return [s.name for s in res.scalars().all()]
+
+            return asyncio.run(_fetch())
+
+        unique_task_statuses = get_all_task_statuses()
+        selected_task_statuses = st.multiselect(
+            "Filter by Task Status",
+            unique_task_statuses,
+            default=unique_task_statuses,
+        )
+
+        st.divider()
         st.subheader("💡 Smart Filters")
         smart_filters = st.multiselect(
             "Quick Filters",
@@ -221,7 +241,8 @@ def main():
     filtered_docs = []
 
     doc_tasks_map = {}
-    if smart_filters and documents:
+    needs_task_data = smart_filters or (selected_task_statuses != unique_task_statuses)
+    if needs_task_data and documents:
         doc_tasks_map = fetch_all_tasks_for_documents([doc.id for doc in documents])
 
     for doc in documents:
@@ -306,6 +327,14 @@ def main():
                         match_smart = False
 
             if not match_smart:
+                continue
+
+        # Task-status filter: skip docs whose tasks don't match selected statuses
+        if selected_task_statuses != unique_task_statuses:
+            doc_tasks = doc_tasks_map.get(doc.id, [])
+            if not doc_tasks:
+                continue
+            if not any(t.status.name in selected_task_statuses for t in doc_tasks):
                 continue
 
         filtered_docs.append(doc)

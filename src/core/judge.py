@@ -284,16 +284,26 @@ Return JSON:
 
     def _check_passed(self, task_name: str, eval_data: Dict[str, Any]) -> bool:
         if task_name in [SUMMARIZER_NAME, DEEP_SUMMARIZER_NAME]:
-            return (
-                eval_data.get("accuracy", 5) >= 4
-                and eval_data.get("hallucination_free", 5) >= 4
-            )
+            accuracy = eval_data.get("accuracy")
+            hallucination_free = eval_data.get("hallucination_free")
+            if not isinstance(accuracy, (int, float)) or not isinstance(
+                hallucination_free, (int, float)
+            ):
+                return False
+            return accuracy >= 4 and hallucination_free >= 4
         elif task_name == PII_HARVESTER_NAME:
-            return (
-                eval_data.get("precision", 5) >= 4 and eval_data.get("recall", 5) >= 4
-            )
+            precision = eval_data.get("precision")
+            recall = eval_data.get("recall")
+            if not isinstance(precision, (int, float)) or not isinstance(
+                recall, (int, float)
+            ):
+                return False
+            return precision >= 4 and recall >= 4
         elif task_name == VISION_ANALYZER_NAME:
-            return eval_data.get("coherence", 5) >= 4
+            coherence = eval_data.get("coherence")
+            if not isinstance(coherence, (int, float)):
+                return False
+            return coherence >= 4
 
         # Default pass if unknown scores
         return True
@@ -306,13 +316,15 @@ Return JSON:
         eval_data: Any,
         improved_prompt: str,
     ):
+        from datetime import datetime, timezone
+
         record = {
             "task_name": task_name,
             "document_path": doc_path,
             "original_result": result,
             "judge_evaluation": eval_data,
             "improved_prompt": improved_prompt,
-            "timestamp": json.dumps(True),  # Dummy for now, or use datetime
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
         try:

@@ -123,11 +123,10 @@ Text:
 """
 
         try:
-            # We pass the maximum supported tokens because reasoning models (like Qwen) use extensive tokens for thinking
-            # before they output the short summary.
-            model_max = await llm.get_max_output_tokens()
+            # Cap output tokens to remaining context budget after the prompt
+            safe_tokens = await llm.get_safe_output_tokens(prompt)
             summary_response = await llm.generate(
-                prompt, max_tokens=model_max, temperature=0.3
+                prompt, max_tokens=safe_tokens, temperature=0.3
             )
 
             if not summary_response:

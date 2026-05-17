@@ -57,3 +57,27 @@ class LLMProvider(ABC):
         Used for dynamic request sizing.
         """
         pass
+
+    async def get_safe_output_tokens(
+        self, prompt: str, chars_per_token: float = 3.5
+    ) -> int:
+        """
+        Returns a safe max_tokens value that accounts for prompt size.
+
+        Estimates prompt token count from character length, then caps output
+        tokens so input + output stays within the provider's reported limit.
+        Falls back to get_max_output_tokens() when prompt is small enough.
+
+        Args:
+            prompt: The full prompt text that will be sent.
+            chars_per_token: Rough character-to-token ratio (default 3.5 for English).
+
+        Returns:
+            A safe number of output tokens (minimum 256).
+        """
+        model_max = await self.get_max_output_tokens()
+        estimated_input_tokens = int(len(prompt) / chars_per_token)
+        # model_max from providers already subtracts a conservative input budget (e.g. 1024),
+        # but that fixed budget may be insufficient for large prompts
+        safe_output = max(256, model_max - estimated_input_tokens)
+        return min(safe_output, model_max)

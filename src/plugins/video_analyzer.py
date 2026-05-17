@@ -262,10 +262,10 @@ class VideoAnalyzerPlugin(AnalyzerBase):
 
             final_prompt += f"SEGMENT DESCRIPTIONS:\n{combined_segments}"
 
-            text_model_max = await text_llm.get_max_output_tokens()
+            text_safe_tokens = await text_llm.get_safe_output_tokens(final_prompt)
             response_text = await text_llm.generate(
                 final_prompt,
-                max_tokens=text_model_max,
+                max_tokens=text_safe_tokens,
                 temperature=0.3,
                 response_format="json",
             )
