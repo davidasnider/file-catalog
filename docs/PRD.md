@@ -3,7 +3,7 @@
 This document outlines the requirements and architectural plan for completely rebuilding the Local AI Digital Archive application from scratch.
 
 ## Core Technical Decisions
-- **Frontend Architecture:** Streamlit (Retained for rapid UI development and Python data integration, featuring real-time progress bars).
+- **Frontend Architecture:** Streamlit (Retained for rapid UI development and Python data integration).
 - **LLM Engine:** `llama-cpp-python` for local ML inference, `mlx-lm` for Apple Silicon, `google-genai` for cloud fallback, and OpenAI-compatible endpoints (e.g. vLLM/Ollama). Because we built an `LLMProvider` interface, we successfully implemented support for Cloud APIs and MLX.
 - **State Management:** SQLite via `SQLModel` to guarantee atomic state transitions, avoiding current multi-threaded JSON corruption issues.
 - **Backend Orchestration:** Pure Python using `asyncio` for robust, high-performance concurrency.
