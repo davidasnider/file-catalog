@@ -161,13 +161,71 @@ class DeepSummarizerPlugin(AnalyzerBase):
                 "error": "Failed to generate any chunk summaries during Map phase.",
             }
 
-        # 3. Reduce Phase: Combine chunk summaries
+        # 3. Reduce Phase: Combine chunk summaries recursively if needed to fit model context window
+        total_ctx = await llm.get_context_window()
+        model_max = await llm.get_max_output_tokens()
+        max_safe_input_tokens = total_ctx - model_max - 1000
+        if max_safe_input_tokens < 1000:
+            max_safe_input_tokens = int(total_ctx * 0.7)
+        max_safe_chars = int(max_safe_input_tokens * 3.5)
+
+        current_summaries = list(chunk_summaries)
+        reduction_level = 1
+
+        while True:
+            combined_summaries = "\n\n".join(
+                [f"Part {j + 1}: {s}" for j, s in enumerate(current_summaries)]
+            )
+
+            if len(combined_summaries) <= max_safe_chars or len(current_summaries) <= 1:
+                break
+
+            logger.info(
+                f"Combined summaries length ({len(combined_summaries)} chars) exceeds safe limit ({max_safe_chars} chars). "
+                f"Performing intermediate hierarchical reduction level {reduction_level}..."
+            )
+
+            group_size = 4
+            next_level_summaries = []
+            for i in range(0, len(current_summaries), group_size):
+                group = current_summaries[i : i + group_size]
+                group_text = "\n\n".join(
+                    [f"Sub-part {j + 1}: {s}" for j, s in enumerate(group)]
+                )
+
+                intermediate_prompt = f"""
+                You are an intermediate summarization assistant. Synthesize the following sequential document part summaries into a single, cohesive intermediate summary.
+                Do not lose important facts, legal terms, or dates.
+
+                CRITICAL INSTRUCTION: Output ONLY the summary.
+                DO NOT output any thinking process. NO <think> tags. NO "Here is a thinking process".
+                Do NOT include any conversational filler or preambles.
+
+                SUMMARIES TO COMBINE:
+                {group_text}
+
+                COHESIVE INTERMEDIATE SUMMARY:
+                """
+
+                try:
+                    safe_tokens = await llm.get_safe_output_tokens(intermediate_prompt)
+                    response = await llm.generate(
+                        intermediate_prompt, max_tokens=safe_tokens, temperature=0.2
+                    )
+                    next_level_summaries.append(self._strip_thinking(response))
+                except Exception as e:
+                    logger.error(
+                        f"Error in intermediate reduction level {reduction_level}, group {i // group_size + 1}: {e}"
+                    )
+                    next_level_summaries.append("\n\n".join(group))
+
+            current_summaries = next_level_summaries
+            reduction_level += 1
+
         combined_summaries = "\n\n".join(
-            [f"Part {j + 1}: {s}" for j, s in enumerate(chunk_summaries)]
+            [f"Part {j + 1}: {s}" for j, s in enumerate(current_summaries)]
         )
 
-        # If the combined summaries are still too large, we might need a recursive Map-Reduce.
-        # But for early MVP, one pass reduce is sufficient.
         final_prompt = f"""
         You are finalizing a deep summarization task. Below are the sequential summaries of different parts of a massive document.
         Synthesize these parts into a single, cohesive, extensive summary that fully explains what this document is about, highlighting key terms, legal implications, financial data, or important narratives.
