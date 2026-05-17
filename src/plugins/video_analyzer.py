@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 @register_analyzer(
-    name=VIDEO_ANALYZER_NAME, depends_on=[AUDIO_TRANSCRIBER_NAME], version="2.0"
+    name=VIDEO_ANALYZER_NAME, depends_on=[AUDIO_TRANSCRIBER_NAME], version="2.1"
 )
 class VideoAnalyzerPlugin(AnalyzerBase):
     """

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 @register_analyzer(
     name=PII_HARVESTER_NAME,
     depends_on=[TEXT_EXTRACTOR_NAME, ROUTER_NAME],
-    version="1.7",
+    version="1.8",
 )
 class PIIHarvesterPlugin(AnalyzerBase):
     """
@@ -121,7 +121,6 @@ class PIIHarvesterPlugin(AnalyzerBase):
                 "pii": parsed,
                 "skipped": False,
                 "method": "llm_json_expert",
-                "prompt": prompt,
             }
         except Exception as e:
             logger.error(f"Failed to harvest PII for {file_path}: {e}")
