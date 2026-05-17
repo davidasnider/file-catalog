@@ -21,7 +21,7 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 - **Audio & Video Analysis**: Features an `AudioTranscriberPlugin` to extract transcripts from audio files and a `VideoAnalyzerPlugin` (v2.0) that performs 100-frame uniform sampling, batching, and synthesis to provide detailed video content descriptions.
 - **Metadata & Language Detection**: Features a `LanguageDetectorPlugin` to tag document language and a `DuplicateDetectorPlugin` to find exact-duplicate files using hashes.
 - **Two-Tier Summarization**:
-  - **Universal Short Summary**: A lightning-fast, 3-sentence summary generated for *every* standard document.
+  - **Universal Short Summary**: A lightning-fast, 3-sentence summary generated for *every* standard document. Supports summaries of parsed `.eml` and `.mbox` files.
   - **Deep Map-Reduce Summarization**: A specialized `DeepSummarizerPlugin` built for massive documents. It dynamically chunks text exceeding the context window, summarizes each chunk sequentially (Map), and synthesizes a final cohesive report (Reduce).
 - **PII Harvesting**: A specialized `PIIHarvesterPlugin` leverages strict JSON-Schema enforcement to extract named entities (Names, Emails, Addresses) into the database.
 - **Credential Detection**: A high-precision `PasswordExtractorPlugin` specifically identifies authentication passwords, PINs, and secrets with advanced hallucination filtering.
