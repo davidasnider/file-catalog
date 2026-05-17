@@ -752,6 +752,7 @@ async def run_scanner(
             recent_errors = await session.execute(
                 select(AnalysisTask.error_message)
                 .where(AnalysisTask.status == TaskStatus.FAILED)
+                .order_by(AnalysisTask.id.desc())
                 .limit(100)  # Only look at last 100 errors for the summary
             )
             for (err_msg,) in recent_errors.all():
@@ -1263,17 +1264,20 @@ async def run_standalone_judge():
     doc_ids = list({doc.id for _, doc in tasks_with_docs})
     doc_contexts = {}
     async with async_session_maker() as session:
-        all_tasks_res = await session.execute(
-            select(AnalysisTask).where(AnalysisTask.document_id.in_(doc_ids))
-        )
-        for t in all_tasks_res.scalars().all():
-            if t.result_data:
-                try:
-                    doc_contexts.setdefault(t.document_id, {})[t.task_name] = (
-                        json.loads(t.result_data)
-                    )
-                except Exception:
-                    pass
+        chunk_size = 900
+        for i in range(0, len(doc_ids), chunk_size):
+            chunk = doc_ids[i : i + chunk_size]
+            all_tasks_res = await session.execute(
+                select(AnalysisTask).where(AnalysisTask.document_id.in_(chunk))
+            )
+            for t in all_tasks_res.scalars().all():
+                if t.result_data:
+                    try:
+                        doc_contexts.setdefault(t.document_id, {})[t.task_name] = (
+                            json.loads(t.result_data)
+                        )
+                    except Exception:
+                        pass
 
     failed_count = 0
     passed_count = 0
@@ -1348,7 +1352,7 @@ async def run_standalone_judge():
             elif status in ["ERROR", "FAILED"]:
                 if retry_count < max_retries:
                     console.print(
-                        f"🔄 [yellow]FAILED/ERROR - Attempting Re-run ({retry_count+1}/{max_retries})[/yellow] | Task: {task.task_name} | Doc: {doc.path}"
+                        f"🔄 [yellow]FAILED/ERROR - Attempting Re-run ({retry_count + 1}/{max_retries})[/yellow] | Task: {task.task_name} | Doc: {doc.path}"
                     )
                     from src.core.plugin_registry import ANALYZER_REGISTRY
 

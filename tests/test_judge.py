@@ -149,3 +149,100 @@ async def test_judge_low_coverage_fails(judge, mock_provider):
             )
             assert status == "FAILED"
             mock_handle.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_run_standalone_judge_retry_and_persist(db_session, test_engine, mocker):
+    """
+    Test standalone judge's self-healing retry-and-persist path.
+    Verify that a failed judge result triggers analyzer retry,
+    persists the corrected result/status/version, and syncs FTS.
+    """
+    from src.scanner import run_standalone_judge
+    from src.db.models import Document, AnalysisTask, TaskStatus, DocumentStatus
+    from src.core.analyzer_names import SUMMARIZER_NAME
+    from src.core.plugin_registry import ANALYZER_REGISTRY
+    from unittest.mock import MagicMock
+    from sqlmodel import SQLModel
+
+    # Ensure tables are created for our imported models
+    async with test_engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+
+    # 1. Populate test Document and Task in the SQLite in-memory DB
+    doc = Document(
+        path="/path/to/test_doc.txt",
+        mime_type="text/plain",
+        file_hash="dummyhash",
+        file_size=100,
+        mtime=1.0,
+        status=DocumentStatus.COMPLETED,
+    )
+    db_session.add(doc)
+    await db_session.commit()
+
+    task = AnalysisTask(
+        document_id=doc.id,
+        task_name=SUMMARIZER_NAME,
+        plugin_version="1.0",
+        status=TaskStatus.COMPLETED,
+        result_data='{"summary": "Bad summary that will fail judge", "skipped": false}',
+    )
+    db_session.add(task)
+    await db_session.commit()
+
+    # 2. Patch the async_session_maker in engine and scanner to use our test engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    mock_maker = sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+    mocker.patch("src.scanner.async_session_maker", return_value=mock_maker())
+    mocker.patch("src.db.engine.async_session_maker", return_value=mock_maker())
+    mocker.patch("src.db.engine.init_db", AsyncMock())
+    mocker.patch("src.scanner.init_db", AsyncMock())
+
+    # Mock TaskJudge to return:
+    # First check: FAILED
+    # Second check (after retry): PASSED
+    mock_judge_instance = AsyncMock()
+    mock_judge_instance.judge_task.side_effect = ["FAILED", "PASSED"]
+    mocker.patch("src.core.judge.TaskJudge", return_value=mock_judge_instance)
+
+    # Mock the SummarizerPlugin in registry and its analyze method
+    mock_analyzer_instance = AsyncMock()
+    mock_analyzer_instance.analyze.return_value = {
+        "summary": "This is a corrected, highly accurate summary",
+        "skipped": False,
+    }
+    mock_analyzer_cls = MagicMock(return_value=mock_analyzer_instance)
+    mock_analyzer_cls._analyzer_version = "1.9"
+    mocker.patch.dict(ANALYZER_REGISTRY, {SUMMARIZER_NAME: mock_analyzer_cls})
+
+    # Mock FTS sync and console input to prevent blocking
+    mock_sync_fts = mocker.patch("src.db.fts.sync_document_to_fts", AsyncMock())
+    mocker.patch("rich.console.Console", MagicMock())
+    mocker.patch("src.scanner.input", return_value="")
+
+    # 3. Run standalone judge
+    await run_standalone_judge()
+
+    # 4. Verify results were updated in the DB
+    await db_session.refresh(task)
+
+    assert task.status == TaskStatus.COMPLETED
+    assert task.plugin_version == "1.9"
+    assert "corrected, highly accurate summary" in task.result_data
+    assert task.error_message is None
+
+    # Verify analyzer and FTS were invoked
+    mock_analyzer_instance.analyze.assert_called_once_with(
+        "/path/to/test_doc.txt",
+        "text/plain",
+        {
+            SUMMARIZER_NAME: {
+                "summary": "Bad summary that will fail judge",
+                "skipped": False,
+            }
+        },
+    )
+    mock_sync_fts.assert_called_once()

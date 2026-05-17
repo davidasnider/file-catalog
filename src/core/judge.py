@@ -126,10 +126,12 @@ class TaskJudge:
 
             # Prepare sections
             source_material = get_all_extracted_text(context) or "N/A (Vision/Binary)"
+            if len(source_material) > 1000:
+                source_material = source_material[:1000] + "..."
 
             original_prompt = result.get("prompt")
             if not original_prompt:
-                # Dynamically construct the current prompt for legacy tasks
+                # Dynamically construct the current prompt for legacy tasks using truncated text
                 if task_name == SUMMARIZER_NAME:
                     original_prompt = f"""You are an expert document summarizer analyzing a local digital archive. Read the following text extracted from a file and provide a concise, 3-sentence summary of the core content.
 
@@ -141,15 +143,12 @@ CRITICAL INSTRUCTIONS:
 5. Do NOT include any conversational filler, preambles, or introductory text.
 6. Begin exactly with the first sentence of the summary.
 
-Text:
+Text (Truncated):
 {source_material}"""
                 elif task_name == PII_HARVESTER_NAME:
-                    original_prompt = f"Identify Personally Identifiable Information (PII) from the following text:\n{source_material}"
+                    original_prompt = f"Identify Personally Identifiable Information (PII) from the following text (Truncated):\n{source_material}"
                 else:
                     original_prompt = "N/A (Prompt not captured or execution failed)"
-
-            if len(source_material) > 1000:
-                source_material = source_material[:1000] + "..."
             ai_output = json.dumps(result, indent=2)
             if len(ai_output) > 1000:
                 ai_output = ai_output[:1000] + "..."
@@ -219,6 +218,10 @@ Text:
 
         if task_name in [SUMMARIZER_NAME, DEEP_SUMMARIZER_NAME]:
             summary = result.get("summary") or result.get("extensive_summary", "")
+            if len(summary) > 5000:
+                summary = (
+                    summary[:5000] + "\n\n[...SUMMARY TRUNCATED FOR EVALUATION...]"
+                )
 
             truncation_warning = ""
             if is_truncated:
