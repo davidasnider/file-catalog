@@ -145,7 +145,6 @@ Text:
                 "summary": cleaned_summary,
                 "skipped": False,
                 "model": getattr(llm, "model_name", "Unknown Model"),
-                "prompt": prompt,
             }
 
         except Exception as e:

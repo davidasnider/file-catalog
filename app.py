@@ -93,6 +93,25 @@ def fetch_document_tasks(doc_id: int):
 
 
 @st.cache_data(ttl=5)
+def fetch_all_tasks_for_documents(doc_ids: list[int]):
+    """Fetch all tasks for a list of documents in a single query."""
+
+    async def _fetch():
+        async with async_session_maker() as session:
+            stmt = select(AnalysisTask).where(AnalysisTask.document_id.in_(doc_ids))
+            res = await session.execute(stmt)
+            tasks = res.scalars().all()
+            task_dict = {doc_id: [] for doc_id in doc_ids}
+            for t in tasks:
+                task_dict[t.document_id].append(t)
+            return task_dict
+
+    if not doc_ids:
+        return {}
+    return asyncio.run(_fetch())
+
+
+@st.cache_data(ttl=5)
 def get_global_metrics():
     """Fetch aggregate metrics for the dashboard."""
 
@@ -200,11 +219,16 @@ def main():
 
     # Apply smart filters and search refinement in-memory on the SQL-filtered subset
     filtered_docs = []
+
+    doc_tasks_map = {}
+    if smart_filters and documents:
+        doc_tasks_map = fetch_all_tasks_for_documents([doc.id for doc in documents])
+
     for doc in documents:
         # SQL filter handled selected_doc_statuses and search_query,
         # but we might still want to apply smart filters which require task data.
         if smart_filters:
-            doc_tasks = fetch_document_tasks(doc.id)
+            doc_tasks = doc_tasks_map.get(doc.id, [])
             match_smart = True
             for f in smart_filters:
                 if f == "Estate Documents":
@@ -228,7 +252,12 @@ def main():
                             t
                             for t in doc_tasks
                             if t.task_name
-                            in [VISION_ANALYZER_NAME, VIDEO_ANALYZER_NAME]
+                            in [
+                                VISION_ANALYZER_NAME,
+                                VIDEO_ANALYZER_NAME,
+                                "vision_analyzer",
+                                "video_analyzer",
+                            ]
                         ),
                         None,
                     )
