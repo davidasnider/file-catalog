@@ -475,11 +475,14 @@ def print_rich_analysis(info: Dict[str, Any]):
     # 13. Full Structured Outputs of Every Completed Scanner/Analyzer
     console.print(
         Rule(
-            "[bold magenta]⚙️ All Scanner & Analyzer Detailed Results[/bold magenta]",
+            "[bold magenta]⚙️ Scanner & Analyzer Detailed Results[/bold magenta]",
             style="magenta",
         )
     )
     console.print()
+
+    skipped_scanners = []
+    active_scanners = []
 
     for task_name, task_info in sorted(results.items()):
         status = task_info.get("status")
@@ -488,17 +491,56 @@ def print_rich_analysis(info: Dict[str, Any]):
 
         if status_str == "COMPLETED" or status_str == "TaskStatus.COMPLETED":
             data = task_info.get("data")
-            if data:
-                json_str = json.dumps(data, indent=2, ensure_ascii=False)
-                console.print(
-                    Panel(
-                        JSON(json_str),
-                        title=f"[bold cyan]Scanner Output: {task_name} (v{task_info.get('version', '1.0')})[/bold cyan]",
-                        border_style="magenta",
-                        box=box.ROUNDED,
-                    )
+            if isinstance(data, dict):
+                is_skipped = (
+                    data.get("skipped") is True or data.get("skipped") == "True"
                 )
-                console.print()
+                if is_skipped:
+                    reason = (
+                        data.get("reason")
+                        or data.get("error")
+                        or "Condition not met by should_run"
+                    )
+                    skipped_scanners.append(
+                        (task_name, task_info.get("version", "1.0"), reason)
+                    )
+                else:
+                    active_scanners.append((task_name, task_info, data))
+            elif data:
+                active_scanners.append((task_name, task_info, data))
+
+    # Print Active Scanners
+    for name, info, data in active_scanners:
+        json_str = json.dumps(data, indent=2, ensure_ascii=False)
+        console.print(
+            Panel(
+                JSON(json_str),
+                title=f"[bold cyan]Scanner Output: {name} (v{info.get('version', '1.0')})[/bold cyan]",
+                border_style="magenta",
+                box=box.ROUNDED,
+            )
+        )
+        console.print()
+
+    # Print Skipped Scanners in a highly compact table
+    if skipped_scanners:
+        skipped_table = Table(box=box.SIMPLE, border_style="dim white")
+        skipped_table.add_column("Skipped Scanner / Plugin", style="bold dim white")
+        skipped_table.add_column("Version", style="dim white")
+        skipped_table.add_column("Reason / Context", style="italic dim white")
+
+        for name, ver, reason in skipped_scanners:
+            skipped_table.add_row(name, ver, reason)
+
+        console.print(
+            Panel(
+                skipped_table,
+                title="[bold dim white]⏭️ Scanners Skipped (Conditions Not Met)[/bold dim white]",
+                border_style="dim white",
+                box=box.ROUNDED,
+            )
+        )
+        console.print()
 
 
 async def get_matching_files(path: str) -> list[Dict[str, Any]]:
@@ -587,9 +629,9 @@ async def main():
         help="Do not attempt to display terminal images.",
     )
     parser.add_argument(
-        "--rich",
+        "--yaml",
         action="store_true",
-        help="Output raw analysis results as a beautifully formatted Rich terminal layout.",
+        help="Output raw analysis results as YAML instead of the formatted Rich layout.",
     )
     args = parser.parse_args()
 
@@ -605,7 +647,7 @@ async def main():
         sys.exit(1)
 
     # 1. Output YAML or Rich
-    if not args.rich:
+    if args.yaml:
         if len(matches) == 1:
             print(yaml.dump(matches[0], sort_keys=False, allow_unicode=True, indent=2))
         else:
