@@ -7,6 +7,9 @@
 - [x] Add audio extraction using Whisper (or similar models) for mp3, audio, and movie files to get transcripts for text extraction.
 - [x] Add video analysis for movie files to provide video content descriptions.
 - [x] Exclude files not worth cataloging (CSS, code/JS from downloaded HTML pages, etc.).
+- [x] Fix ORM enum deserialization by updating `Document` and `AnalysisTask` models.
+- [x] Implement a "Thinking Stripper" in `AnalyzerBase` to remove LLM internal reasoning blocks (e.g., `<think>` tags) from summaries.
+- [x] Integrate `EmailParser` output into the text aggregation logic for summarizer and routing plugins.
 
 ---
 
