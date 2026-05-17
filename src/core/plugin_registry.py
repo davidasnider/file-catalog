@@ -47,6 +47,9 @@ class AnalyzerBase(ABC):
         """
         Removes common LLM 'thinking process' blocks or XML tags before returning the final text.
         """
+        if not response:
+            return ""
+
         import re
 
         clean_str = response.strip()

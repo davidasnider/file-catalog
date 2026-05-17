@@ -44,10 +44,11 @@ class VisionAnalyzerPlugin(AnalyzerBase):
                 "Respond ONLY with valid JSON. Do not include any introductory or concluding text."
             )
 
+            model_max = await llm.get_max_output_tokens()
             response_text = await llm.process_image(
                 image_path=file_path,
                 prompt=prompt,
-                max_tokens=256,  # Sufficient for JSON without excessive repetition
+                max_tokens=model_max,
                 temperature=0.0,
                 response_format="json",
             )
@@ -85,6 +86,7 @@ class VisionAnalyzerPlugin(AnalyzerBase):
                     "adult_content_score": score,
                     "model": getattr(llm, "model_name", "Unknown Model"),
                     "source": VISION_ANALYZER_NAME,
+                    "prompt": prompt,
                 }
                 logger.info(
                     f"Vision analysis result for {file_path}: is_sfw={result['is_sfw']} (score={score}), description='{result['description'][:100]}...'"

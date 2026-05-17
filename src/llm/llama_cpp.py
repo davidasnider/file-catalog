@@ -181,7 +181,8 @@ class LlamaCppProvider(LLMProvider):
                 ],
                 **chat_kwargs,
             )
-            return response["choices"][0]["message"]["content"].strip()
+            content = response["choices"][0]["message"]["content"]
+            return content.strip() if content else ""
 
         return await loop.run_in_executor(self.executor, _run_sync)
 
@@ -257,7 +258,8 @@ class LlamaCppProvider(LLMProvider):
                 ],
                 **gen_kwargs,
             )
-            return response["choices"][0]["message"]["content"].strip()
+            content = response["choices"][0]["message"]["content"]
+            return content.strip() if content else ""
 
         return await loop.run_in_executor(self.executor, _run_sync)
 

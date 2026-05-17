@@ -138,9 +138,9 @@ class DeepSummarizerPlugin(AnalyzerBase):
             SUMMARY:
             """
             try:
-                # Setting higher max_tokens to capture extensive details, but still bounded by model max
-                limit = min(1200, max_output_tokens)
-                response = await llm.generate(prompt, max_tokens=limit, temperature=0.2)
+                response = await llm.generate(
+                    prompt, max_tokens=max_output_tokens, temperature=0.2
+                )
                 chunk_summaries.append(self._strip_thinking(response))
             except Exception as e:
                 logger.error(f"Error summarizing chunk {i + 1} for {file_path}: {e}")
@@ -177,9 +177,8 @@ class DeepSummarizerPlugin(AnalyzerBase):
         """
 
         try:
-            limit = min(3000, max_output_tokens)
             final_response = await llm.generate(
-                final_prompt, max_tokens=limit, temperature=0.3
+                final_prompt, max_tokens=max_output_tokens, temperature=0.3
             )
             cleaned_final = self._strip_thinking(final_response)
             return {
@@ -188,6 +187,7 @@ class DeepSummarizerPlugin(AnalyzerBase):
                 "skipped": False,
                 "chunks_processed": len(chunk_summaries),
                 "model": getattr(llm, "model_name", "Unknown Deep Model"),
+                "prompt": final_prompt,
             }
         except Exception as e:
             logger.error(f"Error during Reduce phase for {file_path}: {e}")

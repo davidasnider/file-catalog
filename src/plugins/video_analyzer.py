@@ -196,10 +196,11 @@ class VideoAnalyzerPlugin(AnalyzerBase):
                 )
 
                 try:
+                    model_max = await llm.get_max_output_tokens()
                     desc = await llm.process_image(
                         image_path=batch if supports_multi_image else batch[0],
                         prompt=batch_prompt,
-                        max_tokens=300,
+                        max_tokens=model_max,
                         temperature=0.2,
                     )
                     partial_descriptions.append(desc.strip())
@@ -261,8 +262,12 @@ class VideoAnalyzerPlugin(AnalyzerBase):
 
             final_prompt += f"SEGMENT DESCRIPTIONS:\n{combined_segments}"
 
+            text_model_max = await text_llm.get_max_output_tokens()
             response_text = await text_llm.generate(
-                final_prompt, max_tokens=1024, temperature=0.3, response_format="json"
+                final_prompt,
+                max_tokens=text_model_max,
+                temperature=0.3,
+                response_format="json",
             )
 
             try:

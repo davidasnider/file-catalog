@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     max_retries: int = 3
     log_format: str = "standard"  # "standard" or "json"
     concurrency_limit_ratio: float = 0.5
+    judge_enabled: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"

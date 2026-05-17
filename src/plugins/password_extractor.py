@@ -92,9 +92,10 @@ class PasswordExtractorPlugin(AnalyzerBase):
         """
 
         try:
+            model_max = await llm.get_max_output_tokens()
             response = await llm.generate(
                 prompt,
-                max_tokens=150,
+                max_tokens=model_max,
                 temperature=0.0,
                 response_format={
                     "type": "json_object",

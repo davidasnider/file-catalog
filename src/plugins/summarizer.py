@@ -110,32 +110,42 @@ class SummarizerPlugin(AnalyzerBase):
         prompt = f"""
 You are an expert document summarizer analyzing a local digital archive. Read the following text extracted from a file and provide a concise, 3-sentence summary of the core content.
 
-CRITICAL INSTRUCTION: Return ONLY the 3-sentence summary.
-DO NOT output any thinking process. NO <think> tags. NO "Here is a thinking process".
-Do NOT include any conversational filler, preambles, or introductory text.
-Begin exactly with the first sentence of the summary.
+CRITICAL INSTRUCTIONS:
+1. Return ONLY the 3-sentence summary.
+2. Accurately identify the roles of individuals (e.g., strictly distinguish between the customer/account holder and service providers/technicians). Do not conflate names with incorrect titles.
+3. Ensure absolute factual alignment with the source text. Do not make assumptions.
+4. DO NOT output any thinking process. NO <think> tags. NO "Here is a thinking process".
+5. Do NOT include any conversational filler, preambles, or introductory text.
+6. Begin exactly with the first sentence of the summary.
 
 Text:
 {extracted_text}
 """
 
         try:
-            # Query the model for its maximum output token limit
+            # We pass the maximum supported tokens because reasoning models (like Qwen) use extensive tokens for thinking
+            # before they output the short summary.
             model_max = await llm.get_max_output_tokens()
-            # For 3-sentence summaries, we clamp it to a safe target
-            max_tokens = min(500, model_max)
-
             summary_response = await llm.generate(
-                prompt, max_tokens=max_tokens, temperature=0.3
+                prompt, max_tokens=model_max, temperature=0.3
             )
+
+            if not summary_response:
+                raise ValueError("LLM returned an empty response during summarization.")
 
             # Strip any leaked thinking blocks
             cleaned_summary = self._strip_thinking(summary_response)
+
+            if not cleaned_summary:
+                raise ValueError(
+                    "LLM response was empty after stripping thinking blocks."
+                )
 
             return {
                 "summary": cleaned_summary,
                 "skipped": False,
                 "model": getattr(llm, "model_name", "Unknown Model"),
+                "prompt": prompt,
             }
 
         except Exception as e:

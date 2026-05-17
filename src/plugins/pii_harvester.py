@@ -78,9 +78,10 @@ class PIIHarvesterPlugin(AnalyzerBase):
         """
 
         try:
+            model_max = await llm.get_max_output_tokens()
             response = await llm.generate(
                 prompt,
-                max_tokens=250,
+                max_tokens=model_max,
                 temperature=0.0,
                 response_format={
                     "type": "json_object",
@@ -116,7 +117,12 @@ class PIIHarvesterPlugin(AnalyzerBase):
                     valid_emails.append(email.strip())
             parsed["emails"] = valid_emails
 
-            return {"pii": parsed, "skipped": False, "method": "llm_json_expert"}
+            return {
+                "pii": parsed,
+                "skipped": False,
+                "method": "llm_json_expert",
+                "prompt": prompt,
+            }
         except Exception as e:
             logger.error(f"Failed to harvest PII for {file_path}: {e}")
             return {"pii": {}, "skipped": True, "error": str(e)}

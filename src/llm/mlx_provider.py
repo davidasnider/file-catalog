@@ -141,7 +141,7 @@ class MLXProvider(LLMProvider):
                 logits_processors=logits_processors,
                 verbose=False,
             )
-            return response.strip()
+            return response.strip() if response else ""
 
         async with get_mlx_gpu_lock():
             return await loop.run_in_executor(None, _run_sync)
@@ -344,7 +344,7 @@ class MLXProvider(LLMProvider):
                     mx.eval(logits)
 
                 result = tokenizer.decode(generated_tokens, skip_special_tokens=True)
-                return result.strip()
+                return result.strip() if result else ""
 
             except Exception as e:
                 logger.error(f"MLX VLM execution failed: {e}")

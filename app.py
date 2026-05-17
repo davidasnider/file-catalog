@@ -59,16 +59,57 @@ st.markdown(
 )
 
 
-async def fetch_all_data():
-    """Fetch all documents and tasks asynchronously in a single session."""
-    async with async_session_maker() as session:
-        docs = (
-            (await session.execute(select(Document).order_by(Document.id.desc())))
-            .scalars()
-            .all()
-        )
-        tasks = (await session.execute(select(AnalysisTask))).scalars().all()
-        return docs, tasks
+@st.cache_data(ttl=10)
+def fetch_documents(selected_statuses: list[str], search_query: str):
+    """Fetch filtered documents from the database."""
+
+    async def _fetch():
+        async with async_session_maker() as session:
+            stmt = select(Document)
+            if selected_statuses:
+                # Map names back to enum if necessary, or just compare strings
+                stmt = stmt.where(Document.status.in_(selected_statuses))
+            if search_query:
+                stmt = stmt.where(Document.path.like(f"%{search_query}%"))
+
+            stmt = stmt.order_by(Document.id.desc())
+            res = await session.execute(stmt)
+            return res.scalars().all()
+
+    return asyncio.run(_fetch())
+
+
+@st.cache_data(ttl=5)
+def fetch_document_tasks(doc_id: int):
+    """Fetch all tasks for a specific document."""
+
+    async def _fetch():
+        async with async_session_maker() as session:
+            stmt = select(AnalysisTask).where(AnalysisTask.document_id == doc_id)
+            res = await session.execute(stmt)
+            return res.scalars().all()
+
+    return asyncio.run(_fetch())
+
+
+@st.cache_data(ttl=5)
+def get_global_metrics():
+    """Fetch aggregate metrics for the dashboard."""
+
+    async def _fetch():
+        from sqlalchemy import func
+
+        async with async_session_maker() as session:
+            total = await session.scalar(select(func.count(Document.id)))
+            completed = await session.scalar(
+                select(func.count(Document.id)).where(Document.status == "COMPLETED")
+            )
+            failed = await session.scalar(
+                select(func.count(Document.id)).where(Document.status == "FAILED")
+            )
+            return {"total": total, "completed": completed, "failed": failed}
+
+    return asyncio.run(_fetch())
 
 
 def get_status_color(status_str: str) -> str:
@@ -77,6 +118,8 @@ def get_status_color(status_str: str) -> str:
         "PENDING": "🟡",
         "ANALYZING": "🔵",
         "FAILED": "🔴",
+        "IN_PROGRESS": "🔵",
+        "RETRIES": "🟠",
     }
     # Handling enum string output
     status_base = status_str.split(".")[-1] if "." in status_str else status_str
@@ -107,61 +150,29 @@ def main():
     st.title("📂 Local AI File Catalog")
     st.markdown("Analyze and interact with your digitally archived documents.")
 
-    # Fetch data
-    with st.status("Loading database records...", expanded=True) as status:
-        try:
-            status.write("Connecting to database and fetching records...")
-            documents, all_tasks = asyncio.run(fetch_all_data())
-            status.write(
-                f"✅ Loaded {len(documents)} documents and {len(all_tasks)} tasks."
-            )
-
-            status.update(label="Data loaded. Preparing dashboard...", state="running")
-
-            # Map tasks
-            tasks_by_doc = {}
-            if all_tasks:
-                progress_text = "Mapping tasks to documents..."
-                mapping_progress = st.progress(0, text=progress_text)
-                total_tasks = len(all_tasks)
-                for i, t in enumerate(all_tasks):
-                    tasks_by_doc.setdefault(t.document_id, []).append(t)
-                    if i % 1000 == 0 or i == total_tasks - 1:
-                        mapping_progress.progress(
-                            (i + 1) / total_tasks,
-                            text=f"Mapping task {i+1}/{total_tasks}...",
-                        )
-                mapping_progress.empty()
-
-            status.update(
-                label=f"Dashboard ready: {len(documents)} docs, {len(all_tasks)} tasks",
-                state="complete",
-            )
-        except Exception as e:
-            status.update(label="Database connection failed", state="error")
-            st.error(f"Failed to connect to database: {e}")
-            return
-
-    if not documents:
-        st.info("No documents found in the database. Run the scanner CLI first!")
-        return
-
     # Sidebar Filters
     with st.sidebar:
         st.header("Filters")
 
-        all_doc_statuses = [doc.status.name for doc in documents]
-        unique_doc_statuses = sorted(list(set(all_doc_statuses)))
+        if st.button("🔄 Refresh Cache"):
+            st.cache_data.clear()
+            st.rerun()
+
+        # Get unique statuses for the multiselect (cached)
+        @st.cache_data(ttl=3600)
+        def get_all_statuses():
+            async def _fetch():
+                async with async_session_maker() as session:
+                    res = await session.execute(select(Document.status).distinct())
+                    return [s.name for s in res.scalars().all()]
+
+            return asyncio.run(_fetch())
+
+        unique_doc_statuses = get_all_statuses()
         selected_doc_statuses = st.multiselect(
             "Filter by Document Status",
             unique_doc_statuses,
             default=unique_doc_statuses,
-        )
-
-        all_task_statuses = [t.status.name for t in all_tasks]
-        unique_task_statuses = sorted(list(set(all_task_statuses)))
-        selected_task_statuses = st.multiselect(
-            "Filter by Task Status", unique_task_statuses, default=unique_task_statuses
         )
 
         search_query = st.text_input("Search path...", "")
@@ -179,22 +190,24 @@ def main():
             default=[],
         )
 
-    # Apply filters
+    # Fetch Filtered Documents
+    with st.spinner("Fetching documents..."):
+        documents = fetch_documents(selected_doc_statuses, search_query)
+
+    if not documents:
+        st.info("No documents found matching your filters.")
+        return
+
+    # Apply smart filters and search refinement in-memory on the SQL-filtered subset
     filtered_docs = []
     for doc in documents:
-        if doc.status.name not in selected_doc_statuses:
-            continue
-        if search_query.lower() not in doc.path.lower():
-            continue
-
-        doc_tasks = tasks_by_doc.get(doc.id, [])
-
-        # Smart Filter Logic
+        # SQL filter handled selected_doc_statuses and search_query,
+        # but we might still want to apply smart filters which require task data.
         if smart_filters:
+            doc_tasks = fetch_document_tasks(doc.id)
             match_smart = True
             for f in smart_filters:
                 if f == "Estate Documents":
-                    # Check EstateAnalyzer
                     estate_task = next(
                         (t for t in doc_tasks if t.task_name == ESTATE_ANALYZER_NAME),
                         None,
@@ -210,18 +223,12 @@ def main():
                         match_smart = False
 
                 elif f == "NSFW Content":
-                    # Check vision_analyzer or video_analyzer
                     nsfw_task = next(
                         (
                             t
                             for t in doc_tasks
                             if t.task_name
-                            in [
-                                VISION_ANALYZER_NAME,
-                                VIDEO_ANALYZER_NAME,
-                                "vision_analyzer",
-                                "video_analyzer",
-                            ]
+                            in [VISION_ANALYZER_NAME, VIDEO_ANALYZER_NAME]
                         ),
                         None,
                     )
@@ -229,7 +236,6 @@ def main():
                     if nsfw_task and nsfw_task.result_data:
                         try:
                             res = json.loads(nsfw_task.result_data)
-                            # is_sfw is True if safe, False if NSFW
                             if "is_sfw" in res:
                                 is_nsfw = not res.get("is_sfw", True)
                         except Exception:
@@ -238,7 +244,6 @@ def main():
                         match_smart = False
 
                 elif f == "Contains Passwords":
-                    # Check PasswordExtractor for 'passwords'
                     pw_task = next(
                         (
                             t
@@ -255,8 +260,6 @@ def main():
                                 has_passwords = True
                         except Exception:
                             pass
-
-                    # Fallback to legacy PIIHarvester
                     if not has_passwords:
                         pii_task = next(
                             (t for t in doc_tasks if t.task_name == PII_HARVESTER_NAME),
@@ -270,17 +273,10 @@ def main():
                                     has_passwords = True
                             except Exception:
                                 pass
-
                     if not has_passwords:
                         match_smart = False
 
             if not match_smart:
-                continue
-
-        if selected_task_statuses != unique_task_statuses:
-            if not doc_tasks:
-                continue
-            if not any(t.status.name in selected_task_statuses for t in doc_tasks):
                 continue
 
         filtered_docs.append(doc)
@@ -327,7 +323,7 @@ def main():
             event = st.dataframe(
                 df[["Document Status", "File"]],
                 height=400,
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
                 column_config={
                     "Document Status": st.column_config.TextColumn(
@@ -344,11 +340,12 @@ def main():
                 selected_row = df.iloc[selected_idx]
 
     # Metrics Row
+    metrics = get_global_metrics()
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total Documents", len(documents))
+    col1.metric("Total Documents", metrics["total"])
     col2.metric("Filtered", len(filtered_docs))
-    col3.metric("Completed", sum(1 for d in documents if d.status.name == "COMPLETED"))
-    col4.metric("Failed", sum(1 for d in documents if d.status.name == "FAILED"))
+    col3.metric("Completed", metrics["completed"])
+    col4.metric("Failed", metrics["failed"])
 
     # Detail View Context
     if selected_row is not None:
@@ -378,8 +375,8 @@ def main():
             st.subheader("Document Details")
             st.markdown(f"**File:** `{selected_doc.path.split('/')[-1]}`")
 
-            # Fetch Tasks
-            raw_tasks = tasks_by_doc.get(doc_id, [])
+            # Fetch Tasks for selected document only
+            raw_tasks = fetch_document_tasks(doc_id)
 
             # Separate out the Summarizer
             # Prioritize DeepSummarizer for large documents

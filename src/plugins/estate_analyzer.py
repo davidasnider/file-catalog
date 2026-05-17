@@ -130,9 +130,10 @@ Text:
 
         try:
             # We urge the LLM towards JSON. Advanced models support forced schemas.
+            model_max = await llm.get_max_output_tokens()
             llm_response = await llm.generate(
                 prompt,
-                max_tokens=150,
+                max_tokens=model_max,
                 temperature=0.0,
                 response_format={
                     "type": "json_object",

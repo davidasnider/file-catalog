@@ -25,7 +25,7 @@ from rich.table import Table
 from rich.columns import Columns
 
 from src.db.engine import init_db, async_session_maker
-from src.db.models import Document, DocumentStatus, AnalysisTask
+from src.db.models import Document, DocumentStatus, AnalysisTask, TaskStatus
 from src.core.task_engine import TaskEngine
 from src.core.file_type import detect_file_type
 from src.core.plugin_registry import load_plugins
@@ -682,48 +682,68 @@ async def run_scanner(
             return "Error reading log file."
 
     async def get_stats():
-        import json
         from sqlalchemy import func
 
         stats_text = Text()
         async with async_session_maker() as session:
-            # Query document counts with aggregate functions
-            total_docs = await session.scalar(select(func.count(Document.id))) or 0
-            completed_docs = (
-                await session.scalar(
-                    select(func.count(Document.id)).where(
-                        Document.status == DocumentStatus.COMPLETED
-                    )
+            # 1. Aggregate Document stats in one query
+            doc_stats_res = await session.execute(
+                select(Document.status, func.count(Document.id)).group_by(
+                    Document.status
                 )
-                or 0
             )
-            failed_docs = (
-                await session.scalar(
-                    select(func.count(Document.id)).where(
-                        Document.status == DocumentStatus.FAILED
-                    )
-                )
-                or 0
-            )
+            doc_stats = {s: c for s, c in doc_stats_res.all()}
+            total_docs = sum(doc_stats.values())
+            completed_docs = doc_stats.get(DocumentStatus.COMPLETED, 0)
+            failed_docs = doc_stats.get(DocumentStatus.FAILED, 0)
             finished_docs = completed_docs + failed_docs
 
-            # Query aggregated task counts by status
-            task_counts_result = await session.execute(
+            # 2. Aggregate Task stats in one query (Group by Plugin and Status)
+            task_stats_res = await session.execute(
                 select(
+                    AnalysisTask.task_name,
                     AnalysisTask.status,
-                    func.count().label("count"),
-                ).group_by(AnalysisTask.status)
+                    func.count(AnalysisTask.id).label("count"),
+                ).group_by(AnalysisTask.task_name, AnalysisTask.status)
             )
-            status_counts = {}
-            for status, count in task_counts_result.all():
-                status_key = status.name if hasattr(status, "name") else str(status)
-                status_counts[status_key] = status_counts.get(status_key, 0) + (
-                    count or 0
-                )
 
-            total_tasks = sum(status_counts.values())
-            completed_tasks = status_counts.get("COMPLETED", 0)
-            failed_tasks = status_counts.get("FAILED", 0)
+            plugin_stats = {}
+            for t_name, t_status, t_count in task_stats_res.all():
+                if t_name not in plugin_stats:
+                    plugin_stats[t_name] = {
+                        "total": 0,
+                        "error": 0,
+                        "skipped": 0,
+                        "success": 0,
+                        "results": [],
+                    }
+
+                s = plugin_stats[t_name]
+                s["total"] += t_count
+
+                status_str = (
+                    t_status.name if hasattr(t_status, "name") else str(t_status)
+                )
+                if status_str == "FAILED" or status_str.endswith(".FAILED"):
+                    s["error"] += t_count
+                elif status_str == "COMPLETED" or status_str.endswith(".COMPLETED"):
+                    s["success"] += t_count
+
+            # 3. Optional: Get a sample of errors for the error table (don't fetch all)
+            error_counts = {}
+            recent_errors = await session.execute(
+                select(AnalysisTask.error_message)
+                .where(AnalysisTask.status == TaskStatus.FAILED)
+                .limit(100)  # Only look at last 100 errors for the summary
+            )
+            for (err_msg,) in recent_errors.all():
+                if err_msg:
+                    msg = err_msg.split(":")[0][:50]
+                    error_counts[msg] = error_counts.get(msg, 0) + 1
+
+            total_tasks = sum(s["total"] for s in plugin_stats.values())
+            completed_tasks = sum(s["success"] for s in plugin_stats.values())
+            failed_tasks = sum(s["error"] for s in plugin_stats.values())
 
             elapsed = time.time() - start_time
             if elapsed > 0 and finished_docs > 0:
@@ -767,65 +787,6 @@ async def run_scanner(
                 style="dim",
             )
             stats_text.append(f"{eta_str}", style="yellow")
-
-            # Query only necessary columns for the plugin table
-            task_result = await session.execute(
-                select(
-                    AnalysisTask.task_name,
-                    AnalysisTask.status,
-                    AnalysisTask.error_message,
-                    AnalysisTask.result_data,
-                )
-            )
-            all_tasks = task_result.all()
-
-            # plugin_name -> {total: X, error: Y, skipped: Z, success: W, results: []}
-            plugin_stats = {}
-            error_counts = {}  # error_msg -> count
-
-            for t in all_tasks:
-                if t.task_name not in plugin_stats:
-                    plugin_stats[t.task_name] = {
-                        "total": 0,
-                        "error": 0,
-                        "skipped": 0,
-                        "success": 0,
-                        "results": [],
-                    }
-
-                s = plugin_stats[t.task_name]
-                s["total"] += 1
-
-                # Check status via string or name attribute
-                status_str = (
-                    t.status.name if hasattr(t.status, "name") else str(t.status)
-                )
-
-                if status_str == "FAILED" or status_str.endswith(".FAILED"):
-                    s["error"] += 1
-                    if t.error_message:
-                        # Truncate and clean up error message for aggregation
-                        msg = t.error_message.split(":")[0][:50]
-                        error_counts[msg] = error_counts.get(msg, 0) + 1
-                elif status_str == "COMPLETED" or status_str.endswith(".COMPLETED"):
-                    if t.result_data:
-                        try:
-                            data = json.loads(t.result_data)
-                            is_skipped = (
-                                data.get("skipped") is True
-                                or data.get("reason")
-                                == "Condition not met by should_run"
-                            )
-
-                            if is_skipped:
-                                s["skipped"] += 1
-                            else:
-                                s["success"] += 1
-                                s["results"].append(data)
-                        except Exception:
-                            s["success"] += 1
-                    else:
-                        s["success"] += 1
 
             def plugin_sort_key(p):
                 return (-plugin_stats[p]["error"], -plugin_stats[p]["total"], p)
@@ -917,6 +878,39 @@ async def run_scanner(
         overall_task = progress.add_task(
             "[cyan]Processing documents...", total=total_docs
         )
+
+        # 0. Cleanup orphaned/stalled tasks from previous runs
+        async with async_session_maker() as session:
+            stalled_tasks_res = await session.execute(
+                select(AnalysisTask).where(
+                    AnalysisTask.status == TaskStatus.IN_PROGRESS
+                )
+            )
+            stalled_tasks = stalled_tasks_res.scalars().all()
+            if stalled_tasks:
+                console.print(
+                    f"[yellow]Found {len(stalled_tasks)} stalled tasks. Resetting to PENDING...[/yellow]"
+                )
+                for st in stalled_tasks:
+                    st.status = TaskStatus.PENDING
+                    st.error_message = "Stalled task reset on scanner startup."
+                await session.commit()
+
+            stalled_docs_res = await session.execute(
+                select(Document).where(
+                    Document.status.in_(
+                        [DocumentStatus.EXTRACTING, DocumentStatus.ANALYZING]
+                    )
+                )
+            )
+            stalled_docs = stalled_docs_res.scalars().all()
+            if stalled_docs:
+                console.print(
+                    f"[yellow]Found {len(stalled_docs)} stalled documents. Resetting to PENDING...[/yellow]"
+                )
+                for sd in stalled_docs:
+                    sd.status = DocumentStatus.PENDING
+                await session.commit()
 
         async def run_background_ingest():
             async with async_session_maker() as session:
@@ -1060,18 +1054,17 @@ async def run_scanner(
             )
             update_waiting()
 
-        callbacks = {
-            "doc_start": on_doc_start,
-            "plugin_start": on_plugin_start,
-            "doc_end": on_doc_end,
-        }
-
         abort_event = asyncio.Event()
+
         task_engine = TaskEngine(
             async_session_maker=async_session_maker,
             max_concurrent_tasks=max_concurrent,
             mime_limit_ratio=limit_ratio,
-            callbacks=callbacks,
+            callbacks={
+                "doc_start": on_doc_start,
+                "doc_end": on_doc_end,
+                "plugin_start": on_plugin_start,
+            },
             abort_event=abort_event,
         )
 
@@ -1108,7 +1101,6 @@ async def run_scanner(
         except NotImplementedError:
             signal.signal(signal.SIGINT, handle_sigint)
 
-        # Background task to update the log pane and stats pane
         async def update_ui_panes():
             while True:
                 # Update Log
@@ -1212,11 +1204,157 @@ async def run_scanner(
         )
 
 
+async def run_standalone_judge():
+    from src.db.engine import async_session_maker
+    from src.db.models import AnalysisTask, Document
+    from src.core.judge import TaskJudge
+    from sqlmodel import select
+    from rich.console import Console
+    import json
+
+    console = Console()
+    console.print("[bold cyan]Starting Standalone LLM Judge Evaluation...[/bold cyan]")
+    judge = TaskJudge()
+
+    async with async_session_maker() as session:
+        # Get tasks that have result_data
+        result = await session.execute(
+            select(AnalysisTask, Document)
+            .join(Document, AnalysisTask.document_id == Document.id)
+            .where(AnalysisTask.result_data.is_not(None))
+            .where(AnalysisTask.result_data != "{}")
+        )
+        tasks_with_docs = result.all()
+
+    if not tasks_with_docs:
+        console.print(
+            "[yellow]No completed tasks with result_data found in the database.[/yellow]"
+        )
+        return
+
+    console.print(f"Found {len(tasks_with_docs)} tasks to evaluate.")
+
+    failed_count = 0
+    passed_count = 0
+    skipped_count = 0
+
+    for task, doc in tasks_with_docs:
+        try:
+            result_data = json.loads(task.result_data)
+        except Exception:
+            continue
+
+        # Build context from all completed tasks for this document
+        context = {}
+        async with async_session_maker() as session:
+            all_tasks_res = await session.execute(
+                select(AnalysisTask).where(AnalysisTask.document_id == doc.id)
+            )
+            for t in all_tasks_res.scalars().all():
+                if t.result_data:
+                    try:
+                        context[t.task_name] = json.loads(t.result_data)
+                    except Exception:
+                        pass
+
+        retry_count = 0
+        max_retries = 1
+
+        while retry_count <= max_retries:
+            console.print(
+                f"[dim]Evaluating {task.task_name} for Document {doc.path}...[/dim]",
+                end="\r",
+            )
+            status = await judge.judge_task(
+                task.task_name, doc.path, result_data, context
+            )
+
+            # Clear the line
+            console.print(" " * 120, end="\r")
+
+            if status == "PASSED":
+                if retry_count == 0:
+                    passed_count += 1
+                    console.print(
+                        f"✅ [green]PASSED[/green] | Task: {task.task_name} | Doc: {doc.path}"
+                    )
+                else:
+                    passed_count += 1
+                    console.print(
+                        f"🎉 [green]FIXED ON RETRY[/green] | Task: {task.task_name} | Doc: {doc.path}"
+                    )
+                    # Save the fixed result to the database
+                    async with async_session_maker() as update_session:
+                        db_task = await update_session.get(AnalysisTask, task.id)
+                        if db_task:
+                            db_task.result_data = json.dumps(result_data)
+                            await update_session.commit()
+                break
+            elif status == "SKIPPED":
+                skipped_count += 1
+                # We don't print skipped tasks to avoid spamming the console
+                break
+            elif status in ["ERROR", "FAILED"]:
+                if retry_count < max_retries:
+                    console.print(
+                        f"🔄 [yellow]FAILED/ERROR - Attempting Re-run ({retry_count+1}/{max_retries})[/yellow] | Task: {task.task_name} | Doc: {doc.path}"
+                    )
+                    from src.core.plugin_registry import ANALYZER_REGISTRY
+
+                    analyzer_cls = ANALYZER_REGISTRY.get(task.task_name)
+                    if analyzer_cls:
+                        try:
+                            analyzer = analyzer_cls()
+                            # Re-run the analyzer on the document
+                            result_data = await analyzer.analyze(
+                                doc.path, doc.mime_type, context
+                            )
+                            retry_count += 1
+                            continue  # Loop back and evaluate the new result
+                        except Exception as e:
+                            console.print(f"[red]Retry execution failed:[/red] {e}")
+                    else:
+                        console.print(
+                            f"[red]Cannot retry: Analyzer class {task.task_name} not found.[/red]"
+                        )
+
+                # If we're here, retries were exhausted or the retry failed
+                if status == "ERROR":
+                    failed_count += 1
+                    console.print(
+                        f"⚠️  [yellow]ERROR[/yellow]  | Task: {task.task_name} | Doc: {doc.path}"
+                    )
+                else:
+                    failed_count += 1
+
+                # The judge_task already printed the panel with details
+                try:
+                    input(
+                        "\nPress Enter to continue to the next evaluation (or Ctrl+C to quit)..."
+                    )
+                except KeyboardInterrupt:
+                    console.print("\n[bold red]Aborting evaluation...[/bold red]")
+                    return
+                break
+
+    console.print("\n[bold green]Evaluation Complete![/bold green]")
+    console.print(f"Total Evaluated: {passed_count + failed_count + skipped_count}")
+    console.print(f"Passed: [green]{passed_count}[/green]")
+    console.print(f"Skipped: [dim]{skipped_count}[/dim] (Not eligible for judging)")
+    console.print(f"Failed/Error: [red]{failed_count}[/red]")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Scan a directory and run LLM analysis pipeline."
     )
-    parser.add_argument("directory", type=str, help="Path to the directory to scan.")
+    parser.add_argument(
+        "directory",
+        type=str,
+        nargs="?",
+        default=None,
+        help="Path to the directory to scan.",
+    )
     parser.add_argument(
         "--concurrency",
         type=int,
@@ -1292,6 +1430,13 @@ def main():
         help="Format of the log output.",
     )
     parser.add_argument(
+        "--judge",
+        dest="judge_enabled",
+        action=argparse.BooleanOptionalAction,
+        default=config.judge_enabled,
+        help="Run standalone LLM-as-a-Judge mode on completed tasks.",
+    )
+    parser.add_argument(
         "--concurrency-limit-ratio",
         type=float,
         default=config.concurrency_limit_ratio,
@@ -1310,16 +1455,26 @@ def main():
 
     setup_logging(args.debug)
 
-    asyncio.run(
-        run_scanner(
-            args.directory,
-            args.concurrency,
-            args.clean,
-            args.limit,
-            mime_type,
-            args.concurrency_limit_ratio,
+    if args.judge_enabled:
+        asyncio.run(run_standalone_judge())
+    else:
+        if not args.directory:
+            print("Error: directory argument is required unless running --judge mode.")
+            parser.print_help()
+            import sys
+
+            sys.exit(1)
+
+        asyncio.run(
+            run_scanner(
+                args.directory,
+                args.concurrency,
+                args.clean,
+                args.limit,
+                mime_type,
+                args.concurrency_limit_ratio,
+            )
         )
-    )
 
 
 if __name__ == "__main__":
