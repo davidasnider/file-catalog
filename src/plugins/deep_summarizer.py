@@ -186,6 +186,7 @@ class DeepSummarizerPlugin(AnalyzerBase):
                 "skipped": False,
                 "chunks_processed": len(chunk_summaries),
                 "model": getattr(llm, "model_name", "Unknown Deep Model"),
+                "prompt": final_prompt,
             }
         except Exception as e:
             logger.error(f"Error during Reduce phase for {file_path}: {e}")

@@ -443,59 +443,84 @@ def print_rich_analysis(info: Dict[str, Any]):
     console.print()
 
 
-async def get_file_info(path: str) -> Optional[Dict[str, Any]]:
-    """Fetch all database info for a specific file path."""
-    abs_path = str(Path(path).resolve())
-
+async def get_matching_files(path: str) -> list[Dict[str, Any]]:
+    """Fetch all matching database info for a file path or filename pattern."""
     async with async_session_maker() as session:
-        # Get Document
+        # 1. Try exact match first
+        abs_path = str(Path(path).resolve())
         stmt = select(Document).where(Document.path == abs_path)
         result = await session.execute(stmt)
-        doc = result.scalar_one_or_none()
+        docs = result.scalars().all()
 
-        if not doc:
-            return None
+        # 2. Try suffix/path fragment match if not found (e.g. 'rfb/Appointments.txt')
+        if not docs:
+            stmt = select(Document).where(Document.path.like(f"%{path}"))
+            result = await session.execute(stmt)
+            docs = result.scalars().all()
 
-        # Get Tasks
-        task_stmt = select(AnalysisTask).where(AnalysisTask.document_id == doc.id)
-        task_result = await session.execute(task_stmt)
-        tasks = task_result.scalars().all()
+        # 3. Try filename basename match (e.g. 'Appointments.txt')
+        if not docs:
+            basename = os.path.basename(path)
+            stmt = select(Document).where(Document.path.like(f"%{basename}"))
+            result = await session.execute(stmt)
+            docs = result.scalars().all()
 
-        info = {
-            "document": {
-                "id": doc.id,
-                "path": doc.path,
-                "mime_type": doc.mime_type,
-                "file_hash": doc.file_hash,
-                "file_size": doc.file_size,
-                "status": doc.status,
-                "created_at": doc.created_at.isoformat() if doc.created_at else None,
-                "mtime": doc.mtime,
-            },
-            "analysis_results": {},
-        }
+        if not docs:
+            return []
 
-        for task in tasks:
-            try:
-                data = json.loads(task.result_data) if task.result_data else {}
-            except json.JSONDecodeError:
-                data = task.result_data
+        all_infos = []
+        for doc in docs:
+            # Get Tasks
+            task_stmt = select(AnalysisTask).where(AnalysisTask.document_id == doc.id)
+            task_result = await session.execute(task_stmt)
+            tasks = task_result.scalars().all()
 
-            info["analysis_results"][task.task_name] = {
-                "status": task.status,
-                "version": task.plugin_version,
-                "data": data,
-                "error": task.error_message,
+            info = {
+                "document": {
+                    "id": doc.id,
+                    "path": doc.path,
+                    "mime_type": doc.mime_type,
+                    "file_hash": doc.file_hash,
+                    "file_size": doc.file_size,
+                    "status": doc.status,
+                    "created_at": doc.created_at.isoformat()
+                    if doc.created_at
+                    else None,
+                    "mtime": doc.mtime,
+                },
+                "analysis_results": {},
             }
 
-        return info
+            for task in tasks:
+                try:
+                    data = json.loads(task.result_data) if task.result_data else {}
+                except json.JSONDecodeError:
+                    data = task.result_data
+
+                info["analysis_results"][task.task_name] = {
+                    "status": task.status,
+                    "version": task.plugin_version,
+                    "data": data,
+                    "error": task.error_message,
+                }
+            all_infos.append(info)
+
+        return all_infos
+
+
+async def get_file_info(path: str) -> Optional[Dict[str, Any]]:
+    """Fetch database info for a specific file path (retained for backward compatibility)."""
+    matches = await get_matching_files(path)
+    return matches[0] if matches else None
 
 
 async def main():
     parser = argparse.ArgumentParser(
-        description="Inspect all recorded metadata and analysis for a specific file."
+        description="Inspect all recorded metadata and analysis for a specific file or filename."
     )
-    parser.add_argument("path", type=str, help="Path to the file to inspect.")
+    parser.add_argument(
+        "path", type=str, help="Path or filename of the file to inspect."
+    )
     parser.add_argument(
         "--no-image",
         action="store_true",
@@ -511,56 +536,68 @@ async def main():
     # Initialize database
     await init_db()
 
-    info = await get_file_info(args.path)
+    matches = await get_matching_files(args.path)
 
-    if not info:
+    if not matches:
         console.print(
-            f"[bold red]Error:[/bold red] File not found in catalog database: {args.path}"
+            f"[bold red]Error:[/bold red] File not found in catalog database matching: {args.path}"
         )
         sys.exit(1)
 
     # 1. Output YAML or Rich
     if args.yaml:
-        print(yaml.dump(info, sort_keys=False, allow_unicode=True, indent=2))
+        if len(matches) == 1:
+            print(yaml.dump(matches[0], sort_keys=False, allow_unicode=True, indent=2))
+        else:
+            print(yaml.dump(matches, sort_keys=False, allow_unicode=True, indent=2))
     else:
-        print_rich_analysis(info)
-
-    # 2. Display Image/Thumbnail if supported
-    if not args.no_image and not args.yaml:
-        mime = info["document"]["mime_type"]
-        path = info["document"]["path"]
-
-        if not mime:
+        if len(matches) > 1:
             console.print(
-                "\n[dim](No MIME type detected for this file, skipping visual preview)[/dim]"
+                f"[bold yellow]🔍 Found {len(matches)} files matching filename/pattern '{args.path}':[/bold yellow]\n"
             )
-            return
 
-        term = os.environ.get("TERM_PROGRAM", "")
-        is_iterm = term == "iTerm.app"
+        for idx, info in enumerate(matches):
+            if len(matches) > 1:
+                console.print(
+                    f"[bold cyan]--- Match #{idx + 1} of {len(matches)} ---[/bold cyan]"
+                )
 
-        if is_iterm:
-            if mime.startswith("image/"):
-                console.print(
-                    "\n[bold cyan]--- iTerm2 Inline Visual Preview ---[/bold cyan]"
-                )
-                display_image_iterm2(path)
-            elif mime.startswith("video/"):
-                console.print(
-                    "\n[bold cyan]--- Video Keyframe Preview (5% Start Offset) ---[/bold cyan]"
-                )
-                try:
-                    plugin = VideoAnalyzerPlugin()
-                    temp_thumb = plugin.extract_keyframes(path, count=1)
-                    if temp_thumb:
-                        display_image_iterm2(temp_thumb[0])
-                        # Cleanup
-                        if os.path.exists(temp_thumb[0]):
-                            os.remove(temp_thumb[0])
-                except Exception as e:
-                    console.print(
-                        f"[dim](Could not extract video keyframe preview: {e})[/dim]"
-                    )
+            print_rich_analysis(info)
+
+            # Display Image/Thumbnail if supported
+            if not args.no_image:
+                mime = info["document"]["mime_type"]
+                path = info["document"]["path"]
+
+                if mime:
+                    term = os.environ.get("TERM_PROGRAM", "")
+                    is_iterm = term == "iTerm.app"
+
+                    if is_iterm:
+                        if mime.startswith("image/"):
+                            console.print(
+                                "\n[bold cyan]--- iTerm2 Inline Visual Preview ---[/bold cyan]"
+                            )
+                            display_image_iterm2(path)
+                        elif mime.startswith("video/"):
+                            console.print(
+                                "\n[bold cyan]--- Video Keyframe Preview (5% Start Offset) ---[/bold cyan]"
+                            )
+                            try:
+                                plugin = VideoAnalyzerPlugin()
+                                temp_thumb = plugin.extract_keyframes(path, count=1)
+                                if temp_thumb:
+                                    display_image_iterm2(temp_thumb[0])
+                                    # Cleanup
+                                    if os.path.exists(temp_thumb[0]):
+                                        os.remove(temp_thumb[0])
+                            except Exception as e:
+                                console.print(
+                                    f"[dim](Could not extract video keyframe preview: {e})[/dim]"
+                                )
+
+            if len(matches) > 1 and idx < len(matches) - 1:
+                console.print("\n" + "═" * console.width + "\n")
 
 
 if __name__ == "__main__":
