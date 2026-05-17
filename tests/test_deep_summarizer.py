@@ -27,6 +27,9 @@ async def test_deep_summarizer_map_reduce(monkeypatch):
         async def get_safe_output_tokens(self, prompt, chars_per_token=3.5):
             return 4096
 
+        async def get_context_window(self):
+            return 8192
+
     mock_llm = MockLLM()
     monkeypatch.setattr(
         "src.plugins.deep_summarizer.get_llm_provider", lambda **kwargs: mock_llm

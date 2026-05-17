@@ -1318,6 +1318,8 @@ async def run_standalone_judge():
                         if analyzer_cls
                         else None
                     )
+                    from src.db.fts import sync_document_to_fts
+
                     async with async_session_maker() as update_session:
                         db_task = await update_session.get(AnalysisTask, task.id)
                         if db_task:
@@ -1327,6 +1329,13 @@ async def run_standalone_judge():
                             if current_version:
                                 db_task.plugin_version = current_version
                             await update_session.commit()
+                            try:
+                                await sync_document_to_fts(update_session, doc.id)
+                                await update_session.commit()
+                            except Exception as fts_err:
+                                logger.error(
+                                    f"FTS resync failed during judge retry: {fts_err}"
+                                )
                 break
             elif status == "SKIPPED":
                 skipped_count += 1
@@ -1469,9 +1478,8 @@ def main():
     )
     parser.add_argument(
         "--judge",
-        dest="judge_enabled",
-        action=argparse.BooleanOptionalAction,
-        default=config.judge_enabled,
+        dest="run_judge",
+        action="store_true",
         help="Run standalone LLM-as-a-Judge mode on completed tasks.",
     )
     parser.add_argument(
@@ -1493,7 +1501,7 @@ def main():
 
     setup_logging(args.debug)
 
-    if args.judge_enabled:
+    if args.run_judge:
         asyncio.run(run_standalone_judge())
     else:
         if not args.directory:

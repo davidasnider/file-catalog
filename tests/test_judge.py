@@ -10,6 +10,8 @@ from src.core.analyzer_names import SUMMARIZER_NAME
 def mock_provider():
     provider = AsyncMock()
     provider.get_max_output_tokens.return_value = 1000
+    provider.get_context_window.return_value = 4096
+    provider.get_safe_output_tokens.return_value = 1000
     return provider
 
 
@@ -120,6 +122,23 @@ async def test_judge_missing_scores_fails(judge, mock_provider):
     """A malformed response without required score fields should FAIL, not silently pass."""
     with patch.object(config, "judge_enabled", True):
         mock_provider.generate.return_value = '{"reasoning": "Some analysis"}'
+        with patch.object(
+            judge, "_handle_failure", new_callable=AsyncMock
+        ) as mock_handle:
+            context = {"TextExtractor": {"text": "some text"}}
+            result = {"summary": "some summary"}
+            status = await judge.judge_task(
+                SUMMARIZER_NAME, "test.txt", result, context
+            )
+            assert status == "FAILED"
+            mock_handle.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_judge_low_coverage_fails(judge, mock_provider):
+    """A response with low coverage score (<4) should fail the judge task evaluation."""
+    with patch.object(config, "judge_enabled", True):
+        mock_provider.generate.return_value = '{"accuracy": 5, "coverage": 2, "hallucination_free": 5, "reasoning": "Good except missing major parts"}'
         with patch.object(
             judge, "_handle_failure", new_callable=AsyncMock
         ) as mock_handle:

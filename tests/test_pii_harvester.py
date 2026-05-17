@@ -36,6 +36,9 @@ async def test_pii_harvester_json_cleanup(monkeypatch):
         async def get_safe_output_tokens(self, prompt, chars_per_token=3.5):
             return 4096
 
+        async def get_context_window(self):
+            return 8192
+
     monkeypatch.setattr(
         "src.plugins.pii_harvester.get_llm_provider", lambda **kwargs: MockLLM()
     )

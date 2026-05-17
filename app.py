@@ -95,13 +95,18 @@ def fetch_document_tasks(doc_id: int):
 
 @st.cache_data(ttl=5)
 def fetch_all_tasks_for_documents(doc_ids: list[int]):
-    """Fetch all tasks for a list of documents in a single query."""
+    """Fetch all tasks for a list of documents in a single query, chunked to prevent SQLite parameter limits."""
 
     async def _fetch():
         async with async_session_maker() as session:
-            stmt = select(AnalysisTask).where(AnalysisTask.document_id.in_(doc_ids))
-            res = await session.execute(stmt)
-            tasks = res.scalars().all()
+            tasks = []
+            chunk_size = 900
+            for i in range(0, len(doc_ids), chunk_size):
+                chunk = doc_ids[i : i + chunk_size]
+                stmt = select(AnalysisTask).where(AnalysisTask.document_id.in_(chunk))
+                res = await session.execute(stmt)
+                tasks.extend(res.scalars().all())
+
             task_dict = {doc_id: [] for doc_id in doc_ids}
             for t in tasks:
                 task_dict[t.document_id].append(t)

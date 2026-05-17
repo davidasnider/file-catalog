@@ -51,6 +51,14 @@ class LLMProvider(ABC):
         pass
 
     @abstractmethod
+    async def get_context_window(self) -> int:
+        """
+        Returns the total context window size (input + output tokens combined)
+        supported by the current model.
+        """
+        pass
+
+    @abstractmethod
     async def get_max_output_tokens(self) -> int:
         """
         Returns the maximum number of output tokens supported by the current model.
@@ -73,11 +81,20 @@ class LLMProvider(ABC):
             chars_per_token: Rough character-to-token ratio (default 3.5 for English).
 
         Returns:
-            A safe number of output tokens (minimum 256).
+            A safe number of output tokens.
+
+        Raises:
+            ValueError: If the estimated input prompt length exceeds the total context window.
         """
+        total_ctx = await self.get_context_window()
         model_max = await self.get_max_output_tokens()
         estimated_input_tokens = int(len(prompt) / chars_per_token)
-        # model_max from providers already subtracts a conservative input budget (e.g. 1024),
-        # but that fixed budget may be insufficient for large prompts
-        safe_output = max(256, model_max - estimated_input_tokens)
+
+        if estimated_input_tokens >= total_ctx:
+            raise ValueError(
+                f"Estimated prompt tokens ({estimated_input_tokens}) exceeds "
+                f"the model's total context window size ({total_ctx}). Prompt must be truncated or chunked."
+            )
+
+        safe_output = total_ctx - estimated_input_tokens
         return min(safe_output, model_max)

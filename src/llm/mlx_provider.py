@@ -353,6 +353,12 @@ class MLXProvider(LLMProvider):
         async with get_mlx_gpu_lock():
             return await loop.run_in_executor(None, _run_sync)
 
+    async def get_context_window(self) -> int:
+        """Query MLX model configuration for context limits."""
+        if not hasattr(self, "model") or not self.model:
+            return 4096
+        return getattr(self.model.config, "max_position_embeddings", 4096)
+
     async def get_max_output_tokens(self) -> int:
         """Query MLX model configuration for context limits."""
         if not hasattr(self, "model") or not self.model:

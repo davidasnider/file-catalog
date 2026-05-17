@@ -31,6 +31,7 @@ async def test_password_extractor_success():
     )
     mock_llm.get_max_output_tokens = AsyncMock(return_value=4096)
     mock_llm.get_safe_output_tokens = AsyncMock(return_value=4096)
+    mock_llm.get_context_window = AsyncMock(return_value=8192)
 
     with patch(
         "src.plugins.password_extractor.get_llm_provider", return_value=mock_llm
@@ -56,6 +57,7 @@ async def test_password_extractor_empty():
     mock_llm.generate = AsyncMock(return_value=json.dumps({"passwords": []}))
     mock_llm.get_max_output_tokens = AsyncMock(return_value=4096)
     mock_llm.get_safe_output_tokens = AsyncMock(return_value=4096)
+    mock_llm.get_context_window = AsyncMock(return_value=8192)
 
     with patch(
         "src.plugins.password_extractor.get_llm_provider", return_value=mock_llm

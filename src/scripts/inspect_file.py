@@ -21,6 +21,8 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from rich import box
+from rich.rule import Rule
+from rich.json import JSON
 
 # Initialize console
 console = Console()
@@ -442,6 +444,62 @@ def print_rich_analysis(info: Dict[str, Any]):
     )
     console.print()
 
+    # 12. Full Extracted Text Readout
+    text_data = results.get("TextExtractor", {}).get("data", {}) or results.get(
+        "DocumentAIExtractor", {}
+    ).get("data", {})
+    raw_text = text_data.get("text", "") if isinstance(text_data, dict) else ""
+    if not raw_text:
+        # Check AudioTranscriber as fallback text readout
+        audio_data = results.get("AudioTranscriber", {}).get("data", {})
+        raw_text = audio_data.get("text", "") if isinstance(audio_data, dict) else ""
+
+    if raw_text:
+        console.print(
+            Rule(
+                "[bold magenta]📄 Full Extracted Text / Content Readout[/bold magenta]",
+                style="magenta",
+            )
+        )
+        console.print()
+        console.print(
+            Panel(
+                Text(raw_text, style="white"),
+                title=f"[bold cyan]Extracted Content ({len(raw_text)} characters)[/bold cyan]",
+                border_style="cyan",
+                box=box.ROUNDED,
+            )
+        )
+        console.print()
+
+    # 13. Full Structured Outputs of Every Completed Scanner/Analyzer
+    console.print(
+        Rule(
+            "[bold magenta]⚙️ All Scanner & Analyzer Detailed Results[/bold magenta]",
+            style="magenta",
+        )
+    )
+    console.print()
+
+    for task_name, task_info in sorted(results.items()):
+        status = task_info.get("status")
+        # Support both Enum objects or raw strings
+        status_str = status.value if hasattr(status, "value") else str(status)
+
+        if status_str == "COMPLETED" or status_str == "TaskStatus.COMPLETED":
+            data = task_info.get("data")
+            if data:
+                json_str = json.dumps(data, indent=2, ensure_ascii=False)
+                console.print(
+                    Panel(
+                        JSON(json_str),
+                        title=f"[bold cyan]Scanner Output: {task_name} (v{task_info.get('version', '1.0')})[/bold cyan]",
+                        border_style="magenta",
+                        box=box.ROUNDED,
+                    )
+                )
+                console.print()
+
 
 async def get_matching_files(path: str) -> list[Dict[str, Any]]:
     """Fetch all matching database info for a file path or filename pattern."""
@@ -494,8 +552,10 @@ async def get_matching_files(path: str) -> list[Dict[str, Any]]:
             for task in tasks:
                 try:
                     data = json.loads(task.result_data) if task.result_data else {}
+                    if not isinstance(data, dict):
+                        data = {}
                 except json.JSONDecodeError:
-                    data = task.result_data
+                    data = {}
 
                 info["analysis_results"][task.task_name] = {
                     "status": task.status,
@@ -527,9 +587,9 @@ async def main():
         help="Do not attempt to display terminal images.",
     )
     parser.add_argument(
-        "--yaml",
+        "--rich",
         action="store_true",
-        help="Output raw analysis results as YAML instead of the formatted Rich layout.",
+        help="Output raw analysis results as a beautifully formatted Rich terminal layout.",
     )
     args = parser.parse_args()
 
@@ -545,7 +605,7 @@ async def main():
         sys.exit(1)
 
     # 1. Output YAML or Rich
-    if args.yaml:
+    if not args.rich:
         if len(matches) == 1:
             print(yaml.dump(matches[0], sort_keys=False, allow_unicode=True, indent=2))
         else:

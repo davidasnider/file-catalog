@@ -13,6 +13,9 @@ class MockLLM:
     async def get_safe_output_tokens(self, prompt, chars_per_token=3.5):
         return 4096
 
+    async def get_context_window(self):
+        return 8192
+
 
 @pytest.fixture
 def mock_get_llm_provider(monkeypatch):

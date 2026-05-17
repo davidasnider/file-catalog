@@ -76,7 +76,7 @@ class TaskJudge:
             # We omit response_format="json" because some local endpoints (like standard mlx-lm servers)
             # might silently return empty strings if JSON mode is not explicitly supported.
             # We pass the maximum supported tokens because reasoning models (like Qwen) use extensive tokens for thinking.
-            max_out = await self.provider.get_max_output_tokens()
+            max_out = await self.provider.get_safe_output_tokens(eval_prompt)
             response = await self.provider.generate(
                 eval_prompt, temperature=0.0, max_tokens=max_out
             )
@@ -131,7 +131,18 @@ class TaskJudge:
             if not original_prompt:
                 # Dynamically construct the current prompt for legacy tasks
                 if task_name == SUMMARIZER_NAME:
-                    original_prompt = f'You are an expert document summarizer analyzing a local digital archive. Read the following text extracted from a file and provide a concise, 3-sentence summary of the core content.\n\nCRITICAL INSTRUCTION: Return ONLY the 3-sentence summary.\nDO NOT output any thinking process. NO <think> tags. NO "Here is a thinking process".\nDo NOT include any conversational filler, preambles, or introductory text.\nBegin exactly with the first sentence of the summary.\n\nText:\n{source_material}'
+                    original_prompt = f"""You are an expert document summarizer analyzing a local digital archive. Read the following text extracted from a file and provide a concise, 3-sentence summary of the core content.
+
+CRITICAL INSTRUCTIONS:
+1. Return ONLY the 3-sentence summary.
+2. Accurately identify the roles of individuals (e.g., strictly distinguish between the customer/account holder and service providers/technicians). Do not conflate names with incorrect titles.
+3. Ensure absolute factual alignment with the source text. Do not make assumptions.
+4. DO NOT output any thinking process. NO <think> tags. NO "Here is a thinking process".
+5. Do NOT include any conversational filler, preambles, or introductory text.
+6. Begin exactly with the first sentence of the summary.
+
+Text:
+{source_material}"""
                 elif task_name == PII_HARVESTER_NAME:
                     original_prompt = f"Identify Personally Identifiable Information (PII) from the following text:\n{source_material}"
                 else:
@@ -285,12 +296,15 @@ Return JSON:
     def _check_passed(self, task_name: str, eval_data: Dict[str, Any]) -> bool:
         if task_name in [SUMMARIZER_NAME, DEEP_SUMMARIZER_NAME]:
             accuracy = eval_data.get("accuracy")
+            coverage = eval_data.get("coverage")
             hallucination_free = eval_data.get("hallucination_free")
-            if not isinstance(accuracy, (int, float)) or not isinstance(
-                hallucination_free, (int, float)
+            if (
+                not isinstance(accuracy, (int, float))
+                or not isinstance(coverage, (int, float))
+                or not isinstance(hallucination_free, (int, float))
             ):
                 return False
-            return accuracy >= 4 and hallucination_free >= 4
+            return accuracy >= 4 and coverage >= 4 and hallucination_free >= 4
         elif task_name == PII_HARVESTER_NAME:
             precision = eval_data.get("precision")
             recall = eval_data.get("recall")

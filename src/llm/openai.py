@@ -135,6 +135,10 @@ class OpenAIProvider(LLMProvider):
         content = response.choices[0].message.content
         return content.strip() if content else ""
 
+    async def get_context_window(self) -> int:
+        """OpenAI models typically support at least 128k context windows."""
+        return 128000
+
     async def get_max_output_tokens(self) -> int:
         """
         Returns the max output tokens. OpenAI doesn't expose this via the chat API,
