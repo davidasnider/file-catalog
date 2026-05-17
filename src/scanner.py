@@ -698,17 +698,32 @@ async def run_scanner(
             failed_docs = doc_stats.get(DocumentStatus.FAILED, 0)
             finished_docs = completed_docs + failed_docs
 
+            from sqlmodel import case
+
             # 2. Aggregate Task stats in one query (Group by Plugin and Status)
             task_stats_res = await session.execute(
                 select(
                     AnalysisTask.task_name,
                     AnalysisTask.status,
+                    case(
+                        (AnalysisTask.result_data.like('%"skipped": true%'), True),
+                        (AnalysisTask.result_data.like('%"skipped":true%'), True),
+                        else_=False,
+                    ).label("is_skipped"),
                     func.count(AnalysisTask.id).label("count"),
-                ).group_by(AnalysisTask.task_name, AnalysisTask.status)
+                ).group_by(
+                    AnalysisTask.task_name,
+                    AnalysisTask.status,
+                    case(
+                        (AnalysisTask.result_data.like('%"skipped": true%'), True),
+                        (AnalysisTask.result_data.like('%"skipped":true%'), True),
+                        else_=False,
+                    ),
+                )
             )
 
             plugin_stats = {}
-            for t_name, t_status, t_count in task_stats_res.all():
+            for t_name, t_status, is_skipped, t_count in task_stats_res.all():
                 if t_name not in plugin_stats:
                     plugin_stats[t_name] = {
                         "total": 0,
@@ -727,7 +742,10 @@ async def run_scanner(
                 if status_str == "FAILED" or status_str.endswith(".FAILED"):
                     s["error"] += t_count
                 elif status_str == "COMPLETED" or status_str.endswith(".COMPLETED"):
-                    s["success"] += t_count
+                    if is_skipped:
+                        s["skipped"] += t_count
+                    else:
+                        s["success"] += t_count
 
             # 3. Optional: Get a sample of errors for the error table (don't fetch all)
             error_counts = {}
@@ -1205,12 +1223,14 @@ async def run_scanner(
 
 
 async def run_standalone_judge():
-    from src.db.engine import async_session_maker
-    from src.db.models import AnalysisTask, Document
+    from src.db.engine import async_session_maker, init_db
+    from src.db.models import AnalysisTask, Document, TaskStatus
     from src.core.judge import TaskJudge
     from sqlmodel import select
     from rich.console import Console
     import json
+
+    await init_db()
 
     console = Console()
     console.print("[bold cyan]Starting Standalone LLM Judge Evaluation...[/bold cyan]")
@@ -1221,6 +1241,7 @@ async def run_standalone_judge():
         result = await session.execute(
             select(AnalysisTask, Document)
             .join(Document, AnalysisTask.document_id == Document.id)
+            .where(AnalysisTask.status == TaskStatus.COMPLETED)
             .where(AnalysisTask.result_data.is_not(None))
             .where(AnalysisTask.result_data != "{}")
         )
@@ -1288,6 +1309,8 @@ async def run_standalone_judge():
                         db_task = await update_session.get(AnalysisTask, task.id)
                         if db_task:
                             db_task.result_data = json.dumps(result_data)
+                            db_task.status = TaskStatus.COMPLETED
+                            db_task.error_message = None
                             await update_session.commit()
                 break
             elif status == "SKIPPED":

@@ -8,6 +8,9 @@ class MockLLMJson:
         # We simulate the LLM returning a slightly messy JSON block
         return '```json\n{"is_estate_document": true, "reasoning": "Mentions a Last Will and Testament."}\n```'
 
+    async def get_max_output_tokens(self):
+        return 4096
+
 
 @pytest.fixture
 def mock_get_llm_provider(monkeypatch):

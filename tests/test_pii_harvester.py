@@ -30,6 +30,9 @@ async def test_pii_harvester_json_cleanup(monkeypatch):
         async def generate(self, prompt, **kwargs):
             return '```json\n{"names": ["John Doe"], "emails": [], "addresses": [], "secrets": []}\n```'
 
+        async def get_max_output_tokens(self):
+            return 4096
+
     monkeypatch.setattr(
         "src.plugins.pii_harvester.get_llm_provider", lambda **kwargs: MockLLM()
     )
