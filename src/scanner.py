@@ -1226,9 +1226,13 @@ async def run_standalone_judge():
     from src.db.engine import async_session_maker, init_db
     from src.db.models import AnalysisTask, Document, TaskStatus
     from src.core.judge import TaskJudge
+    from src.core.config import config
     from sqlmodel import select
     from rich.console import Console
     import json
+
+    # Force enable judge for standalone execution
+    config.judge_enabled = True
 
     await init_db()
 

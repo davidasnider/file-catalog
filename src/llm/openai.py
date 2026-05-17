@@ -136,8 +136,8 @@ class OpenAIProvider(LLMProvider):
         return content.strip() if content else ""
 
     async def get_context_window(self) -> int:
-        """OpenAI models typically support at least 128k context windows."""
-        return 128000
+        """Get the configured context window size for the OpenAI-compatible endpoint."""
+        return config.openai_context_window
 
     async def get_max_output_tokens(self) -> int:
         """

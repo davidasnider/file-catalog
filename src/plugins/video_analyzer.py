@@ -247,6 +247,35 @@ class VideoAnalyzerPlugin(AnalyzerBase):
                 [f"Segment {i+1}: {d}" for i, d in enumerate(partial_descriptions)]
             )
 
+            # Dynamically trim transcript and combined_segments to fit within the text LLM's context window.
+            # Leave at least 512 tokens budget for the output.
+            ctx_window = await text_llm.get_context_window()
+            max_input_tokens = max(256, ctx_window - 512)
+            max_input_chars = int(max_input_tokens * 3.5)
+
+            # Static instruction overhead is ~400 chars.
+            base_prompt_len = 400
+
+            if (
+                len(transcript) + len(combined_segments) + base_prompt_len
+                > max_input_chars
+            ):
+                budget_rem = max_input_chars - base_prompt_len
+
+                if transcript:
+                    transcript_budget = int(budget_rem * 0.3)
+                    if len(transcript) > transcript_budget:
+                        transcript = transcript[:transcript_budget] + "... [TRUNCATED]"
+                    budget_rem -= len(transcript)
+
+                if len(combined_segments) > budget_rem:
+                    if budget_rem > 50:
+                        combined_segments = (
+                            combined_segments[: budget_rem - 20] + "... [TRUNCATED]"
+                        )
+                    else:
+                        combined_segments = "... [TRUNCATED]"
+
             final_prompt = (
                 "You are finalizing a video analysis task. Below are descriptions of sequential segments of a video. "
                 "Synthesize these into a single, cohesive, detailed description of the entire video's contents. "

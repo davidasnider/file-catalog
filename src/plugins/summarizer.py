@@ -146,6 +146,18 @@ Text:
                 "model": getattr(llm, "model_name", "Unknown Model"),
             }
 
+        except ValueError as e:
+            if "context window" in str(e) or "exceeds" in str(e):
+                logger.info(
+                    f"Prompt exceeds standard summarizer context size for {file_path}. Skipping in favor of DeepSummarizer."
+                )
+                return {
+                    "summary": "",
+                    "skipped": True,
+                    "reason": "text_too_large",
+                }
+            logger.error(f"Failed to generate summary for {file_path}: {e}")
+            raise Exception(f"Summarization execution failed: {str(e)}")
         except Exception as e:
             logger.error(f"Failed to generate summary for {file_path}: {e}")
             raise Exception(f"Summarization execution failed: {str(e)}")

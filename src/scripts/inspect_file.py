@@ -124,12 +124,13 @@ def print_rich_analysis(info: Dict[str, Any]):
 
     # Status Coloring
     status = doc["status"]
+    status_str = status.value if hasattr(status, "value") else str(status)
     status_style = "bold yellow"
-    if status == "COMPLETED":
+    if status_str == "COMPLETED" or status_str == "DocumentStatus.COMPLETED":
         status_style = "bold green"
-    elif status == "FAILED":
+    elif status_str == "FAILED" or status_str == "DocumentStatus.FAILED":
         status_style = "bold red"
-    elif status == "ANALYZING":
+    elif status_str == "ANALYZING" or status_str == "DocumentStatus.ANALYZING":
         status_style = "bold magenta"
 
     meta_table.add_row(
@@ -399,10 +400,11 @@ def print_rich_analysis(info: Dict[str, Any]):
 
     for t_name, t_info in results.items():
         status = t_info.get("status", "PENDING")
+        status_str = status.value if hasattr(status, "value") else str(status)
         status_style = "bold yellow"
-        if status == "COMPLETED":
+        if status_str == "COMPLETED" or status_str == "TaskStatus.COMPLETED":
             status_style = "bold green"
-        elif status == "FAILED":
+        elif status_str == "FAILED" or status_str == "TaskStatus.FAILED":
             status_style = "bold red"
 
         err = t_info.get("error") or ""
@@ -430,7 +432,7 @@ def print_rich_analysis(info: Dict[str, Any]):
         task_table.add_row(
             t_name,
             str(t_info.get("version", "1.0")),
-            f"[{status_style}]{status}[/{status_style}]",
+            f"[{status_style}]{status_str}[/{status_style}]",
             details,
         )
 

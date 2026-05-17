@@ -37,8 +37,17 @@ class DeepSummarizerPlugin(AnalyzerBase):
         from src.core.text_utils import get_all_extracted_text
 
         extracted_text = get_all_extracted_text(context)
+        from src.core.analyzer_names import SUMMARIZER_NAME
+
+        summarizer_data = context.get(SUMMARIZER_NAME, {})
+        is_skipped_large = (
+            summarizer_data.get("skipped") is True
+            and summarizer_data.get("reason") == "text_too_large"
+        )
+
         # Only trigger Deep Summarization for large texts (> 20,000 characters)
-        if len(extracted_text) < 20000:
+        # OR if the standard summarizer was explicitly skipped due to context window limitations.
+        if len(extracted_text) < 20000 and not is_skipped_large:
             return False
 
         router_data = context.get(ROUTER_NAME, {})
