@@ -115,13 +115,20 @@ class MLXProvider(LLMProvider):
 
         max_tokens = kwargs.get("max_tokens", 1024)
 
+        # Default to enable_thinking=False for all tasks, unless explicitly requested
+        enable_thinking = kwargs.pop("enable_thinking", False)
+        chat_template_kwargs = {"enable_thinking": enable_thinking}
+
         if self.use_chat_template:
             messages = [
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt},
             ]
             formatted_prompt = self.tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+                **chat_template_kwargs,
             )
         else:
             formatted_prompt = prompt
@@ -155,13 +162,20 @@ class MLXProvider(LLMProvider):
 
         max_tokens = kwargs.get("max_tokens", 1024)
 
+        # Default to enable_thinking=False for all tasks, unless explicitly requested
+        enable_thinking = kwargs.pop("enable_thinking", False)
+        chat_template_kwargs = {"enable_thinking": enable_thinking}
+
         if self.use_chat_template:
             messages = [
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt},
             ]
             formatted_prompt = self.tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+                **chat_template_kwargs,
             )
         else:
             formatted_prompt = prompt
@@ -202,6 +216,10 @@ class MLXProvider(LLMProvider):
 
         loop = asyncio.get_running_loop()
         max_tokens = kwargs.get("max_tokens", 512)
+
+        # Default to enable_thinking=False for all tasks, unless explicitly requested
+        enable_thinking = kwargs.pop("enable_thinking", False)
+        chat_template_kwargs = {"enable_thinking": enable_thinking}
 
         def _run_sync():
             try:
@@ -249,7 +267,10 @@ class MLXProvider(LLMProvider):
                         }
                     ]
                     formatted_prompt = self.processor.apply_chat_template(
-                        messages, tokenize=False, add_generation_prompt=True
+                        messages,
+                        tokenize=False,
+                        add_generation_prompt=True,
+                        **chat_template_kwargs,
                     )
                 else:
                     formatted_prompt = f"USER: <image>\n{prompt} ASSISTANT:"

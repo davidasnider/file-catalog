@@ -135,6 +135,7 @@ Text:
                 prompt,
                 max_tokens=safe_tokens,
                 temperature=0.0,
+                enable_thinking=True,
                 response_format={
                     "type": "json_object",
                     "schema": {

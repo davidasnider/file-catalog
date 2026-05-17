@@ -78,7 +78,7 @@ class TaskJudge:
             # We pass the maximum supported tokens because reasoning models (like Qwen) use extensive tokens for thinking.
             max_out = await self.provider.get_safe_output_tokens(eval_prompt)
             response = await self.provider.generate(
-                eval_prompt, temperature=0.0, max_tokens=max_out
+                eval_prompt, temperature=0.0, max_tokens=max_out, enable_thinking=True
             )
             eval_data = repair_and_load_json(response)
         except Exception as e:

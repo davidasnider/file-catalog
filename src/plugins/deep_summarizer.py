@@ -146,7 +146,10 @@ class DeepSummarizerPlugin(AnalyzerBase):
             try:
                 safe_tokens = await llm.get_safe_output_tokens(prompt)
                 response = await llm.generate(
-                    prompt, max_tokens=safe_tokens, temperature=0.2
+                    prompt,
+                    max_tokens=safe_tokens,
+                    temperature=0.2,
+                    enable_thinking=True,
                 )
                 chunk_summaries.append(self._strip_thinking(response))
             except Exception as e:
@@ -210,7 +213,10 @@ class DeepSummarizerPlugin(AnalyzerBase):
                 try:
                     safe_tokens = await llm.get_safe_output_tokens(intermediate_prompt)
                     response = await llm.generate(
-                        intermediate_prompt, max_tokens=safe_tokens, temperature=0.2
+                        intermediate_prompt,
+                        max_tokens=safe_tokens,
+                        temperature=0.2,
+                        enable_thinking=True,
                     )
                     next_level_summaries.append(self._strip_thinking(response))
                 except Exception as e:
@@ -244,7 +250,10 @@ class DeepSummarizerPlugin(AnalyzerBase):
         try:
             safe_tokens = await llm.get_safe_output_tokens(final_prompt)
             final_response = await llm.generate(
-                final_prompt, max_tokens=safe_tokens, temperature=0.3
+                final_prompt,
+                max_tokens=safe_tokens,
+                temperature=0.3,
+                enable_thinking=True,
             )
             cleaned_final = self._strip_thinking(final_response)
             return {
