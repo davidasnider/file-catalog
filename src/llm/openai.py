@@ -37,12 +37,29 @@ class OpenAIProvider(LLMProvider):
             # for the OpenAI chat completion API.
             response_format = {"type": "json_object"}
 
+        # Handle thinking/reasoning for local and official OpenAI models
+        enable_thinking = kwargs.get("enable_thinking", False)
+        extra_body = {}
+        create_kwargs = {}
+
+        if enable_thinking:
+            # Official OpenAI o1/o3 reasoning models
+            if self.model_name.startswith(("o1", "o3")):
+                create_kwargs["reasoning_effort"] = "high"
+                # o1/o3 models do not support temperature
+                kwargs["temperature"] = None
+            else:
+                # Many local reasoning servers (vLLM, llama.cpp) support a 'thinking' flag in extra_body
+                extra_body["thinking"] = True
+
         response = await self.client.chat.completions.create(
             model=self.model_name,
             messages=messages,
             max_tokens=kwargs.get("max_tokens", 1024),
             temperature=kwargs.get("temperature", 0.7),
             response_format=response_format,
+            extra_body=extra_body if extra_body else None,
+            **create_kwargs,
         )
         content = response.choices[0].message.content
         return content.strip() if content else ""
@@ -125,12 +142,29 @@ class OpenAIProvider(LLMProvider):
         elif isinstance(rf, dict) and "type" in rf:
             response_format = rf
 
+        # Handle thinking/reasoning for local and official OpenAI models
+        enable_thinking = kwargs.get("enable_thinking", False)
+        extra_body = {}
+        create_kwargs = {}
+
+        if enable_thinking:
+            # Official OpenAI o1/o3 reasoning models
+            if self.model_name.startswith(("o1", "o3")):
+                create_kwargs["reasoning_effort"] = "high"
+                # o1/o3 models do not support temperature
+                kwargs["temperature"] = None
+            else:
+                # Many local reasoning servers (vLLM, llama.cpp) support a 'thinking' flag in extra_body
+                extra_body["thinking"] = True
+
         response = await self.client.chat.completions.create(
             model=self.model_name,
             messages=messages,
             max_tokens=kwargs.get("max_tokens", 512),
             temperature=kwargs.get("temperature", 0.2),
             response_format=response_format,
+            extra_body=extra_body if extra_body else None,
+            **create_kwargs,
         )
         content = response.choices[0].message.content
         return content.strip() if content else ""

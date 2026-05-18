@@ -1230,6 +1230,7 @@ async def run_standalone_judge():
     from src.core.config import config
     from sqlmodel import select
     from rich.console import Console
+    from datetime import datetime, timezone
     import json
 
     # Force enable judge for standalone execution
@@ -1249,6 +1250,7 @@ async def run_standalone_judge():
             .where(AnalysisTask.status == TaskStatus.COMPLETED)
             .where(AnalysisTask.result_data.is_not(None))
             .where(AnalysisTask.result_data != "{}")
+            .order_by(AnalysisTask.judged_at.asc().nulls_first())
         )
         tasks_with_docs = result.all()
 
@@ -1302,6 +1304,13 @@ async def run_standalone_judge():
             status = await judge.judge_task(
                 task.task_name, doc.path, result_data, context
             )
+
+            # Record judged_at timestamp
+            async with async_session_maker() as update_session:
+                db_task = await update_session.get(AnalysisTask, task.id)
+                if db_task:
+                    db_task.judged_at = datetime.now(timezone.utc)
+                    await update_session.commit()
 
             # Clear the line
             console.print(" " * 120, end="\r")
