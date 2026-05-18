@@ -451,10 +451,18 @@ def test_mlx_provider_enable_thinking_toggling():
     mock_tokenizer.apply_chat_template = MagicMock(return_value="formatted prompt")
 
     with patch(
-        "src.llm.mlx_provider.load", return_value=(mock_model, mock_tokenizer)
-    ), patch("src.llm.mlx_provider.generate", return_value="dummy response"), patch(
-        "src.llm.mlx_provider.HAS_MLX", True
-    ):
+        "src.llm.mlx_provider.load",
+        return_value=(mock_model, mock_tokenizer),
+        create=True,
+    ), patch(
+        "src.llm.mlx_provider.generate", return_value="dummy response", create=True
+    ), patch(
+        "src.llm.mlx_provider.make_sampler", return_value=MagicMock(), create=True
+    ), patch(
+        "src.llm.mlx_provider.make_logits_processors",
+        return_value=MagicMock(),
+        create=True,
+    ), patch("src.llm.mlx_provider.HAS_MLX", True, create=True):
         provider = MLXProvider(model_path="dummy", is_vision=False)
         provider.use_chat_template = True
 
