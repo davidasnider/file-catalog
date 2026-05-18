@@ -471,8 +471,13 @@ def test_mlx_provider_enable_thinking_toggling():
 
         original_loop = None
         try:
-            original_loop = asyncio.get_event_loop_policy().get_event_loop()
-        except RuntimeError:
+            policy = asyncio.get_event_loop_policy()
+            if (
+                hasattr(policy, "_local")
+                and getattr(policy._local, "_loop", None) is not None
+            ):
+                original_loop = policy._local._loop
+        except Exception:
             pass
 
         loop = asyncio.new_event_loop()
