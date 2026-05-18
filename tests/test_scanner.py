@@ -469,38 +469,49 @@ def test_mlx_provider_enable_thinking_toggling():
         # Test default call (without enable_thinking passed)
         import asyncio
 
+        original_loop = None
+        try:
+            original_loop = asyncio.get_event_loop_policy().get_event_loop()
+        except RuntimeError:
+            pass
+
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-        # Mock run_in_executor to execute the sync function immediately
-        async def mock_run_in_executor(executor, func, *args):
-            return func(*args)
+        try:
+            # Mock run_in_executor to execute the sync function immediately
+            async def mock_run_in_executor(executor, func, *args):
+                return func(*args)
 
-        with patch("asyncio.get_running_loop", return_value=loop), patch.object(
-            loop, "run_in_executor", new=mock_run_in_executor
-        ), patch("src.llm.mlx_provider.get_mlx_gpu_lock"):
-            # Default: enable_thinking should be False
-            loop.run_until_complete(provider.generate("test prompt"))
-            mock_tokenizer.apply_chat_template.assert_called_with(
-                [
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": "test prompt"},
-                ],
-                tokenize=False,
-                add_generation_prompt=True,
-                enable_thinking=False,
-            )
+            with patch("asyncio.get_running_loop", return_value=loop), patch.object(
+                loop, "run_in_executor", new=mock_run_in_executor
+            ), patch("src.llm.mlx_provider.get_mlx_gpu_lock"):
+                # Default: enable_thinking should be False
+                loop.run_until_complete(provider.generate("test prompt"))
+                mock_tokenizer.apply_chat_template.assert_called_with(
+                    [
+                        {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": "test prompt"},
+                    ],
+                    tokenize=False,
+                    add_generation_prompt=True,
+                    enable_thinking=False,
+                )
 
-            # Explicit enable_thinking=True
-            loop.run_until_complete(
-                provider.generate("test prompt", enable_thinking=True)
-            )
-            mock_tokenizer.apply_chat_template.assert_called_with(
-                [
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": "test prompt"},
-                ],
-                tokenize=False,
-                add_generation_prompt=True,
-                enable_thinking=True,
-            )
+                # Explicit enable_thinking=True
+                loop.run_until_complete(
+                    provider.generate("test prompt", enable_thinking=True)
+                )
+                mock_tokenizer.apply_chat_template.assert_called_with(
+                    [
+                        {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": "test prompt"},
+                    ],
+                    tokenize=False,
+                    add_generation_prompt=True,
+                    enable_thinking=True,
+                )
+        finally:
+            loop.close()
+            if original_loop is not None:
+                asyncio.set_event_loop(original_loop)
