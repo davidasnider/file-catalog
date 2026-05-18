@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
         SUMMARIZER_NAME,
         EMAIL_PARSER_NAME,
     ],
-    version="1.3",
+    version="1.4",
 )
 class DeepSummarizerPlugin(AnalyzerBase):
     """

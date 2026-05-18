@@ -452,7 +452,9 @@ def test_mlx_provider_enable_thinking_toggling():
 
     with patch(
         "src.llm.mlx_provider.load", return_value=(mock_model, mock_tokenizer)
-    ), patch("src.llm.mlx_provider.generate", return_value="dummy response"):
+    ), patch("src.llm.mlx_provider.generate", return_value="dummy response"), patch(
+        "src.llm.mlx_provider.HAS_MLX", True
+    ):
         provider = MLXProvider(model_path="dummy", is_vision=False)
         provider.use_chat_template = True
 
