@@ -515,3 +515,5 @@ def test_mlx_provider_enable_thinking_toggling():
             loop.close()
             if original_loop is not None:
                 asyncio.set_event_loop(original_loop)
+            else:
+                asyncio.set_event_loop(None)
