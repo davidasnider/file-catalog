@@ -24,6 +24,44 @@ class OpenAIProvider(LLMProvider):
             f"Initializing OpenAIProvider with model: {self.model_name} at {config.openai_base_url}"
         )
 
+    def _prepare_chat_kwargs(self, kwargs: dict) -> dict:
+        """Prepare chat completion kwargs, handling reasoning/thinking models."""
+        import re
+
+        enable_thinking = kwargs.get("enable_thinking", False)
+        extra_body = {}
+        create_kwargs = {}
+
+        # Default parameters from kwargs
+        max_tokens = kwargs.get("max_tokens")
+        temperature = kwargs.get("temperature")
+
+        if enable_thinking:
+            # Official OpenAI o1/o3 reasoning models
+            if re.match(r"^o[13](-|$)", self.model_name):
+                create_kwargs["reasoning_effort"] = "high"
+                # o1/o3 models use max_completion_tokens instead of max_tokens
+                if max_tokens:
+                    create_kwargs["max_completion_tokens"] = max_tokens
+                # o1/o3 models do not support temperature; leave it omitted
+            else:
+                # Many local reasoning servers (vLLM, llama.cpp) support a 'thinking' flag in extra_body
+                extra_body["thinking"] = True
+                if max_tokens:
+                    create_kwargs["max_tokens"] = max_tokens
+                if temperature is not None:
+                    create_kwargs["temperature"] = temperature
+        else:
+            if max_tokens:
+                create_kwargs["max_tokens"] = max_tokens
+            if temperature is not None:
+                create_kwargs["temperature"] = temperature
+
+        if extra_body:
+            create_kwargs["extra_body"] = extra_body
+
+        return create_kwargs
+
     async def generate(self, prompt: str, **kwargs) -> str:
         """Run generation asynchronously."""
         messages = [{"role": "user", "content": prompt}]
@@ -37,29 +75,16 @@ class OpenAIProvider(LLMProvider):
             # for the OpenAI chat completion API.
             response_format = {"type": "json_object"}
 
-        # Handle thinking/reasoning for local and official OpenAI models
-        enable_thinking = kwargs.get("enable_thinking", False)
-        extra_body = {}
-        create_kwargs = {}
-
-        if enable_thinking:
-            # Official OpenAI o1/o3 reasoning models
-            if self.model_name.startswith(("o1", "o3")):
-                create_kwargs["reasoning_effort"] = "high"
-                # o1/o3 models do not support temperature
-                kwargs["temperature"] = None
-            else:
-                # Many local reasoning servers (vLLM, llama.cpp) support a 'thinking' flag in extra_body
-                extra_body["thinking"] = True
+        # Prepare parameters (handling thinking/reasoning)
+        chat_kwargs = self._prepare_chat_kwargs(
+            {"max_tokens": 1024, "temperature": 0.7, **kwargs}
+        )
 
         response = await self.client.chat.completions.create(
             model=self.model_name,
             messages=messages,
-            max_tokens=kwargs.get("max_tokens", 1024),
-            temperature=kwargs.get("temperature", 0.7),
             response_format=response_format,
-            extra_body=extra_body if extra_body else None,
-            **create_kwargs,
+            **chat_kwargs,
         )
         content = response.choices[0].message.content
         return content.strip() if content else ""
@@ -68,12 +93,16 @@ class OpenAIProvider(LLMProvider):
         """Stream the generated response."""
         messages = [{"role": "user", "content": prompt}]
 
+        # Stream defaults
+        chat_kwargs = self._prepare_chat_kwargs(
+            {"max_tokens": 1024, "temperature": 0.7, **kwargs}
+        )
+
         stream = await self.client.chat.completions.create(
             model=self.model_name,
             messages=messages,
-            max_tokens=kwargs.get("max_tokens", 1024),
-            temperature=kwargs.get("temperature", 0.7),
             stream=True,
+            **chat_kwargs,
         )
 
         async for chunk in stream:
@@ -142,29 +171,16 @@ class OpenAIProvider(LLMProvider):
         elif isinstance(rf, dict) and "type" in rf:
             response_format = rf
 
-        # Handle thinking/reasoning for local and official OpenAI models
-        enable_thinking = kwargs.get("enable_thinking", False)
-        extra_body = {}
-        create_kwargs = {}
-
-        if enable_thinking:
-            # Official OpenAI o1/o3 reasoning models
-            if self.model_name.startswith(("o1", "o3")):
-                create_kwargs["reasoning_effort"] = "high"
-                # o1/o3 models do not support temperature
-                kwargs["temperature"] = None
-            else:
-                # Many local reasoning servers (vLLM, llama.cpp) support a 'thinking' flag in extra_body
-                extra_body["thinking"] = True
+        # Prepare parameters (handling thinking/reasoning)
+        chat_kwargs = self._prepare_chat_kwargs(
+            {"max_tokens": 512, "temperature": 0.2, **kwargs}
+        )
 
         response = await self.client.chat.completions.create(
             model=self.model_name,
             messages=messages,
-            max_tokens=kwargs.get("max_tokens", 512),
-            temperature=kwargs.get("temperature", 0.2),
             response_format=response_format,
-            extra_body=extra_body if extra_body else None,
-            **create_kwargs,
+            **chat_kwargs,
         )
         content = response.choices[0].message.content
         return content.strip() if content else ""

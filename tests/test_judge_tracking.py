@@ -59,8 +59,8 @@ async def test_judge_tracking_ordering_and_update(db_session, test_engine, mocke
 
     # 2. Mocking
     mock_maker = sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
-    mocker.patch("src.scanner.async_session_maker", return_value=mock_maker())
-    mocker.patch("src.db.engine.async_session_maker", return_value=mock_maker())
+    mocker.patch("src.scanner.async_session_maker", side_effect=mock_maker)
+    mocker.patch("src.db.engine.async_session_maker", side_effect=mock_maker)
     mocker.patch("src.db.engine.init_db", AsyncMock())
     mocker.patch("src.scanner.init_db", AsyncMock())
 
