@@ -65,6 +65,9 @@ class AnalysisTask(SQLModel, table=True):
     )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    judged_at: Optional[datetime] = Field(
+        default=None, description="Timestamp when the task was last judged"
+    )
     error_message: Optional[str] = Field(
         default=None, description="Error message if the task failed"
     )

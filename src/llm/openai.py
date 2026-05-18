@@ -1,6 +1,7 @@
 import logging
 import base64
 import mimetypes
+import re
 from typing import AsyncGenerator
 
 from openai import AsyncOpenAI
@@ -24,6 +25,65 @@ class OpenAIProvider(LLMProvider):
             f"Initializing OpenAIProvider with model: {self.model_name} at {config.openai_base_url}"
         )
 
+    def _prepare_chat_kwargs(self, kwargs: dict) -> dict:
+        """Prepare chat completion kwargs, handling reasoning/thinking models."""
+        enable_thinking = kwargs.pop("enable_thinking", False)
+        # Remove response_format because callers pass it explicitly as an arg
+        kwargs.pop("response_format", None)
+
+        extra_body = {}
+        create_kwargs = {}
+
+        # Default parameters from kwargs
+        max_tokens = kwargs.pop("max_tokens", None)
+        temperature = kwargs.pop("temperature", None)
+
+        if enable_thinking:
+            # Official OpenAI o1/o3 reasoning models
+            if re.match(r"^o[13](-|$)", self.model_name):
+                create_kwargs["reasoning_effort"] = "high"
+                # o1/o3 models use max_completion_tokens instead of max_tokens
+                if max_tokens is not None:
+                    create_kwargs["max_completion_tokens"] = max_tokens
+                # o1/o3 models do not support temperature; leave it omitted
+            else:
+                # Many local reasoning servers (vLLM, llama.cpp) support a 'thinking' flag in extra_body
+                extra_body["thinking"] = True
+                if max_tokens is not None:
+                    create_kwargs["max_tokens"] = max_tokens
+                if temperature is not None:
+                    create_kwargs["temperature"] = temperature
+        else:
+            if max_tokens is not None:
+                create_kwargs["max_tokens"] = max_tokens
+            if temperature is not None:
+                create_kwargs["temperature"] = temperature
+
+        if extra_body:
+            create_kwargs["extra_body"] = extra_body
+
+        # Whitelist of known OpenAI chat completion parameters to avoid passing
+        # arbitrary plugin kwargs that would cause the client to raise TypeError.
+        openai_whitelist = {
+            "top_p",
+            "n",
+            "stop",
+            "presence_penalty",
+            "frequency_penalty",
+            "logit_bias",
+            "user",
+            "seed",
+            "logprobs",
+            "top_logprobs",
+        }
+
+        # Pass through only whitelisted remaining kwargs
+        for k, v in kwargs.items():
+            if k in openai_whitelist:
+                create_kwargs[k] = v
+
+        return create_kwargs
+
     async def generate(self, prompt: str, **kwargs) -> str:
         """Run generation asynchronously."""
         messages = [{"role": "user", "content": prompt}]
@@ -37,12 +97,16 @@ class OpenAIProvider(LLMProvider):
             # for the OpenAI chat completion API.
             response_format = {"type": "json_object"}
 
+        # Prepare parameters (handling thinking/reasoning)
+        chat_kwargs = self._prepare_chat_kwargs(
+            {"max_tokens": 1024, "temperature": 0.7, **kwargs}
+        )
+
         response = await self.client.chat.completions.create(
             model=self.model_name,
             messages=messages,
-            max_tokens=kwargs.get("max_tokens", 1024),
-            temperature=kwargs.get("temperature", 0.7),
             response_format=response_format,
+            **chat_kwargs,
         )
         content = response.choices[0].message.content
         return content.strip() if content else ""
@@ -51,12 +115,16 @@ class OpenAIProvider(LLMProvider):
         """Stream the generated response."""
         messages = [{"role": "user", "content": prompt}]
 
+        # Stream defaults
+        chat_kwargs = self._prepare_chat_kwargs(
+            {"max_tokens": 1024, "temperature": 0.7, **kwargs}
+        )
+
         stream = await self.client.chat.completions.create(
             model=self.model_name,
             messages=messages,
-            max_tokens=kwargs.get("max_tokens", 1024),
-            temperature=kwargs.get("temperature", 0.7),
             stream=True,
+            **chat_kwargs,
         )
 
         async for chunk in stream:
@@ -125,12 +193,16 @@ class OpenAIProvider(LLMProvider):
         elif isinstance(rf, dict) and "type" in rf:
             response_format = rf
 
+        # Prepare parameters (handling thinking/reasoning)
+        chat_kwargs = self._prepare_chat_kwargs(
+            {"max_tokens": 512, "temperature": 0.2, **kwargs}
+        )
+
         response = await self.client.chat.completions.create(
             model=self.model_name,
             messages=messages,
-            max_tokens=kwargs.get("max_tokens", 512),
-            temperature=kwargs.get("temperature", 0.2),
             response_format=response_format,
+            **chat_kwargs,
         )
         content = response.choices[0].message.content
         return content.strip() if content else ""

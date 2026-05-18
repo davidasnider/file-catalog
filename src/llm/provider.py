@@ -14,7 +14,7 @@ class LLMProvider(ABC):
 
         Args:
             prompt: The input text prompt.
-            **kwargs: Provider-specific configuration options (e.g., temperature).
+            **kwargs: Provider-specific configuration options (e.g., temperature, enable_thinking).
 
         Returns:
             The generated text response.
@@ -43,7 +43,7 @@ class LLMProvider(ABC):
         Args:
             image_path: Absolute path to the image.
             prompt: Text prompt to accompany the image.
-            **kwargs: Provider-specific configuration options.
+            **kwargs: Provider-specific configuration options (e.g., enable_thinking).
 
         Returns:
             The generated text response.
