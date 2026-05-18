@@ -28,37 +28,43 @@ class OpenAIProvider(LLMProvider):
         """Prepare chat completion kwargs, handling reasoning/thinking models."""
         import re
 
-        enable_thinking = kwargs.get("enable_thinking", False)
+        enable_thinking = kwargs.pop("enable_thinking", False)
+        # Remove response_format because callers pass it explicitly as an arg
+        kwargs.pop("response_format", None)
+
         extra_body = {}
         create_kwargs = {}
 
         # Default parameters from kwargs
-        max_tokens = kwargs.get("max_tokens")
-        temperature = kwargs.get("temperature")
+        max_tokens = kwargs.pop("max_tokens", None)
+        temperature = kwargs.pop("temperature", None)
 
         if enable_thinking:
             # Official OpenAI o1/o3 reasoning models
             if re.match(r"^o[13](-|$)", self.model_name):
                 create_kwargs["reasoning_effort"] = "high"
                 # o1/o3 models use max_completion_tokens instead of max_tokens
-                if max_tokens:
+                if max_tokens is not None:
                     create_kwargs["max_completion_tokens"] = max_tokens
                 # o1/o3 models do not support temperature; leave it omitted
             else:
                 # Many local reasoning servers (vLLM, llama.cpp) support a 'thinking' flag in extra_body
                 extra_body["thinking"] = True
-                if max_tokens:
+                if max_tokens is not None:
                     create_kwargs["max_tokens"] = max_tokens
                 if temperature is not None:
                     create_kwargs["temperature"] = temperature
         else:
-            if max_tokens:
+            if max_tokens is not None:
                 create_kwargs["max_tokens"] = max_tokens
             if temperature is not None:
                 create_kwargs["temperature"] = temperature
 
         if extra_body:
             create_kwargs["extra_body"] = extra_body
+
+        # Pass through any remaining kwargs
+        create_kwargs.update(kwargs)
 
         return create_kwargs
 

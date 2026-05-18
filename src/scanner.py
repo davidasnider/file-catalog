@@ -1310,16 +1310,6 @@ async def run_standalone_judge():
                     task.task_name, doc.path, result_data, context
                 )
 
-                # Record judged_at timestamp only for real verdicts (PASSED/SKIPPED/FAILED).
-                # ERROR verdicts (system failures) don't update judged_at so they stay
-                # at the front of the queue for the next run.
-                if status in ["PASSED", "SKIPPED", "FAILED"]:
-                    db_task = await session.get(AnalysisTask, task.id)
-                    if db_task:
-                        db_task.judged_at = datetime.now(timezone.utc)
-                        # Commit incrementally to show progress in DB but keep the session open
-                        await session.commit()
-
                 # Clear the line
                 console.print(" " * 120, end="\r")
 
@@ -1407,6 +1397,16 @@ async def run_standalone_judge():
                         console.print("\n[bold red]Aborting evaluation...[/bold red]")
                         return
                     break
+
+            # Record judged_at timestamp only for real verdicts (PASSED/SKIPPED/FAILED).
+            # ERROR verdicts (system failures) don't update judged_at so they stay
+            # at the front of the queue for the next run.
+            if status in ["PASSED", "SKIPPED", "FAILED"]:
+                db_task = await session.get(AnalysisTask, task.id)
+                if db_task:
+                    db_task.judged_at = datetime.now(timezone.utc)
+                    # Commit incrementally to show progress in DB but keep the session open
+                    await session.commit()
 
     console.print("\n[bold green]Evaluation Complete![/bold green]")
     console.print(f"Total Evaluated: {passed_count + failed_count + skipped_count}")
