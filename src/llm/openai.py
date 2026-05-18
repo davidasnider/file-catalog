@@ -1,6 +1,7 @@
 import logging
 import base64
 import mimetypes
+import re
 from typing import AsyncGenerator
 
 from openai import AsyncOpenAI
@@ -26,8 +27,6 @@ class OpenAIProvider(LLMProvider):
 
     def _prepare_chat_kwargs(self, kwargs: dict) -> dict:
         """Prepare chat completion kwargs, handling reasoning/thinking models."""
-        import re
-
         enable_thinking = kwargs.pop("enable_thinking", False)
         # Remove response_format because callers pass it explicitly as an arg
         kwargs.pop("response_format", None)
@@ -63,8 +62,25 @@ class OpenAIProvider(LLMProvider):
         if extra_body:
             create_kwargs["extra_body"] = extra_body
 
-        # Pass through any remaining kwargs
-        create_kwargs.update(kwargs)
+        # Whitelist of known OpenAI chat completion parameters to avoid passing
+        # arbitrary plugin kwargs that would cause the client to raise TypeError.
+        openai_whitelist = {
+            "top_p",
+            "n",
+            "stop",
+            "presence_penalty",
+            "frequency_penalty",
+            "logit_bias",
+            "user",
+            "seed",
+            "logprobs",
+            "top_logprobs",
+        }
+
+        # Pass through only whitelisted remaining kwargs
+        for k, v in kwargs.items():
+            if k in openai_whitelist:
+                create_kwargs[k] = v
 
         return create_kwargs
 

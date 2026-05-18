@@ -1292,121 +1292,135 @@ async def run_standalone_judge():
     async with async_session_maker() as session:
         for task, doc in tasks_with_docs:
             try:
-                result_data = json.loads(task.result_data)
-            except Exception:
-                continue
+                try:
+                    result_data = json.loads(task.result_data)
+                except Exception:
+                    continue
 
-            context = doc_contexts.get(doc.id, {})
+                context = doc_contexts.get(doc.id, {})
 
-            retry_count = 0
-            max_retries = 1
+                retry_count = 0
+                max_retries = 1
 
-            while retry_count <= max_retries:
-                console.print(
-                    f"[dim]Evaluating {task.task_name} for Document {doc.path}...[/dim]",
-                    end="\r",
-                )
-                status = await judge.judge_task(
-                    task.task_name, doc.path, result_data, context
-                )
+                while retry_count <= max_retries:
+                    console.print(
+                        f"[dim]Evaluating {task.task_name} for Document {doc.path}...[/dim]",
+                        end="\r",
+                    )
+                    status = await judge.judge_task(
+                        task.task_name, doc.path, result_data, context
+                    )
 
-                # Clear the line
-                console.print(" " * 120, end="\r")
+                    # Clear the line
+                    console.print(" " * 120, end="\r")
 
-                if status == "PASSED":
-                    if retry_count == 0:
-                        passed_count += 1
-                        console.print(
-                            f"✅ [green]PASSED[/green] | Task: {task.task_name} | Doc: {doc.path}"
-                        )
-                    else:
-                        passed_count += 1
-                        console.print(
-                            f"🎉 [green]FIXED ON RETRY[/green] | Task: {task.task_name} | Doc: {doc.path}"
-                        )
-                        # Save the fixed result to the database
-                        from src.core.plugin_registry import ANALYZER_REGISTRY
-
-                        analyzer_cls = ANALYZER_REGISTRY.get(task.task_name)
-                        current_version = (
-                            getattr(analyzer_cls, "_analyzer_version", None)
-                            if analyzer_cls
-                            else None
-                        )
-                        from src.db.fts import sync_document_to_fts
-
-                        db_task = await session.get(AnalysisTask, task.id)
-                        if db_task:
-                            db_task.result_data = json.dumps(result_data)
-                            db_task.status = TaskStatus.COMPLETED
-                            db_task.error_message = None
-                            if current_version:
-                                db_task.plugin_version = current_version
-                            await session.commit()
-                            try:
-                                await sync_document_to_fts(session, doc.id)
-                                await session.commit()
-                            except Exception as fts_err:
-                                logger.error(
-                                    f"FTS resync failed during judge retry: {fts_err}"
-                                )
-                    break
-                elif status == "SKIPPED":
-                    skipped_count += 1
-                    # We don't print skipped tasks to avoid spamming the console
-                    break
-                elif status in ["ERROR", "FAILED"]:
-                    if retry_count < max_retries:
-                        console.print(
-                            f"🔄 [yellow]FAILED/ERROR - Attempting Re-run ({retry_count + 1}/{max_retries})[/yellow] | Task: {task.task_name} | Doc: {doc.path}"
-                        )
-                        from src.core.plugin_registry import ANALYZER_REGISTRY
-
-                        analyzer_cls = ANALYZER_REGISTRY.get(task.task_name)
-                        if analyzer_cls:
-                            try:
-                                analyzer = analyzer_cls()
-                                # Re-run the analyzer on the document
-                                result_data = await analyzer.analyze(
-                                    doc.path, doc.mime_type, context
-                                )
-                                retry_count += 1
-                                continue  # Loop back and evaluate the new result
-                            except Exception as e:
-                                console.print(f"[red]Retry execution failed:[/red] {e}")
-                        else:
+                    if status == "PASSED":
+                        if retry_count == 0:
+                            passed_count += 1
                             console.print(
-                                f"[red]Cannot retry: Analyzer class {task.task_name} not found.[/red]"
+                                f"✅ [green]PASSED[/green] | Task: {task.task_name} | Doc: {doc.path}"
                             )
+                        else:
+                            passed_count += 1
+                            console.print(
+                                f"🎉 [green]FIXED ON RETRY[/green] | Task: {task.task_name} | Doc: {doc.path}"
+                            )
+                            # Save the fixed result to the database
+                            from src.core.plugin_registry import ANALYZER_REGISTRY
 
-                    # If we're here, retries were exhausted or the retry failed
-                    if status == "ERROR":
-                        failed_count += 1
-                        console.print(
-                            f"⚠️  [yellow]ERROR[/yellow]  | Task: {task.task_name} | Doc: {doc.path}"
-                        )
-                    else:
-                        failed_count += 1
+                            analyzer_cls = ANALYZER_REGISTRY.get(task.task_name)
+                            current_version = (
+                                getattr(analyzer_cls, "_analyzer_version", None)
+                                if analyzer_cls
+                                else None
+                            )
+                            from src.db.fts import sync_document_to_fts
 
-                    # The judge_task already printed the panel with details
-                    try:
-                        input(
-                            "\nPress Enter to continue to the next evaluation (or Ctrl+C to quit)..."
-                        )
-                    except KeyboardInterrupt:
-                        console.print("\n[bold red]Aborting evaluation...[/bold red]")
-                        return
-                    break
+                            db_task = await session.get(AnalysisTask, task.id)
+                            if db_task:
+                                db_task.result_data = json.dumps(result_data)
+                                db_task.status = TaskStatus.COMPLETED
+                                db_task.error_message = None
+                                db_task.updated_at = datetime.now(timezone.utc)
+                                if current_version:
+                                    db_task.plugin_version = current_version
+                                await session.commit()
+                                try:
+                                    await sync_document_to_fts(session, doc.id)
+                                    await session.commit()
+                                except Exception as fts_err:
+                                    logger.error(
+                                        f"FTS resync failed during judge retry: {fts_err}"
+                                    )
+                        break
+                    elif status == "SKIPPED":
+                        skipped_count += 1
+                        # We don't print skipped tasks to avoid spamming the console
+                        break
+                    elif status in ["ERROR", "FAILED"]:
+                        if retry_count < max_retries:
+                            console.print(
+                                f"🔄 [yellow]FAILED/ERROR - Attempting Re-run ({retry_count + 1}/{max_retries})[/yellow] | Task: {task.task_name} | Doc: {doc.path}"
+                            )
+                            from src.core.plugin_registry import ANALYZER_REGISTRY
 
-            # Record judged_at timestamp only for real verdicts (PASSED/SKIPPED/FAILED).
-            # ERROR verdicts (system failures) don't update judged_at so they stay
-            # at the front of the queue for the next run.
-            if status in ["PASSED", "SKIPPED", "FAILED"]:
-                db_task = await session.get(AnalysisTask, task.id)
-                if db_task:
-                    db_task.judged_at = datetime.now(timezone.utc)
-                    # Commit incrementally to show progress in DB but keep the session open
-                    await session.commit()
+                            analyzer_cls = ANALYZER_REGISTRY.get(task.task_name)
+                            if analyzer_cls:
+                                try:
+                                    analyzer = analyzer_cls()
+                                    # Re-run the analyzer on the document
+                                    result_data = await analyzer.analyze(
+                                        doc.path, doc.mime_type, context
+                                    )
+                                    retry_count += 1
+                                    continue  # Loop back and evaluate the new result
+                                except Exception as e:
+                                    console.print(
+                                        f"[red]Retry execution failed:[/red] {e}"
+                                    )
+                            else:
+                                console.print(
+                                    f"[red]Cannot retry: Analyzer class {task.task_name} not found.[/red]"
+                                )
+
+                        # If we're here, retries were exhausted or the retry failed
+                        if status == "ERROR":
+                            failed_count += 1
+                            console.print(
+                                f"⚠️  [yellow]ERROR[/yellow]  | Task: {task.task_name} | Doc: {doc.path}"
+                            )
+                        else:
+                            failed_count += 1
+
+                        # The judge_task already printed the panel with details
+                        try:
+                            input(
+                                "\nPress Enter to continue to the next evaluation (or Ctrl+C to quit)..."
+                            )
+                        except KeyboardInterrupt:
+                            console.print(
+                                "\n[bold red]Aborting evaluation...[/bold red]"
+                            )
+                            return
+                        break
+
+                # Record judged_at timestamp only for real verdicts (PASSED/SKIPPED/FAILED).
+                # ERROR verdicts (system failures) don't update judged_at so they stay
+                # at the front of the queue for the next run.
+                if status in ["PASSED", "SKIPPED", "FAILED"]:
+                    db_task = await session.get(AnalysisTask, task.id)
+                    if db_task:
+                        db_task.judged_at = datetime.now(timezone.utc)
+                        # Commit incrementally to show progress in DB but keep the session open
+                        await session.commit()
+            except Exception as e:
+                logger.error(
+                    f"Unexpected error judging task {task.task_name} for {doc.path}: {e}"
+                )
+                console.print(
+                    f"[bold red]Unexpected error judging {doc.path}:[/bold red] {e}"
+                )
+                continue
 
     console.print("\n[bold green]Evaluation Complete![/bold green]")
     console.print(f"Total Evaluated: {passed_count + failed_count + skipped_count}")
