@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 @register_analyzer(
     name=PII_HARVESTER_NAME,
     depends_on=[TEXT_EXTRACTOR_NAME, ROUTER_NAME],
-    version="1.8",
+    version="1.9",
 )
 class PIIHarvesterPlugin(AnalyzerBase):
     """

@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 @register_analyzer(
     name=ESTATE_ANALYZER_NAME,
     depends_on=[TEXT_EXTRACTOR_NAME, ROUTER_NAME],
-    version="1.9",
+    version="2.0",
 )
 class EstateAnalyzerPlugin(AnalyzerBase):
     """
@@ -135,6 +135,7 @@ Text:
                 prompt,
                 max_tokens=safe_tokens,
                 temperature=0.0,
+                enable_thinking=True,
                 response_format={
                     "type": "json_object",
                     "schema": {

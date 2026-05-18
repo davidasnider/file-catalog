@@ -438,3 +438,87 @@ async def test_startup_wma_reclassification(db_session, temp_dir):
     result = await db_session.execute(select(Document).where(Document.id == doc.id))
     updated_doc = result.scalars().first()
     assert updated_doc.mime_type == "audio/x-ms-wma"
+
+
+def test_mlx_provider_enable_thinking_toggling():
+    """Verify that MLXProvider defaults enable_thinking to False, and respects enable_thinking=True when passed."""
+    from src.llm.mlx_provider import MLXProvider
+    from unittest.mock import MagicMock, patch
+
+    # Mock the models and tokenizers so we don't load real files on disk
+    mock_model = MagicMock()
+    mock_tokenizer = MagicMock()
+    mock_tokenizer.apply_chat_template = MagicMock(return_value="formatted prompt")
+
+    with patch(
+        "src.llm.mlx_provider.load",
+        return_value=(mock_model, mock_tokenizer),
+        create=True,
+    ), patch(
+        "src.llm.mlx_provider.generate", return_value="dummy response", create=True
+    ), patch(
+        "src.llm.mlx_provider.make_sampler", return_value=MagicMock(), create=True
+    ), patch(
+        "src.llm.mlx_provider.make_logits_processors",
+        return_value=MagicMock(),
+        create=True,
+    ), patch("src.llm.mlx_provider.HAS_MLX", True, create=True):
+        provider = MLXProvider(model_path="dummy", is_vision=False)
+        provider.use_chat_template = True
+
+        # Test default call (without enable_thinking passed)
+        import asyncio
+
+        original_loop = None
+        try:
+            policy = asyncio.get_event_loop_policy()
+            if (
+                hasattr(policy, "_local")
+                and getattr(policy._local, "_loop", None) is not None
+            ):
+                original_loop = policy._local._loop
+        except Exception:
+            pass
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        try:
+            # Mock run_in_executor to execute the sync function immediately
+            async def mock_run_in_executor(executor, func, *args):
+                return func(*args)
+
+            with patch("asyncio.get_running_loop", return_value=loop), patch.object(
+                loop, "run_in_executor", new=mock_run_in_executor
+            ), patch("src.llm.mlx_provider.get_mlx_gpu_lock"):
+                # Default: enable_thinking should be False
+                loop.run_until_complete(provider.generate("test prompt"))
+                mock_tokenizer.apply_chat_template.assert_called_with(
+                    [
+                        {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": "test prompt"},
+                    ],
+                    tokenize=False,
+                    add_generation_prompt=True,
+                    enable_thinking=False,
+                )
+
+                # Explicit enable_thinking=True
+                loop.run_until_complete(
+                    provider.generate("test prompt", enable_thinking=True)
+                )
+                mock_tokenizer.apply_chat_template.assert_called_with(
+                    [
+                        {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": "test prompt"},
+                    ],
+                    tokenize=False,
+                    add_generation_prompt=True,
+                    enable_thinking=True,
+                )
+        finally:
+            loop.close()
+            if original_loop is not None:
+                asyncio.set_event_loop(original_loop)
+            else:
+                asyncio.set_event_loop(None)

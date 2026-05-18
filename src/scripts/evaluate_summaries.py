@@ -172,7 +172,7 @@ async def evaluate_pair(llm, pair: Dict[str, Any]) -> Dict[str, Any]:
 
     try:
         response_text = await llm.generate(
-            prompt, response_format="json", temperature=0.0
+            prompt, response_format="json", temperature=0.0, enable_thinking=True
         )
         evaluation = repair_and_load_json(response_text)
 

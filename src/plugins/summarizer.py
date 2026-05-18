@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
         VIDEO_ANALYZER_NAME,
         EMAIL_PARSER_NAME,
     ],
-    version="1.5",
+    version="1.6",
 )
 class SummarizerPlugin(AnalyzerBase):
     """

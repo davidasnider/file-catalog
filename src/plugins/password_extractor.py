@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 @register_analyzer(
     name=PASSWORD_EXTRACTOR_NAME,
     depends_on=[TEXT_EXTRACTOR_NAME, ROUTER_NAME],
-    version="1.1",
+    version="1.2",
 )
 class PasswordExtractorPlugin(AnalyzerBase):
     """
