@@ -64,6 +64,7 @@
 - [ ] Add test coverage reporting and set a minimum coverage threshold in CI.
 - [ ] Add tests for the Streamlit dashboard (e.g., using `streamlit.testing` or snapshot tests).
 - [x] Add tests for the `LlamaCppProvider` and `ModelManager` (mocked inference, LRU eviction behavior, memory monitoring).
+- [x] Add tests for judge prioritization and tracking logic.
 
 ## Documentation
 - [ ] Write a contributor guide explaining how to create a new plugin (step-by-step with the `@register_analyzer` decorator pattern).
