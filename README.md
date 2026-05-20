@@ -44,6 +44,10 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
   - **Interactive Detail View**: Drill down into document metadata, AI results, and visual previews.
 - **SQLite Concurrency Management**: Uses semantic locking and FTS-specific semaphores to prevent "database is locked" errors during high-concurrency ingestion and indexing.
 
+### 7. Evaluation & Quality Assurance
+- **Task Judging & Prioritization**: The system features an automated `TaskJudge` to evaluate the quality of AI extractions and summaries. To ensure efficient evaluation across runs, `AnalysisTask` records a `judged_at` timestamp, prioritizing unjudged and older tasks during evaluation.
+- **Reasoning Model Support**: High-complexity plugins (e.g., `PIIHarvester` and `PasswordExtractor`) leverage advanced reasoning models by enabling the `enable_thinking` flag in supported providers (like OpenAI o1/o3 and local equivalents) for maximum extraction accuracy.
+
 ## Configuration & Production Usage
 
 The scanner can be configured via environment variables (in a `.env` file) or CLI arguments.
