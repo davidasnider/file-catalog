@@ -132,5 +132,19 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 python -m src.scripts.scan_text_failures "/path/to/directory" --limit 10
 ```
 
+---
+
+### 10. Duplicate Remover (`delete_duplicates.py`)
+Finds and deletes duplicate files based on MD5 hashes. In case of duplicates, it automatically preserves the version with the shortest file path (fewer characters) and deletes the rest.
+
+**Examples:**
+```bash
+# Preview duplicates that would be deleted (Recommended first step)
+python -m src.scripts.delete_duplicates "/path/to/directory" --dry-run
+
+# Delete duplicates for real
+python -m src.scripts.delete_duplicates "/path/to/directory"
+```
+
 ## General Usage Note
 All scripts should be run from the root of the project using the `python -m src.scripts.<script_name>` syntax to ensure that internal imports and the `PYTHONPATH` are handled correctly.
