@@ -5,7 +5,7 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 ## Core Features
 
 ### 1. Multi-Model Orchestration & Memory Management
-- **Multi-Backend Python LLM Management**: Directly manages models using `llama-cpp-python` (GGUF), `mlx-lm` (Apple Silicon), `google-genai` (Cloud Fallback), or `openai` for local LLM inference via any OpenAI-compatible endpoint (e.g. vLLM/Ollama) without external proxy bloat.
+- **Multi-Backend Python LLM Management**: Directly manages models using `llama-cpp-python` (GGUF), `mlx-lm` (Apple Silicon), `google-genai` (Cloud Fallback), or `openai` for local LLM inference via any OpenAI-compatible endpoint (e.g. vLLM/Ollama) without external proxy bloat. Includes reasoning support (`enable_thinking`) for advanced models like o1/o3 or local models supporting explicit reasoning modes.
 - **LRU Cache & RAM Monitoring**: For the `llama-cpp` backend, actively monitors system RAM (via `psutil`). Models are cached "hot" in unified memory for maximum speed between tasks, and gracefully evicted using an LRU strategy only when memory drops below 2GB.
 - **Dynamic Model Fetching**: For the `llama-cpp` backend, automatically downloads and manages localized GGUF models directly from HuggingFace (e.g., `Llama-3.1-8B-Instruct`, `Phi-4-mini`) upon first request.
 
@@ -66,7 +66,7 @@ Configuration is centrally managed via `pydantic-settings`.
 
 ### Performance: Incremental Scanning
 The system implements a **Quick Skip** mechanism. It tracks the `file_size` and `mtime` of every ingested file. On subsequent runs, if a file's metadata hasn't changed and its status is `COMPLETED`, the scanner skips the entire analysis pipeline for that file, significantly reducing processing time for large, stable archives. The system also handles deleted or moved files by utilizing the core `DocumentStatus.NOT_PRESENT` state, ensuring accurate filesystem synchronization (note that moved files are handled as a deletion followed by a new ingestion).
-Additionally, when resuming scans, a **Priority-Based Hydration** logic is used to aggressively push incomplete tasks forward: unprocessed files are prioritized first, followed by failed files, and finally partially processed/retrying files.
+Additionally, when resuming scans, a **Priority-Based Hydration** logic is used to aggressively push incomplete tasks forward: unprocessed files are prioritized first, followed by failed files, and finally partially processed/retrying files. For evaluation, use `python src/scanner.py --judge` to run a standalone LLM-as-a-Judge on unjudged/older tasks to track analysis quality.
 
 ---
 *Built with Python, SQLite (SQLModel), Streamlit, and Llama.cpp.*

@@ -65,6 +65,9 @@ python -m src.scripts.sync_fts
 
 # Evaluate generated summaries using an LLM-as-a-judge
 python -m src.scripts.evaluate_summaries --samples 10
+
+# Run standalone LLM-as-a-Judge mode on completed tasks
+python src/scanner.py --judge
 ```
 
 ## 📝 Development Conventions
