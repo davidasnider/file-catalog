@@ -29,7 +29,7 @@ Rebuild the application from the ground up to address robustness, extensibility,
 - **Solution:** Use **SQLite** via `SQLModel` (or `SQLAlchemy`).
 - **Schema Design:**
   - `Document`: Tracks path, robustly detected MIME type, file hash (to detect content changes), and overall status (`PENDING`, `EXTRACTING`, `ANALYZING`, `COMPLETED`, `FAILED`, `NOT_PRESENT`). The `NOT_PRESENT` status is used to mark files that have been deleted or moved from their original location; when a document enters this state, it is automatically removed from the Full-Text Search (FTS) index to ensure search results remain accurate and synchronized with the current filesystem state.
-  - `AnalysisTask`: Each document has multiple linked tasks (e.g., OCR, Text Splitting, Summarization, Estate Analysis). Each task has its own status (`PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `RETRIES`), and tracks evaluations using `judged_at`.
+  - `AnalysisTask`: Each document has multiple linked tasks (e.g., OCR, Text Splitting, Summarization, Estate Analysis). Each task has its own status (`PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `RETRIES`). It also includes a `judged_at` timestamp which is used to prioritize unjudged and older tasks during background evaluation by the `TaskJudge`.
 
 ### 2.2 Advanced File Type Detection
 - **Problem:** Current detection depends largely on file extensions, failing on extensionless files or spoofed files.
@@ -56,8 +56,7 @@ Rebuild the application from the ground up to address robustness, extensibility,
 - **Problem:** Hardcoded Ollama dependencies limit performance tuning and cloud fallback capabilities.
 - **Solution:** Defined an `LLMProvider` interface.
   - Implemented multiple adapters: `MLXProvider`, `LlamaCppProvider`, Cloud Providers (`GeminiProvider`), and `OpenAIProvider` for OpenAI-compatible endpoints.
-  - Added support for explicit reasoning modes (`enable_thinking`) for advanced models (e.g., OpenAI o1/o3, deepseek-r1).
-  - This allows falling back to robust cloud models for heavy reasoning while keeping local options for privacy.
+  - This allows falling back to robust cloud models for heavy reasoning while keeping local options for privacy. We also support enabling advanced reasoning models (like OpenAI o1/o3 or local equivalents) via the `enable_thinking` flag for high-complexity analytical plugins.
 
 ---
 
