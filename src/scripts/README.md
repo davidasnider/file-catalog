@@ -81,7 +81,7 @@ python -m src.scripts.evaluate_summaries --samples 5 --output eval_results.json
 ---
 
 ### 6. Inspect File (`inspect_file.py`)
-Retrieves and displays all database metadata and analysis results for a specific file in a formatted Rich terminal layout. You can optionally use the `--yaml` flag to output the raw analysis results as YAML. If using iTerm2, it will also display a visual preview of the image or a video thumbnail.
+Retrieves and displays all database metadata and analysis results for a specific file in a formatted Rich terminal layout. You can optionally use the `--yaml` flag to output the full record as YAML, including document metadata and analysis results. If using iTerm2, it will also display a visual preview of the image or a video thumbnail.
 
 **Example:**
 ```bash
