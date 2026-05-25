@@ -163,7 +163,7 @@ def main():
 
     args = parser.parse_args()
 
-    if args.directory == "." and not args.force:
+    if Path(args.directory).resolve() == Path.cwd().resolve() and not args.force:
         parser.error(
             "Scanning the current directory without --force is not allowed "
             "to prevent accidental self-deletion. Use --force to override."
