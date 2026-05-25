@@ -1,15 +1,15 @@
 from src.scripts.delete_duplicates import (
-    find_duplicates,
+    compute_sha256,
     delete_duplicates,
-    compute_md5,
+    find_duplicates,
 )
 
 
-def test_compute_md5(tmp_path):
+def test_compute_sha256(tmp_path):
     f = tmp_path / "test.txt"
     f.write_text("hello world")
-    expected = "5eb63bbbe01eeed093cb22bb8f5acdc3"  # pragma: allowlist secret
-    assert compute_md5(str(f)) == expected
+    expected = "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"  # pragma: allowlist secret
+    assert compute_sha256(str(f)) == expected
 
 
 def test_find_and_delete_duplicates(tmp_path):
@@ -34,8 +34,9 @@ def test_find_and_delete_duplicates(tmp_path):
     # 1. Find duplicates
     hashes = find_duplicates(str(dir1))
 
-    # Use compute_md5 to get the expected hash for the duplicate content
-    dup_hash = compute_md5(str(file_a))
+    # Use compute_sha256 to get the expected hash for the duplicate content
+    dup_hash = compute_sha256(str(file_a))
+    assert hashes is not None
     assert dup_hash in hashes
     assert len(hashes[dup_hash]) == 3
 
