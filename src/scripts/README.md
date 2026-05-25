@@ -135,7 +135,7 @@ python -m src.scripts.scan_text_failures "/path/to/directory" --limit 10
 ---
 
 ### 10. Duplicate Remover (`delete_duplicates.py`)
-Finds and deletes duplicate files based on MD5 hashes. In case of duplicates, it automatically preserves the version with the shortest file path (fewer characters) and deletes the rest.
+Finds and deletes duplicate files based on SHA-256 hashes. In case of duplicates, it automatically preserves the version with the shortest file path (fewer characters) and deletes the rest.
 
 **Examples:**
 ```bash
