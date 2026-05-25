@@ -96,7 +96,9 @@ def find_duplicates(directory: str) -> dict[str, list[str]] | None:
             except (PermissionError, OSError) as e:
                 logger.error(f"⚠️  Could not read {file_path}: {e}")
 
-    return hashes
+    # Filter to only include actual duplicates (2+ paths per hash)
+    duplicates = {h: paths for h, paths in hashes.items() if len(paths) > 1}
+    return duplicates
 
 
 def delete_duplicates(hashes: dict[str, list[str]], dry_run: bool = False) -> None:
