@@ -70,3 +70,6 @@ Additionally, when resuming scans, a **Priority-Based Hydration** logic is used 
 
 ---
 *Built with Python, SQLite (SQLModel), Streamlit, and Llama.cpp.*
+
+### Utility Scripts
+For more details on utility scripts such as MBOX exploder, Archive Extractor, FTS Index Synchronizer, and Inspect File with YAML output, please refer to the `src/scripts/README.md`.
