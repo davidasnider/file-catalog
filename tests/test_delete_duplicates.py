@@ -5,6 +5,45 @@ from src.scripts.delete_duplicates import (
 )
 
 
+def test_find_duplicates_invalid_directory():
+    """find_duplicates returns None for non-existent or non-directory paths."""
+    assert find_duplicates("/nonexistent/path") is None
+    assert find_duplicates("/etc/hostname") is None  # regular file, not directory
+
+
+def test_find_duplicates_cwd_rejected_without_force(tmp_path, monkeypatch):
+    """CLI refuses to scan Path.cwd() unless --force is provided."""
+    from unittest.mock import patch
+    import sys
+    from src.scripts.delete_duplicates import main
+
+    # Change to tmp_path so Path.cwd() would be a valid target
+    monkeypatch.chdir(tmp_path)
+    args = [sys.argv[0], str(tmp_path)]
+    with patch.object(sys, "argv", args):
+        try:
+            main()
+            assert False, "Expected SystemExit"
+        except SystemExit as e:
+            assert e.code == 2
+
+
+def test_find_duplicates_cwd_accepted_with_force(tmp_path, monkeypatch, caplog):
+    """CLI accepts Path.cwd() when --force is provided."""
+    import sys
+    from src.scripts.delete_duplicates import main
+    from unittest.mock import patch
+
+    (tmp_path / "a.txt").write_text("content")
+    (tmp_path / "b.txt").write_text("content")
+
+    monkeypatch.chdir(tmp_path)
+    args = [sys.argv[0], str(tmp_path), "--force", "--dry-run"]
+    with patch.object(sys, "argv", args):
+        # Should not raise SystemExit(2)
+        main()  # Runs without error
+
+
 def test_compute_sha256(tmp_path):
     f = tmp_path / "test.txt"
     f.write_text("hello world")
