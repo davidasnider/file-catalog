@@ -43,7 +43,7 @@ def find_duplicates(directory: str) -> dict[str, list[str]] | None:
         A dictionary mapping SHA-256 hashes to lists of file paths,
         or None if the directory is invalid.
     """
-    hashes: dict[str, list[str]] = defaultdict(list)
+    hashes: defaultdict[str, list[str]] = defaultdict(list)
     base_path = Path(directory).resolve()
 
     if not base_path.exists() or not base_path.is_dir():
@@ -53,7 +53,7 @@ def find_duplicates(directory: str) -> dict[str, list[str]] | None:
     logger.info(f"🔍 Scanning {base_path} for duplicates...")
 
     # Phase 1: Group by file size (fast, no hashing)
-    size_groups: dict[int, list[str]] = defaultdict(list)
+    size_groups: defaultdict[int, list[str]] = defaultdict(list)
     seen_inodes: dict[tuple[int, int], str] = {}  # (dev, ino) -> path
 
     for root, _, files in os.walk(base_path):
@@ -128,7 +128,7 @@ def delete_duplicates(hashes: dict[str, list[str]], dry_run: bool = False) -> No
 
                     total_deleted += 1
                     total_saved_space += file_size
-                except Exception as e:
+                except (OSError, PermissionError, FileNotFoundError) as e:
                     logger.error(f"  ❌ Error processing {dup_path}: {e}")
 
     if total_deleted > 0:
