@@ -108,9 +108,11 @@ def delete_duplicates(hashes: dict[str, list[str]], dry_run: bool = False) -> No
     """
     total_deleted = 0
     total_saved_space = 0
+    duplicates_found = 0
 
     for file_hash, paths in hashes.items():
         if len(paths) > 1:
+            duplicates_found += 1
             # Sort paths by length (shortest first), then alphabetically for stability
             sorted_paths = sorted(paths, key=lambda p: (len(p), p))
 
@@ -141,6 +143,11 @@ def delete_duplicates(hashes: dict[str, list[str]], dry_run: bool = False) -> No
         logger.info(f"\n✨{status} {total_deleted} duplicate files.")
         logger.info(
             f"📦 Total space {'to be saved' if dry_run else 'saved'}: {total_saved_space} bytes."
+        )
+    elif duplicates_found > 0:
+        logger.info(
+            "\n⚠️  Duplicates found but none were deleted. "
+            "Check permissions and re-run."
         )
     else:
         logger.info("\n✅ No duplicates found.")
