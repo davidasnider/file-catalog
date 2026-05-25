@@ -1,6 +1,7 @@
 import argparse
 import hashlib
 import os
+import stat
 from pathlib import Path
 from collections import defaultdict
 import logging
@@ -65,18 +66,22 @@ def find_duplicates(directory: str) -> dict[str, list[str]] | None:
                 continue
 
             try:
-                stat = os.stat(file_path)
+                stat_result = os.stat(file_path)
             except (PermissionError, OSError) as e:
                 logger.error(f"⚠️  Could not stat {file_path}: {e}")
                 continue
 
+            # Skip non-regular files (FIFOs, device nodes, etc.)
+            if not stat.S_ISREG(stat_result.st_mode):
+                continue
+
             # Skip hardlinks beyond the first occurrence (same inode on same device)
-            inode_key = (stat.st_dev, stat.st_ino)
+            inode_key = (stat_result.st_dev, stat_result.st_ino)
             if inode_key in seen_inodes:
                 continue
             seen_inodes[inode_key] = file_path
 
-            size_groups[stat.st_size].append(file_path)
+            size_groups[stat_result.st_size].append(file_path)
 
     # Phase 2: Only hash files that share a size with at least one other
     for size, paths in size_groups.items():
@@ -160,6 +165,11 @@ def main():
         action="store_true",
         help="Allow scanning the current directory (use with caution).",
     )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Skip the confirmation prompt before deleting files.",
+    )
 
     args = parser.parse_args()
 
@@ -172,6 +182,15 @@ def main():
     hashes = find_duplicates(args.directory)
     if hashes is None:
         raise SystemExit(2)
+
+    if not args.dry_run and not args.yes:
+        dup_count = sum(1 for v in hashes.values() if len(v) > 1)
+        confirm = input(
+            f"This will delete {dup_count} duplicate file(s). " "Are you sure? (y/N): "
+        )
+        if confirm.lower() != "y":
+            print("Aborted.")
+            raise SystemExit(1)
 
     delete_duplicates(hashes, dry_run=args.dry_run)
 
