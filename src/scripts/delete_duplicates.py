@@ -1,6 +1,7 @@
 import argparse
 import hashlib
 import os
+import stat
 from pathlib import Path
 from collections import defaultdict
 import logging
@@ -43,7 +44,7 @@ def find_duplicates(directory: str) -> dict[str, list[str]] | None:
         A dictionary mapping SHA-256 hashes to lists of file paths,
         or None if the directory is invalid.
     """
-    hashes: dict[str, list[str]] = defaultdict(list)
+    hashes: defaultdict[str, list[str]] = defaultdict(list)
     base_path = Path(directory).resolve()
 
     if not base_path.exists() or not base_path.is_dir():
@@ -53,7 +54,7 @@ def find_duplicates(directory: str) -> dict[str, list[str]] | None:
     logger.info(f"🔍 Scanning {base_path} for duplicates...")
 
     # Phase 1: Group by file size (fast, no hashing)
-    size_groups: dict[int, list[str]] = defaultdict(list)
+    size_groups: defaultdict[int, list[str]] = defaultdict(list)
     seen_inodes: dict[tuple[int, int], str] = {}  # (dev, ino) -> path
 
     for root, _, files in os.walk(base_path):
@@ -65,18 +66,22 @@ def find_duplicates(directory: str) -> dict[str, list[str]] | None:
                 continue
 
             try:
-                stat = os.stat(file_path)
+                stat_result = os.stat(file_path)
             except (PermissionError, OSError) as e:
                 logger.error(f"⚠️  Could not stat {file_path}: {e}")
                 continue
 
+            # Skip non-regular files (FIFOs, device nodes, etc.)
+            if not stat.S_ISREG(stat_result.st_mode):
+                continue
+
             # Skip hardlinks beyond the first occurrence (same inode on same device)
-            inode_key = (stat.st_dev, stat.st_ino)
+            inode_key = (stat_result.st_dev, stat_result.st_ino)
             if inode_key in seen_inodes:
                 continue
             seen_inodes[inode_key] = file_path
 
-            size_groups[stat.st_size].append(file_path)
+            size_groups[stat_result.st_size].append(file_path)
 
     # Phase 2: Only hash files that share a size with at least one other
     for size, paths in size_groups.items():
