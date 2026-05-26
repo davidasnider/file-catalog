@@ -3,6 +3,7 @@ import asyncio
 from sqlmodel import select
 import pandas as pd
 import json
+import html
 
 from src.db.engine import async_session_maker
 from src.db.models import Document, AnalysisTask
@@ -425,14 +426,16 @@ def main():
             match = fts_results[doc_id]
 
             if match.get("summary_snippet"):
+                safe_summary = html.escape(match["summary_snippet"])
+                safe_summary = safe_summary.replace("[HL_START]", "**").replace("[HL_END]", "**")
                 st.markdown(
-                    f"**In Summary:** ...{match['summary_snippet']}...",
-                    unsafe_allow_html=True,
+                    f"**In Summary:** ...{safe_summary}...",
                 )
             if match.get("content_snippet"):
+                safe_content = html.escape(match["content_snippet"])
+                safe_content = safe_content.replace("[HL_START]", "**").replace("[HL_END]", "**")
                 st.markdown(
-                    f"**In Content:** ...{match['content_snippet']}...",
-                    unsafe_allow_html=True,
+                    f"**In Content:** ...{safe_content}...",
                 )
             st.divider()
         selected_doc = next((d for d in filtered_docs if d.id == doc_id), None)

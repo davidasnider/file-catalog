@@ -117,7 +117,7 @@ async def test_search_fts(fts_setup):
 
     assert match["document_id"] == doc.id
     # Ensure highlight snippet is working
-    assert "<b>unique_searchable_term</b>" in match["content_snippet"]
+    assert "[HL_START]unique_searchable_term[HL_END]" in match["content_snippet"]
 
 
 @pytest.mark.asyncio

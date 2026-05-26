@@ -208,8 +208,8 @@ async def search_fts(session: AsyncSession, query: str, limit: int = 50):
         SELECT
             document_id,
             path,
-            snippet(document_fts, 2, '<b>', '</b>', '...', 64) as content_snippet,
-            snippet(document_fts, 3, '<b>', '</b>', '...', 64) as summary_snippet,
+            snippet(document_fts, 2, '[HL_START]', '[HL_END]', '...', 64) as content_snippet,
+            snippet(document_fts, 3, '[HL_START]', '[HL_END]', '...', 64) as summary_snippet,
             rank
         FROM document_fts
         WHERE document_fts MATCH :query
