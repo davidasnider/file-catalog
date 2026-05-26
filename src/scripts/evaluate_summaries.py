@@ -230,7 +230,7 @@ async def main():
     results = []
     for i, pair in enumerate(pairs):
         logger.info(
-            f"[{i + 1}/{len(pairs)}] Evaluating {pair['path']} (Model: {pair['model_used']})..."
+            f"[{i+1}/{len(pairs)}] Evaluating {pair['path']} (Model: {pair['model_used']})..."
         )
         evaluation = await evaluate_pair(llm, pair)
         results.append(evaluation)
