@@ -44,10 +44,6 @@ def find_duplicates(directory: str) -> dict[str, list[str]] | None:
     hashes: defaultdict[str, list[str]] = defaultdict(list)
     base_path = Path(directory).resolve()
 
-    if not base_path.exists() or not base_path.is_dir():
-        logger.error(f"Error: {directory} is not a valid directory.")
-        return None
-
     logger.info(f"🔍 Scanning {base_path} for duplicates...")
 
     # Phase 1: Group by file size (fast, no hashing)
@@ -114,7 +110,14 @@ def delete_duplicates(hashes: dict[str, list[str]], dry_run: bool = False) -> No
         # Sort paths by length (shortest first), then alphabetically for stability
         sorted_paths = sorted(paths, key=lambda p: (len(p), p))
 
+        # Ensure the path we intend to keep still exists
         keep_path = sorted_paths[0]
+        if not os.path.exists(keep_path):
+            logger.error(
+                f"\n⚠️  Skipping hash {file_hash[:8]}: 'Keep' file {keep_path} is missing!"
+            )
+            continue
+
         dup_paths = sorted_paths[1:]
         duplicates_found += len(dup_paths)
 
@@ -179,15 +182,17 @@ def main():
 
     args = parser.parse_args()
 
-    if Path(args.directory).resolve() == Path.cwd().resolve() and not args.allow_cwd:
+    base_path = Path(args.directory).resolve()
+    if not base_path.exists() or not base_path.is_dir():
+        parser.error(f"'{args.directory}' is not a valid directory.")
+
+    if base_path == Path.cwd().resolve() and not args.allow_cwd:
         parser.error(
             "Scanning the current directory without --allow-cwd is not allowed "
             "to prevent accidental self-deletion. Use --allow-cwd to override."
         )
 
     hashes = find_duplicates(args.directory)
-    if hashes is None:
-        raise SystemExit(2)
 
     if not args.dry_run and not args.yes and hashes:
         dup_count = sum(len(paths) - 1 for paths in hashes.values())

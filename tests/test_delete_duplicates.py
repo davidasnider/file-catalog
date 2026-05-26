@@ -97,3 +97,63 @@ def test_find_and_delete_duplicates(tmp_path):
     assert not file_b.exists()
     assert not file_c.exists()
     assert unique.exists()
+
+
+def test_main_confirmation_yes(tmp_path, monkeypatch):
+    """CLI with --yes flag bypasses confirmation and deletes files."""
+    import sys
+    from src.scripts.delete_duplicates import main
+    from unittest.mock import patch
+
+    f1 = tmp_path / "1.txt"
+    f2 = tmp_path / "2.txt"
+    f1.write_text("dup")
+    f2.write_text("dup")
+
+    args = [sys.argv[0], str(tmp_path), "--yes"]
+    with patch.object(sys, "argv", args):
+        main()
+
+    assert f1.exists() != f2.exists()  # One was deleted
+
+
+def test_main_confirmation_no(tmp_path, monkeypatch):
+    """CLI interactive prompt 'n' aborts deletion."""
+    import sys
+    from src.scripts.delete_duplicates import main
+    from unittest.mock import patch
+    import pytest
+
+    f1 = tmp_path / "1.txt"
+    f2 = tmp_path / "2.txt"
+    f1.write_text("dup")
+    f2.write_text("dup")
+
+    args = [sys.argv[0], str(tmp_path)]
+    with patch.object(sys, "argv", args):
+        with patch("builtins.input", return_value="n"):
+            with pytest.raises(SystemExit) as excinfo:
+                main()
+            assert excinfo.value.code == 1
+
+    assert f1.exists()
+    assert f2.exists()
+
+
+def test_main_confirmation_y(tmp_path, monkeypatch):
+    """CLI interactive prompt 'y' proceeds with deletion."""
+    import sys
+    from src.scripts.delete_duplicates import main
+    from unittest.mock import patch
+
+    f1 = tmp_path / "1.txt"
+    f2 = tmp_path / "2.txt"
+    f1.write_text("dup")
+    f2.write_text("dup")
+
+    args = [sys.argv[0], str(tmp_path)]
+    with patch.object(sys, "argv", args):
+        with patch("builtins.input", return_value="y"):
+            main()
+
+    assert f1.exists() != f2.exists()  # One was deleted
