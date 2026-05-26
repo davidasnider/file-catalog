@@ -46,7 +46,7 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 
 ### 7. Evaluation & Quality Assurance
 - **Task Judging & Prioritization**: The system features an automated `TaskJudge` to evaluate the quality of AI extractions and summaries. To ensure efficient evaluation across runs, `AnalysisTask` records a `judged_at` timestamp, prioritizing unjudged and older tasks during evaluation.
-- **Reasoning Model Support**: High-complexity plugins (e.g., `PIIHarvester` and `PasswordExtractor`) leverage advanced reasoning models by enabling the `enable_thinking` flag in supported providers (like OpenAI o1/o3 and local equivalents) for maximum extraction accuracy.
+- **Reasoning Model Support**: High-complexity plugins (e.g., `PIIHarvesterPlugin` and `PasswordExtractorPlugin`) leverage advanced reasoning models by enabling the `enable_thinking` flag in supported providers (like OpenAI o1/o3 and local equivalents) for maximum extraction accuracy.
 
 ## Configuration & Production Usage
 
@@ -69,7 +69,7 @@ The system implements a **Quick Skip** mechanism. It tracks the `file_size` and 
 Additionally, when resuming scans, a **Priority-Based Hydration** logic is used to aggressively push incomplete tasks forward: unprocessed files are prioritized first, followed by failed files, and finally partially processed/retrying files. For evaluation, use `python src/scanner.py --judge` to run a standalone LLM-as-a-Judge on unjudged/older tasks to track analysis quality.
 
 ## Utility Scripts
-For more details on utility scripts such as MBOX Exploder, Archive Extractor, FTS Index Synchronizer, and Inspect File with YAML output, please refer to the [utility scripts README](src/scripts/README.md).
+For more details on utility scripts such as MBOX Exploder, Archive Extractor, FTS Index Synchronizer, Duplicate Remover, and Inspect File with YAML output, please refer to the [utility scripts README](src/scripts/README.md).
 
 ---
 *Built with Python, SQLite (SQLModel), Streamlit, and Llama.cpp.*
