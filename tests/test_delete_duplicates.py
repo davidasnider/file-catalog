@@ -5,10 +5,13 @@ from src.scripts.delete_duplicates import (
 )
 
 
-def test_find_duplicates_invalid_directory():
+def test_find_duplicates_invalid_directory(tmp_path):
     """find_duplicates returns None for non-existent or non-directory paths."""
-    assert find_duplicates("/nonexistent/path") is None
-    assert find_duplicates("/etc/hostname") is None  # regular file, not directory
+    assert find_duplicates(str(tmp_path / "nonexistent")) is None
+
+    file_path = tmp_path / "regular_file"
+    file_path.write_text("not a directory")
+    assert find_duplicates(str(file_path)) is None
 
 
 def test_find_duplicates_cwd_rejected_without_allow_cwd(tmp_path, monkeypatch):
@@ -16,16 +19,15 @@ def test_find_duplicates_cwd_rejected_without_allow_cwd(tmp_path, monkeypatch):
     from unittest.mock import patch
     import sys
     from src.scripts.delete_duplicates import main
+    import pytest
 
     # Change to tmp_path so Path.cwd() would be a valid target
     monkeypatch.chdir(tmp_path)
     args = [sys.argv[0], str(tmp_path)]
     with patch.object(sys, "argv", args):
-        try:
+        with pytest.raises(SystemExit) as excinfo:
             main()
-            assert False, "Expected SystemExit"
-        except SystemExit as e:
-            assert e.code == 2
+        assert excinfo.value.code == 2
 
 
 def test_find_duplicates_cwd_accepted_with_allow_cwd(tmp_path, monkeypatch, caplog):

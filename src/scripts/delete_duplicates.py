@@ -19,11 +19,8 @@ def _setup_logging() -> None:
 
 
 def compute_sha256(file_path: str, chunk_size: int = 8192) -> str:
-    """Compute SHA-256 hash of a file efficiently by reading it in chunks.
-
-    Uses usedforsecurity=False to avoid failures on FIPS-restricted systems.
-    """
-    hasher = hashlib.sha256(usedforsecurity=False)
+    """Compute SHA-256 hash of a file efficiently by reading it in chunks."""
+    hasher = hashlib.sha256()
     with open(file_path, "rb") as f:
         while chunk := f.read(chunk_size):
             hasher.update(chunk)
@@ -198,7 +195,7 @@ def main():
             f"This will delete {dup_count} duplicate file(s). Are you sure? (y/N): "
         )
         if confirm.strip().lower() != "y":
-            print("Aborted.")
+            logger.info("Operation cancelled.")
             raise SystemExit(1)
 
     delete_duplicates(hashes, dry_run=args.dry_run)
