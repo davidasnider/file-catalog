@@ -28,9 +28,10 @@ def compute_sha256(file_path: str, chunk_size: int = 8192) -> str:
 
 
 def find_duplicates(directory: str) -> dict[str, list[str]] | None:
-    """Recursively find and group files by their SHA-256 hashes.
+    """Recursively find and group duplicate files by their SHA-256 hashes.
 
-    Uses a two-phase approach for efficiency:
+    Only hashes with two or more associated paths are returned (non-duplicates
+    are excluded). Uses a two-phase approach for efficiency:
     1. Group candidates by file size (exact size match required).
     2. Only compute full SHA-256 hashes for size-colliding groups.
 
@@ -38,7 +39,7 @@ def find_duplicates(directory: str) -> dict[str, list[str]] | None:
         directory: Path to the directory to scan.
 
     Returns:
-        A dictionary mapping SHA-256 hashes to lists of file paths,
+        A dictionary mapping SHA-256 hashes to lists of duplicate file paths,
         or None if the directory is invalid.
     """
     hashes: defaultdict[str, list[str]] = defaultdict(list)
@@ -155,8 +156,8 @@ def delete_duplicates(hashes: dict[str, list[str]], dry_run: bool = False) -> No
     if duplicates_found == 0:
         logger.info("\n✅ No duplicates found.")
     elif total_deleted > 0:
-        status = " [DRY RUN] Would have deleted" if dry_run else "Successfully deleted"
-        logger.info(f"\n✨{status} {total_deleted} duplicate files.")
+        status = "[DRY RUN] Would have deleted" if dry_run else "Successfully deleted"
+        logger.info(f"\n✨ {status} {total_deleted} duplicate files.")
         logger.info(
             f"📦 Total space {'to be saved' if dry_run else 'saved'}: {total_saved_space} bytes."
         )
@@ -205,6 +206,8 @@ def main():
         )
 
     hashes = find_duplicates(args.directory)
+    if hashes is None:
+        raise SystemExit(2)
 
     if not args.dry_run and not args.yes and hashes:
         dup_count = sum(len(paths) - 1 for paths in hashes.values())
