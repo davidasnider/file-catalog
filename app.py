@@ -427,13 +427,17 @@ def main():
 
             if match.get("summary_snippet"):
                 safe_summary = html.escape(match["summary_snippet"])
-                safe_summary = safe_summary.replace("[HL_START]", "**").replace("[HL_END]", "**")
+                safe_summary = safe_summary.replace("[HL_START]", "**").replace(
+                    "[HL_END]", "**"
+                )
                 st.markdown(
                     f"**In Summary:** ...{safe_summary}...",
                 )
             if match.get("content_snippet"):
                 safe_content = html.escape(match["content_snippet"])
-                safe_content = safe_content.replace("[HL_START]", "**").replace("[HL_END]", "**")
+                safe_content = safe_content.replace("[HL_START]", "**").replace(
+                    "[HL_END]", "**"
+                )
                 st.markdown(
                     f"**In Content:** ...{safe_content}...",
                 )
