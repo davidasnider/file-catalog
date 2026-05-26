@@ -1037,8 +1037,6 @@ async def run_scanner(
                     except Exception as e:
                         logger.error(f"FTS sync failed for doc {doc_id}: {e}")
 
-
-
         def on_doc_end(doc_id):
             nonlocal completed_count
             task_id = active_tasks.get(doc_id)
@@ -1195,29 +1193,30 @@ async def run_scanner(
     # Batch check for missing models/libraries
     if processed_doc_ids:
         import json
-        from sqlmodel import select
-        from src.db.models import AnalysisTask
 
-        async with async_session_maker() as session:
-            # Chunking to avoid sqlite variable limits (usually 999)
-            doc_ids_list = list(processed_doc_ids)
-            chunk_size = 900
-            for i in range(0, len(doc_ids_list), chunk_size):
-                chunk = doc_ids_list[i : i + chunk_size]
-                result = await session.execute(
-                    select(AnalysisTask).where(AnalysisTask.document_id.in_(chunk))
-                )
-                for t in result.scalars().all():
-                    if t.result_data:
-                        try:
-                            data = json.loads(t.result_data)
-                            err = data.get("error", "")
-                            if "model not found" in err.lower():
-                                missing_models.add(err)
-                            elif "llama-cpp-python is not installed" in err:
-                                missing_libraries.add(err)
-                        except Exception:
-                            pass
+        try:
+            async with async_session_maker() as session:
+                # Chunking to avoid sqlite variable limits (usually 999)
+                doc_ids_list = list(processed_doc_ids)
+                chunk_size = 900
+                for i in range(0, len(doc_ids_list), chunk_size):
+                    chunk = doc_ids_list[i : i + chunk_size]
+                    result = await session.execute(
+                        select(AnalysisTask).where(AnalysisTask.document_id.in_(chunk))
+                    )
+                    for t in result.scalars().all():
+                        if t.result_data:
+                            try:
+                                data = json.loads(t.result_data)
+                                err = data.get("error", "")
+                                if "model not found" in err.lower():
+                                    missing_models.add(err)
+                                elif "llama-cpp-python is not installed" in err:
+                                    missing_libraries.add(err)
+                            except Exception:
+                                pass
+        except Exception as e:
+            logger.error(f"Error checking document tasks: {e}")
 
     console.print("\n[bold green]✨ Analysis Complete![/bold green]\n")
 
