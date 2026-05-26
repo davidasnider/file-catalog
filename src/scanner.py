@@ -970,6 +970,7 @@ async def run_scanner(
         completed_count = 0
         missing_models = set()
         missing_libraries = set()
+        processed_docs = set()
 
         def update_waiting():
             nonlocal waiting_tasks
@@ -1130,6 +1131,7 @@ async def run_scanner(
             mime_type = id_to_mime.get(doc_id)
             processed = await task_engine.process_document(doc_id, mime_type=mime_type)
             if processed:
+                processed_docs.add(doc_id)
                 try:
                     await check_doc_errors(doc_id)
                 except Exception:
@@ -1190,26 +1192,32 @@ async def run_scanner(
 
     console.print("\n[bold green]✨ Analysis Complete![/bold green]\n")
 
-    # Perform a single fast bulk check for runtime errors (like missing models)
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(AnalysisTask.result_data).where(
-                AnalysisTask.result_data.like('%"error"%')
-            )
-        )
-        import json
+    if processed_docs:
+        async with async_session_maker() as session:
+            # Fetch errors only for documents processed in this run to avoid surfacing old errors.
+            chunk_size = 900
+            processed_list = list(processed_docs)
+            for i in range(0, len(processed_list), chunk_size):
+                chunk = processed_list[i : i + chunk_size]
+                result = await session.execute(
+                    select(AnalysisTask.result_data).where(
+                        AnalysisTask.document_id.in_(chunk),
+                        AnalysisTask.result_data.like('%"error"%'),
+                    )
+                )
+                import json
 
-        for result_data in result.scalars().all():
-            if result_data:
-                try:
-                    data = json.loads(result_data)
-                    err = data.get("error", "")
-                    if "model not found" in err.lower():
-                        missing_models.add(err)
-                    elif "llama-cpp-python is not installed" in err:
-                        missing_libraries.add(err)
-                except Exception:
-                    pass
+                for result_data in result.scalars().all():
+                    if result_data:
+                        try:
+                            data = json.loads(result_data)
+                            err = data.get("error", "")
+                            if "model not found" in err.lower():
+                                missing_models.add(err)
+                            elif "llama-cpp-python is not installed" in err:
+                                missing_libraries.add(err)
+                        except Exception:
+                            pass
 
     if missing_models or missing_libraries:
         console.print(
