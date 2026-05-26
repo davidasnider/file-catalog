@@ -44,6 +44,10 @@ def find_duplicates(directory: str) -> dict[str, list[str]] | None:
     hashes: defaultdict[str, list[str]] = defaultdict(list)
     base_path = Path(directory).resolve()
 
+    if not base_path.exists() or not base_path.is_dir():
+        logger.error(f"❌ '{directory}' is not a valid directory.")
+        return None
+
     logger.info(f"🔍 Scanning {base_path} for duplicates...")
 
     # Phase 1: Group by file size (fast, no hashing)
@@ -110,18 +114,26 @@ def delete_duplicates(hashes: dict[str, list[str]], dry_run: bool = False) -> No
         # Sort paths by length (shortest first), then alphabetically for stability
         sorted_paths = sorted(paths, key=lambda p: (len(p), p))
 
-        # Ensure the path we intend to keep still exists
-        keep_path = sorted_paths[0]
-        if not os.path.exists(keep_path):
+        # Find the first path that still exists to keep it as our primary version
+        existing_paths = [p for p in sorted_paths if os.path.exists(p)]
+        if not existing_paths:
             logger.error(
-                f"\n⚠️  Skipping hash {file_hash[:8]}: 'Keep' file {keep_path} is missing!"
+                f"\n⚠️  Skipping hash {file_hash[:8]}: All files in this group have disappeared!"
             )
             continue
 
-        dup_paths = sorted_paths[1:]
+        keep_path = existing_paths[0]
+        dup_paths = existing_paths[1:]
+
+        if not dup_paths:
+            # Only one file exists now, it's no longer a duplicate group
+            continue
+
         duplicates_found += len(dup_paths)
 
-        logger.info(f"\n💎 Found {len(paths)} versions of hash {file_hash[:8]}...")
+        logger.info(
+            f"\n💎 Found {len(existing_paths)} versions of hash {file_hash[:8]}..."
+        )
         logger.info(f"  ✅ Keeping: {keep_path}")
 
         for dup_path in dup_paths:

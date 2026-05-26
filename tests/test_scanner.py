@@ -256,9 +256,9 @@ async def test_ingest_directory_atomic_queueing(db_session, temp_dir):
             # When an item is put in the queue, it MUST be visible to a new session
             async with async_session_maker() as session:
                 doc = await session.get(Document, item)
-                assert (
-                    doc is not None
-                ), f"Document {item} was enqueued before it was committed to the DB!"
+                assert doc is not None, (
+                    f"Document {item} was enqueued before it was committed to the DB!"
+                )
             await real_put(item)
 
         doc_queue.put = wrapped_put
@@ -450,19 +450,25 @@ def test_mlx_provider_enable_thinking_toggling():
     mock_tokenizer = MagicMock()
     mock_tokenizer.apply_chat_template = MagicMock(return_value="formatted prompt")
 
-    with patch(
-        "src.llm.mlx_provider.load",
-        return_value=(mock_model, mock_tokenizer),
-        create=True,
-    ), patch(
-        "src.llm.mlx_provider.generate", return_value="dummy response", create=True
-    ), patch(
-        "src.llm.mlx_provider.make_sampler", return_value=MagicMock(), create=True
-    ), patch(
-        "src.llm.mlx_provider.make_logits_processors",
-        return_value=MagicMock(),
-        create=True,
-    ), patch("src.llm.mlx_provider.HAS_MLX", True, create=True):
+    with (
+        patch(
+            "src.llm.mlx_provider.load",
+            return_value=(mock_model, mock_tokenizer),
+            create=True,
+        ),
+        patch(
+            "src.llm.mlx_provider.generate", return_value="dummy response", create=True
+        ),
+        patch(
+            "src.llm.mlx_provider.make_sampler", return_value=MagicMock(), create=True
+        ),
+        patch(
+            "src.llm.mlx_provider.make_logits_processors",
+            return_value=MagicMock(),
+            create=True,
+        ),
+        patch("src.llm.mlx_provider.HAS_MLX", True, create=True),
+    ):
         provider = MLXProvider(model_path="dummy", is_vision=False)
         provider.use_chat_template = True
 
@@ -488,9 +494,11 @@ def test_mlx_provider_enable_thinking_toggling():
             async def mock_run_in_executor(executor, func, *args):
                 return func(*args)
 
-            with patch("asyncio.get_running_loop", return_value=loop), patch.object(
-                loop, "run_in_executor", new=mock_run_in_executor
-            ), patch("src.llm.mlx_provider.get_mlx_gpu_lock"):
+            with (
+                patch("asyncio.get_running_loop", return_value=loop),
+                patch.object(loop, "run_in_executor", new=mock_run_in_executor),
+                patch("src.llm.mlx_provider.get_mlx_gpu_lock"),
+            ):
                 # Default: enable_thinking should be False
                 loop.run_until_complete(provider.generate("test prompt"))
                 mock_tokenizer.apply_chat_template.assert_called_with(
