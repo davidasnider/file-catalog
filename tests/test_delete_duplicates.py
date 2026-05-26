@@ -79,6 +79,9 @@ def test_find_and_delete_duplicates(tmp_path):
     assert dup_hash in hashes
     assert len(hashes[dup_hash]) == 3
 
+    # Unique file should not appear in duplicates
+    assert compute_sha256(str(unique)) not in hashes
+
     # 2. Delete duplicates (Dry Run)
     delete_duplicates(hashes, dry_run=True)
     assert file_a.exists()
