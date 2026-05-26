@@ -137,13 +137,24 @@ python -m src.scripts.scan_text_failures "/path/to/directory" --limit 10
 ### 10. Duplicate Remover (`delete_duplicates.py`)
 Finds and deletes duplicate files based on SHA-256 hashes. In case of duplicates, it automatically preserves the version with the shortest file path (fewer characters) and deletes the rest.
 
+**Flags:**
+- `--dry-run` — Preview duplicates that would be deleted without making any changes.
+- `--yes` — Skip the interactive y/N confirmation prompt (useful for automated/scripted use).
+- `--allow-cwd` — Allow scanning the current working directory (blocked by default to prevent accidental self-deletion).
+
 **Examples:**
 ```bash
 # Preview duplicates that would be deleted (Recommended first step)
 python -m src.scripts.delete_duplicates "/path/to/directory" --dry-run
 
-# Delete duplicates for real
+# Delete duplicates interactively (prompts for y/N confirmation)
 python -m src.scripts.delete_duplicates "/path/to/directory"
+
+# Delete duplicates non-interactively (skip confirmation prompt)
+python -m src.scripts.delete_duplicates "/path/to/directory" --yes
+
+# Scan the current working directory (requires --allow-cwd)
+python -m src.scripts.delete_duplicates "." --allow-cwd --dry-run
 ```
 
 ## General Usage Note

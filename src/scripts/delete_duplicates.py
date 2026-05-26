@@ -91,54 +91,63 @@ def find_duplicates(directory: str) -> dict[str, list[str]] | None:
             except (PermissionError, OSError) as e:
                 logger.error(f"⚠️  Could not read {file_path}: {e}")
 
-    return hashes
+    # Filter to only include hashes with 2+ paths (actual duplicates)
+    duplicates = {h: paths for h, paths in hashes.items() if len(paths) > 1}
+    return duplicates
 
 
 def delete_duplicates(hashes: dict[str, list[str]], dry_run: bool = False) -> None:
     """Keep the shortest path version of each file and delete the rest.
 
     Args:
-        hashes: Dictionary mapping SHA-256 hashes to lists of file paths.
+        hashes: Dictionary mapping SHA-256 hashes to lists of file paths,
+                where each list contains 2+ paths (actual duplicates).
         dry_run: If True, only report what would be deleted.
     """
     total_deleted = 0
     total_saved_space = 0
+    duplicates_found = 0
 
     for file_hash, paths in hashes.items():
-        if len(paths) > 1:
-            # Sort paths by length (shortest first), then alphabetically for stability
-            sorted_paths = sorted(paths, key=lambda p: (len(p), p))
+        # Sort paths by length (shortest first), then alphabetically for stability
+        sorted_paths = sorted(paths, key=lambda p: (len(p), p))
 
-            keep_path = sorted_paths[0]
-            duplicates = sorted_paths[1:]
+        keep_path = sorted_paths[0]
+        dup_paths = sorted_paths[1:]
+        duplicates_found += len(dup_paths)
 
-            logger.info(f"\n💎 Found {len(paths)} versions of hash {file_hash[:8]}...")
-            logger.info(f"  ✅ Keeping: {keep_path}")
+        logger.info(f"\n💎 Found {len(paths)} versions of hash {file_hash[:8]}...")
+        logger.info(f"  ✅ Keeping: {keep_path}")
 
-            for dup_path in duplicates:
-                try:
-                    file_size = os.path.getsize(dup_path)
-                    if dry_run:
-                        logger.info(
-                            f"  [DRY RUN] Would delete: {dup_path} ({file_size} bytes)"
-                        )
-                    else:
-                        os.remove(dup_path)
-                        logger.info(f"  🗑️  Deleted: {dup_path}")
+        for dup_path in dup_paths:
+            try:
+                file_size = os.path.getsize(dup_path)
+                if dry_run:
+                    logger.info(
+                        f"  [DRY RUN] Would delete: {dup_path} ({file_size} bytes)"
+                    )
+                else:
+                    os.remove(dup_path)
+                    logger.info(f"  🗑️  Deleted: {dup_path}")
 
-                    total_deleted += 1
-                    total_saved_space += file_size
-                except Exception as e:
-                    logger.error(f"  ❌ Error processing {dup_path}: {e}")
+                total_deleted += 1
+                total_saved_space += file_size
+            except (OSError, PermissionError, FileNotFoundError) as e:
+                logger.error(f"  ❌ Error processing {dup_path}: {e}")
 
-    if total_deleted > 0:
+    if duplicates_found == 0:
+        logger.info("\n✅ No duplicates found.")
+    elif total_deleted > 0:
         status = " [DRY RUN] Would have deleted" if dry_run else "Successfully deleted"
         logger.info(f"\n✨{status} {total_deleted} duplicate files.")
         logger.info(
             f"📦 Total space {'to be saved' if dry_run else 'saved'}: {total_saved_space} bytes."
         )
     else:
-        logger.info("\n✅ No duplicates found.")
+        logger.info(
+            f"\n⚠️  Found {duplicates_found} duplicate file(s) but could not delete any "
+            "(check permissions)."
+        )
 
 
 def main():
@@ -156,22 +165,36 @@ def main():
         help="Show what would be deleted without actually deleting anything.",
     )
     parser.add_argument(
-        "--force",
+        "--allow-cwd",
         action="store_true",
-        help="Allow scanning the current directory (use with caution).",
+        help="Allow scanning the current working directory (use with caution).",
+    )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Skip the interactive confirmation prompt before deleting files.",
     )
 
     args = parser.parse_args()
 
-    if Path(args.directory).resolve() == Path.cwd().resolve() and not args.force:
+    if Path(args.directory).resolve() == Path.cwd().resolve() and not args.allow_cwd:
         parser.error(
-            "Scanning the current directory without --force is not allowed "
-            "to prevent accidental self-deletion. Use --force to override."
+            "Scanning the current directory without --allow-cwd is not allowed "
+            "to prevent accidental self-deletion. Use --allow-cwd to override."
         )
 
     hashes = find_duplicates(args.directory)
     if hashes is None:
         raise SystemExit(2)
+
+    if not args.dry_run and not args.yes and hashes:
+        dup_count = sum(len(paths) - 1 for paths in hashes.values())
+        confirm = input(
+            f"This will delete {dup_count} duplicate file(s). Are you sure? (y/N): "
+        )
+        if confirm.strip().lower() != "y":
+            print("Aborted.")
+            raise SystemExit(1)
 
     delete_duplicates(hashes, dry_run=args.dry_run)
 
