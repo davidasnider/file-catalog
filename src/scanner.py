@@ -970,6 +970,7 @@ async def run_scanner(
         completed_count = 0
         missing_models = set()
         missing_libraries = set()
+        processed_doc_ids = set()
 
         def update_waiting():
             nonlocal waiting_tasks
@@ -1036,24 +1037,7 @@ async def run_scanner(
                     except Exception as e:
                         logger.error(f"FTS sync failed for doc {doc_id}: {e}")
 
-                # After syncing to FTS, perform non-indexed reads to check for runtime errors
-                async with async_session_maker() as session:
-                    result = await session.execute(
-                        select(AnalysisTask).where(AnalysisTask.document_id == doc_id)
-                    )
-                    import json
 
-                    for t in result.scalars().all():
-                        if t.result_data:
-                            try:
-                                data = json.loads(t.result_data)
-                                err = data.get("error", "")
-                                if "model not found" in err.lower():
-                                    missing_models.add(err)
-                                elif "llama-cpp-python is not installed" in err:
-                                    missing_libraries.add(err)
-                            except Exception:
-                                pass
 
         def on_doc_end(doc_id):
             nonlocal completed_count
@@ -1149,6 +1133,7 @@ async def run_scanner(
             mime_type = id_to_mime.get(doc_id)
             processed = await task_engine.process_document(doc_id, mime_type=mime_type)
             if processed:
+                processed_doc_ids.add(doc_id)
                 try:
                     await check_doc_errors(doc_id)
                 except Exception:
@@ -1206,6 +1191,33 @@ async def run_scanner(
 
     # Let background tasks (like our check_doc_errors quick checks) settle
     await asyncio.sleep(0.1)
+
+    # Batch check for missing models/libraries
+    if processed_doc_ids:
+        import json
+        from sqlmodel import select
+        from src.db.models import AnalysisTask
+
+        async with async_session_maker() as session:
+            # Chunking to avoid sqlite variable limits (usually 999)
+            doc_ids_list = list(processed_doc_ids)
+            chunk_size = 900
+            for i in range(0, len(doc_ids_list), chunk_size):
+                chunk = doc_ids_list[i : i + chunk_size]
+                result = await session.execute(
+                    select(AnalysisTask).where(AnalysisTask.document_id.in_(chunk))
+                )
+                for t in result.scalars().all():
+                    if t.result_data:
+                        try:
+                            data = json.loads(t.result_data)
+                            err = data.get("error", "")
+                            if "model not found" in err.lower():
+                                missing_models.add(err)
+                            elif "llama-cpp-python is not installed" in err:
+                                missing_libraries.add(err)
+                        except Exception:
+                            pass
 
     console.print("\n[bold green]✨ Analysis Complete![/bold green]\n")
 
