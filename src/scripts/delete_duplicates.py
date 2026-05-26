@@ -170,9 +170,9 @@ def main():
         help="Show what would be deleted without actually deleting anything.",
     )
     parser.add_argument(
-        "--force",
+        "--allow-cwd",
         action="store_true",
-        help="Allow scanning the current directory (use with caution).",
+        help="Allow scanning the current working directory (use with caution).",
     )
     parser.add_argument(
         "--yes",
@@ -182,10 +182,10 @@ def main():
 
     args = parser.parse_args()
 
-    if Path(args.directory).resolve() == Path.cwd().resolve() and not args.force:
+    if Path(args.directory).resolve() == Path.cwd().resolve() and not args.allow_cwd:
         parser.error(
-            "Scanning the current directory without --force is not allowed "
-            "to prevent accidental self-deletion. Use --force to override."
+            "Scanning the current directory without --allow-cwd is not allowed "
+            "to prevent accidental self-deletion. Use --allow-cwd to override."
         )
 
     hashes = find_duplicates(args.directory)
