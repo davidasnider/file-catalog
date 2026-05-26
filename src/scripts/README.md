@@ -146,5 +146,12 @@ python -m src.scripts.delete_duplicates "/path/to/directory" --dry-run
 python -m src.scripts.delete_duplicates "/path/to/directory"
 ```
 
+**Flags:**
+- `--dry-run`: Preview deletions without removing files (recommended first step)
+- `--force`: Allow scanning the current working directory (blocked by default to prevent accidental self-deletion)
+- `--yes`: Skip the interactive y/N confirmation prompt before deleting (use with caution)
+
+The script prompts for confirmation before performing real deletions (unless `--yes` is provided).
+
 ## General Usage Note
 All scripts should be run from the root of the project using the `python -m src.scripts.<script_name>` syntax to ensure that internal imports and the `PYTHONPATH` are handled correctly.
