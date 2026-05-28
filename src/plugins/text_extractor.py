@@ -93,7 +93,11 @@ class TextExtractorPlugin(AnalyzerBase):
                         extracted_text = pytesseract.image_to_string(img)
                 except Exception as e:
                     logger.warning(f"Pytesseract failed for {file_path}: {e}")
-                    extracted_text = ""
+                    return {
+                        "extracted": False,
+                        "error": str(e),
+                        "source": TEXT_EXTRACTOR_NAME,
+                    }
             elif mime_type == "text/rtf":
                 from striprtf.striprtf import rtf_to_text
 
