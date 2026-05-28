@@ -178,10 +178,13 @@ async def test_text_extractor_ocr_exception(tmp_path, mocker):
     test_file.write_bytes(b"dummy")
 
     # Mock pytesseract to raise an exception
-    mocker.patch("pytesseract.image_to_string", side_effect=Exception("OCR Error"))
+    mocker.patch(
+        "src.plugins.text_extractor.pytesseract.image_to_string",
+        side_effect=Exception("OCR Error"),
+    )
     # Mock PIL.Image.open to work with dummy file
     mock_img = mocker.MagicMock()
-    mocker.patch("PIL.Image.open", return_value=mock_img)
+    mocker.patch("src.plugins.text_extractor.Image.open", return_value=mock_img)
 
     result = await plugin.analyze(str(test_file), "image/png", {})
 
@@ -198,10 +201,12 @@ async def test_text_extractor_image_no_text(tmp_path, mocker):
     test_file.write_bytes(b"dummy")
 
     # Mock pytesseract to return no text
-    mocker.patch("pytesseract.image_to_string", return_value="   ")
+    mocker.patch(
+        "src.plugins.text_extractor.pytesseract.image_to_string", return_value="   "
+    )
     # Mock PIL.Image.open to work with dummy file
     mock_img = mocker.MagicMock()
-    mocker.patch("PIL.Image.open", return_value=mock_img)
+    mocker.patch("src.plugins.text_extractor.Image.open", return_value=mock_img)
 
     result = await plugin.analyze(str(test_file), "image/png", {})
 
