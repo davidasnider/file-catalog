@@ -130,9 +130,7 @@ async def test_text_extractor_powerpoint_mocked(tmp_path, mocker):
     # Mock hachoir.parser.createParser and hachoir.metadata.extractMetadata
     mocker.patch(
         "src.plugins.text_extractor.createParser",
-        return_value=mocker.MagicMock(
-            __enter__=lambda x: x, __exit__=lambda x, *args: None
-        ),
+        return_value=mocker.MagicMock(),
     )
     mock_metadata = mocker.Mock()
     mock_metadata.exportPlaintext.return_value = "Mocked PPT metadata text."
@@ -207,6 +205,6 @@ async def test_text_extractor_image_no_text(tmp_path, mocker):
 
     result = await plugin.analyze(str(test_file), "image/png", {})
 
-    assert result["extracted"] is True
+    assert result["extracted"] is False
     assert result["text"] == ""
     assert result["source"] == TEXT_EXTRACTOR_NAME

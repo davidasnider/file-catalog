@@ -303,7 +303,9 @@ class TextExtractorPlugin(AnalyzerBase):
                 )
 
             extracted_content = extracted_text.strip()
-            if not extracted_content:
+            is_extracted = bool(extracted_content)
+
+            if not is_extracted:
                 if mime_type in SUPPORTED_IMAGE_TYPES:
                     logger.info(
                         f"No text extracted from image {file_path}, but skipping ValueError to prevent retries."
@@ -315,7 +317,7 @@ class TextExtractorPlugin(AnalyzerBase):
 
             return {
                 "text": extracted_content,
-                "extracted": True,
+                "extracted": is_extracted,
                 "source": TEXT_EXTRACTOR_NAME,
             }
 
