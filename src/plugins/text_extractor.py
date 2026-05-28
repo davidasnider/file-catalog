@@ -94,6 +94,7 @@ class TextExtractorPlugin(AnalyzerBase):
                 except Exception as e:
                     logger.warning(f"Pytesseract failed for {file_path}: {e}")
                     return {
+                        "text": "",
                         "extracted": False,
                         "error": f"OCR failed: {e}",
                         "source": TEXT_EXTRACTOR_NAME,
