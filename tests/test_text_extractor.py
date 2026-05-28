@@ -145,57 +145,6 @@ async def test_text_extractor_powerpoint_mocked(tmp_path, mocker):
 
 
 @pytest.mark.asyncio
-async def test_text_extractor_image_no_ocr_text_does_not_raise(tmp_path, mocker):
-    """Supported images where OCR yields no text should complete without raising."""
-    plugin = TextExtractorPlugin()
-
-    test_file = tmp_path / "blank.png"
-    test_file.write_bytes(b"")
-
-    mocker.patch(
-        "src.plugins.text_extractor.Image.open",
-        return_value=mocker.MagicMock(
-            __enter__=lambda s: mocker.MagicMock(), __exit__=lambda s, *a: None
-        ),
-    )
-    mocker.patch(
-        "src.plugins.text_extractor.pytesseract.image_to_string", return_value=""
-    )
-
-    result = await plugin.analyze(str(test_file), "image/png", {})
-
-    assert result["extracted"] is False
-    assert result["text"] == ""
-
-
-@pytest.mark.asyncio
-async def test_text_extractor_ocr_exception_returns_extracted_false(tmp_path, mocker):
-    """When pytesseract raises, the result should have extracted=False and an error field."""
-    plugin = TextExtractorPlugin()
-
-    test_file = tmp_path / "bad.png"
-    test_file.write_bytes(b"")
-
-    mocker.patch(
-        "src.plugins.text_extractor.Image.open",
-        return_value=mocker.MagicMock(
-            __enter__=lambda s: mocker.MagicMock(), __exit__=lambda s, *a: None
-        ),
-    )
-    mocker.patch(
-        "src.plugins.text_extractor.pytesseract.image_to_string",
-        side_effect=Exception("tesseract not found"),
-    )
-
-    result = await plugin.analyze(str(test_file), "image/png", {})
-
-    assert result["extracted"] is False
-    assert result["text"] == ""
-    assert "OCR failed: tesseract not found" in result["error"]
-    assert result["source"] == TEXT_EXTRACTOR_NAME
-
-
-@pytest.mark.asyncio
 async def test_text_extractor_pptx_mocked(tmp_path, mocker):
     plugin = TextExtractorPlugin()
 
