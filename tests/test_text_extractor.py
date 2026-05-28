@@ -152,8 +152,15 @@ async def test_text_extractor_image_no_ocr_text_does_not_raise(tmp_path, mocker)
     test_file = tmp_path / "blank.png"
     test_file.write_bytes(b"")
 
-    mocker.patch("src.plugins.text_extractor.Image.open", return_value=mocker.MagicMock(__enter__=lambda s: mocker.MagicMock(), __exit__=lambda s, *a: None))
-    mocker.patch("src.plugins.text_extractor.pytesseract.image_to_string", return_value="")
+    mocker.patch(
+        "src.plugins.text_extractor.Image.open",
+        return_value=mocker.MagicMock(
+            __enter__=lambda s: mocker.MagicMock(), __exit__=lambda s, *a: None
+        ),
+    )
+    mocker.patch(
+        "src.plugins.text_extractor.pytesseract.image_to_string", return_value=""
+    )
 
     result = await plugin.analyze(str(test_file), "image/png", {})
 
@@ -169,8 +176,16 @@ async def test_text_extractor_ocr_exception_returns_extracted_false(tmp_path, mo
     test_file = tmp_path / "bad.png"
     test_file.write_bytes(b"")
 
-    mocker.patch("src.plugins.text_extractor.Image.open", return_value=mocker.MagicMock(__enter__=lambda s: mocker.MagicMock(), __exit__=lambda s, *a: None))
-    mocker.patch("src.plugins.text_extractor.pytesseract.image_to_string", side_effect=Exception("tesseract not found"))
+    mocker.patch(
+        "src.plugins.text_extractor.Image.open",
+        return_value=mocker.MagicMock(
+            __enter__=lambda s: mocker.MagicMock(), __exit__=lambda s, *a: None
+        ),
+    )
+    mocker.patch(
+        "src.plugins.text_extractor.pytesseract.image_to_string",
+        side_effect=Exception("tesseract not found"),
+    )
 
     result = await plugin.analyze(str(test_file), "image/png", {})
 
