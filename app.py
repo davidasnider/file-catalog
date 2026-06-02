@@ -4,10 +4,11 @@ from sqlmodel import select
 import pandas as pd
 import json
 import html
+import re
 
 from src.db.engine import async_session_maker
 from src.db.models import Document, AnalysisTask
-from src.db.fts import search_fts
+from src.db.fts import search_fts, FTS_HL_START, FTS_HL_END
 from src.core.analyzer_names import (
     TEXT_EXTRACTOR_NAME,
     SUMMARIZER_NAME,
@@ -175,6 +176,33 @@ def get_task_status_color(task: AnalysisTask) -> str:
             pass
 
     return get_status_color(task.status.name)
+
+
+def render_snippet(snippet_text: str):
+    """
+    Escapes HTML and Markdown in a snippet while preserving bolding for highlights.
+    """
+    if not snippet_text:
+        return ""
+
+    # 1. Escape HTML
+    escaped = html.escape(snippet_text)
+
+    # 2. Split by highlight markers to avoid escaping our own bolding
+    # We use a regex that captures the markers so we can distinguish them
+    parts = re.split(f"({re.escape(FTS_HL_START)}|{re.escape(FTS_HL_END)})", escaped)
+
+    result = []
+    for part in parts:
+        if part == FTS_HL_START or part == FTS_HL_END:
+            result.append("**")
+        else:
+            # Escape Markdown special characters in the content part
+            # Characters to escape: \ ` * _ { } [ ] ( ) # + - . !
+            escaped_part = re.sub(r"([\\`*_{}\[\]()#+\-.!])", r"\\\1", part)
+            result.append(escaped_part)
+
+    return "".join(result)
 
 
 def main():
@@ -426,20 +454,12 @@ def main():
             match = fts_results[doc_id]
 
             if match.get("summary_snippet"):
-                safe_summary = html.escape(match["summary_snippet"])
-                safe_summary = safe_summary.replace("[HL_START]", "**").replace(
-                    "[HL_END]", "**"
-                )
                 st.markdown(
-                    f"**In Summary:** ...{safe_summary}...",
+                    f"**In Summary:** ...{render_snippet(match['summary_snippet'])}...",
                 )
             if match.get("content_snippet"):
-                safe_content = html.escape(match["content_snippet"])
-                safe_content = safe_content.replace("[HL_START]", "**").replace(
-                    "[HL_END]", "**"
-                )
                 st.markdown(
-                    f"**In Content:** ...{safe_content}...",
+                    f"**In Content:** ...{render_snippet(match['content_snippet'])}...",
                 )
             st.divider()
         selected_doc = next((d for d in filtered_docs if d.id == doc_id), None)

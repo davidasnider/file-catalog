@@ -2,7 +2,7 @@ import pytest
 import json
 from sqlmodel import text
 from src.db.models import Document, AnalysisTask, DocumentStatus, TaskStatus
-from src.db.fts import sync_document_to_fts, search_fts
+from src.db.fts import sync_document_to_fts, search_fts, FTS_HL_START, FTS_HL_END
 from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
 
 
@@ -117,7 +117,13 @@ async def test_search_fts(fts_setup):
 
     assert match["document_id"] == doc.id
     # Ensure highlight snippet is working
-    assert "[HL_START]unique_searchable_term[HL_END]" in match["content_snippet"]
+    assert (
+        f"{FTS_HL_START}unique_searchable_term{FTS_HL_END}" in match["content_snippet"]
+    )
+
+    # Regression check: ensure old HTML markers are NOT present
+    assert "<b>" not in match["content_snippet"]
+    assert "</b>" not in match["content_snippet"]
 
 
 @pytest.mark.asyncio

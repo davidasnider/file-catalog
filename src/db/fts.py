@@ -17,6 +17,9 @@ from src.core.analyzer_names import (
 
 logger = logging.getLogger(__name__)
 
+FTS_HL_START = "[HL_START]"
+FTS_HL_END = "[HL_END]"
+
 # Global semaphore to serialize FTS writes and prevent "database is locked" errors.
 # SQLite allows multiple concurrent readers but only one writer.
 # Because FTS (Full Text Search) indexing is write-intensive and involves complex virtual tables,
@@ -204,12 +207,12 @@ async def search_fts(session: AsyncSession, query: str, limit: int = 50):
     if not query or not query.strip():
         return []
 
-    search_sql = """
+    search_sql = f"""
         SELECT
             document_id,
             path,
-            snippet(document_fts, 2, '[HL_START]', '[HL_END]', '...', 64) as content_snippet,
-            snippet(document_fts, 3, '[HL_START]', '[HL_END]', '...', 64) as summary_snippet,
+            snippet(document_fts, 2, '{FTS_HL_START}', '{FTS_HL_END}', '...', 64) as content_snippet,
+            snippet(document_fts, 3, '{FTS_HL_START}', '{FTS_HL_END}', '...', 64) as summary_snippet,
             rank
         FROM document_fts
         WHERE document_fts MATCH :query
