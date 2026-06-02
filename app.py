@@ -185,8 +185,8 @@ def render_snippet(snippet_text: str):
     if not snippet_text:
         return ""
 
-    # 1. Escape HTML
-    escaped = html.escape(snippet_text)
+    # 1. Escape HTML (using quote=False to avoid UI regression with &#x27;)
+    escaped = html.escape(snippet_text, quote=False)
 
     # 2. Split by highlight markers to avoid escaping our own bolding
     # We use a regex that captures the markers so we can distinguish them
