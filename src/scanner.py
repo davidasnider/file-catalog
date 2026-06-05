@@ -1,3 +1,4 @@
+import json
 import argparse
 import asyncio
 import hashlib
@@ -562,6 +563,21 @@ async def _load_and_queue_existing_docs(
                 )
         await session.commit()
 
+
+
+def _categorize_errors(result_data: str, missing_models: set, missing_libraries: set):
+    """Helper to parse result_data and categorize specific missing dependencies."""
+    if not result_data:
+        return
+    try:
+        data = json.loads(result_data)
+        err = data.get("error", "")
+        if "model not found" in err.lower():
+            missing_models.add(err)
+        elif "llama-cpp-python is not installed" in err:
+            missing_libraries.add(err)
+    except Exception:
+        pass
 
 async def run_scanner(
     directory: str,
@@ -1208,16 +1224,7 @@ async def run_scanner(
                 import json
 
                 for result_data in result.scalars().all():
-                    if result_data:
-                        try:
-                            data = json.loads(result_data)
-                            err = data.get("error", "")
-                            if "model not found" in err.lower():
-                                missing_models.add(err)
-                            elif "llama-cpp-python is not installed" in err:
-                                missing_libraries.add(err)
-                        except Exception:
-                            pass
+                    _categorize_errors(result_data, missing_models, missing_libraries)
 
     if missing_models or missing_libraries:
         console.print(

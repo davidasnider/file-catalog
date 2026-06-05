@@ -256,9 +256,9 @@ async def test_ingest_directory_atomic_queueing(db_session, temp_dir):
             # When an item is put in the queue, it MUST be visible to a new session
             async with async_session_maker() as session:
                 doc = await session.get(Document, item)
-                assert (
-                    doc is not None
-                ), f"Document {item} was enqueued before it was committed to the DB!"
+                assert doc is not None, (
+                    f"Document {item} was enqueued before it was committed to the DB!"
+                )
             await real_put(item)
 
         doc_queue.put = wrapped_put
@@ -450,19 +450,25 @@ def test_mlx_provider_enable_thinking_toggling():
     mock_tokenizer = MagicMock()
     mock_tokenizer.apply_chat_template = MagicMock(return_value="formatted prompt")
 
-    with patch(
-        "src.llm.mlx_provider.load",
-        return_value=(mock_model, mock_tokenizer),
-        create=True,
-    ), patch(
-        "src.llm.mlx_provider.generate", return_value="dummy response", create=True
-    ), patch(
-        "src.llm.mlx_provider.make_sampler", return_value=MagicMock(), create=True
-    ), patch(
-        "src.llm.mlx_provider.make_logits_processors",
-        return_value=MagicMock(),
-        create=True,
-    ), patch("src.llm.mlx_provider.HAS_MLX", True, create=True):
+    with (
+        patch(
+            "src.llm.mlx_provider.load",
+            return_value=(mock_model, mock_tokenizer),
+            create=True,
+        ),
+        patch(
+            "src.llm.mlx_provider.generate", return_value="dummy response", create=True
+        ),
+        patch(
+            "src.llm.mlx_provider.make_sampler", return_value=MagicMock(), create=True
+        ),
+        patch(
+            "src.llm.mlx_provider.make_logits_processors",
+            return_value=MagicMock(),
+            create=True,
+        ),
+        patch("src.llm.mlx_provider.HAS_MLX", True, create=True),
+    ):
         provider = MLXProvider(model_path="dummy", is_vision=False)
         provider.use_chat_template = True
 
@@ -488,9 +494,11 @@ def test_mlx_provider_enable_thinking_toggling():
             async def mock_run_in_executor(executor, func, *args):
                 return func(*args)
 
-            with patch("asyncio.get_running_loop", return_value=loop), patch.object(
-                loop, "run_in_executor", new=mock_run_in_executor
-            ), patch("src.llm.mlx_provider.get_mlx_gpu_lock"):
+            with (
+                patch("asyncio.get_running_loop", return_value=loop),
+                patch.object(loop, "run_in_executor", new=mock_run_in_executor),
+                patch("src.llm.mlx_provider.get_mlx_gpu_lock"),
+            ):
                 # Default: enable_thinking should be False
                 loop.run_until_complete(provider.generate("test prompt"))
                 mock_tokenizer.apply_chat_template.assert_called_with(
@@ -522,3 +530,70 @@ def test_mlx_provider_enable_thinking_toggling():
                 asyncio.set_event_loop(original_loop)
             else:
                 asyncio.set_event_loop(None)
+
+
+@pytest.mark.asyncio
+async def test_run_scanner_chunked_error_checking_integration(db_session, temp_dir):
+    """Verify that chunked error checking only processes errors from the current run."""
+    import json
+    from src.db.models import Document, DocumentStatus, AnalysisTask, TaskStatus
+
+    # Create 2 documents
+    doc1 = Document(
+        path=str(temp_dir / "doc1.txt"),
+        filename="doc1.txt",
+        status=DocumentStatus.PENDING,
+    )
+    doc2 = Document(
+        path=str(temp_dir / "doc2.txt"),
+        filename="doc2.txt",
+        status=DocumentStatus.PENDING,
+    )
+    db_session.add_all([doc1, doc2])
+    await db_session.commit()
+
+    # Add an old error for doc1 (from a previous run)
+    task1_old = AnalysisTask(
+        document_id=doc1.id,
+        task_name="test_plugin",
+        status=TaskStatus.COMPLETED,
+        result_data=json.dumps({"error": "model not found in old run"}),
+    )
+    db_session.add(task1_old)
+    await db_session.commit()
+
+    # Add an error for doc2 in this run
+    task2_new = AnalysisTask(
+        document_id=doc2.id,
+        task_name="test_plugin",
+        status=TaskStatus.COMPLETED,
+        result_data=json.dumps({"error": "llama-cpp-python is not installed"}),
+    )
+    db_session.add(task2_new)
+    await db_session.commit()
+
+    # We will test the exact block of logic that queries these by simulating the end of run_scanner
+    from sqlalchemy import select
+    from src.scanner import _categorize_errors
+
+    missing_models = set()
+    missing_libraries = set()
+    processed_docs = {doc2.id}  # Simulate that ONLY doc2 was processed
+
+    if processed_docs:
+        chunk_size = 900
+        processed_list = list(processed_docs)
+        for i in range(0, len(processed_list), chunk_size):
+            chunk = processed_list[i : i + chunk_size]
+            result = await db_session.execute(
+                select(AnalysisTask.result_data).where(
+                    AnalysisTask.document_id.in_(chunk),
+                    AnalysisTask.result_data.like('%"error"%'),
+                )
+            )
+            for result_data in result.scalars().all():
+                _categorize_errors(result_data, missing_models, missing_libraries)
+
+    # Validate that we only picked up the error from doc2 (llama-cpp-python), NOT doc1 (model not found)
+    assert "llama-cpp-python is not installed" in missing_libraries
+    assert not missing_models, "Should not have picked up doc1's old model error"
