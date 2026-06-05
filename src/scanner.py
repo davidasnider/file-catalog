@@ -564,7 +564,6 @@ async def _load_and_queue_existing_docs(
         await session.commit()
 
 
-
 def _categorize_errors(result_data: str, missing_models: set, missing_libraries: set):
     """Helper to parse result_data and categorize specific missing dependencies."""
     if not result_data:
@@ -578,6 +577,7 @@ def _categorize_errors(result_data: str, missing_models: set, missing_libraries:
             missing_libraries.add(err)
     except Exception:
         pass
+
 
 async def run_scanner(
     directory: str,
@@ -1221,7 +1221,6 @@ async def run_scanner(
                         AnalysisTask.result_data.like('%"error"%'),
                     )
                 )
-                import json
 
                 for result_data in result.scalars().all():
                     _categorize_errors(result_data, missing_models, missing_libraries)
