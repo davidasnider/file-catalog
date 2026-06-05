@@ -256,9 +256,9 @@ async def test_ingest_directory_atomic_queueing(db_session, temp_dir):
             # When an item is put in the queue, it MUST be visible to a new session
             async with async_session_maker() as session:
                 doc = await session.get(Document, item)
-                assert (
-                    doc is not None
-                ), f"Document {item} was enqueued before it was committed to the DB!"
+                assert doc is not None, (
+                    f"Document {item} was enqueued before it was committed to the DB!"
+                )
             await real_put(item)
 
         doc_queue.put = wrapped_put
@@ -599,6 +599,7 @@ async def test_run_scanner_chunked_error_checking_integration(db_session, temp_d
     assert not missing_models, "Should not have picked up doc1's old model error"
 
 
+@pytest.mark.asyncio
 async def test_chunked_error_checking_exceeds_chunk_size(db_session, temp_dir):
     """Verify that chunked error checking correctly processes errors across multiple chunks.
 
@@ -607,7 +608,7 @@ async def test_chunked_error_checking_exceeds_chunk_size(db_session, temp_dir):
     """
     import json
 
-    from src.db.models import Document, AnalysisTask, TaskStatus
+    from src.db.models import Document, DocumentStatus, AnalysisTask, TaskStatus
 
     # Create 950 documents (exceeding chunk_size=900)
     docs = []

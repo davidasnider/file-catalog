@@ -568,15 +568,19 @@ def _categorize_errors(result_data: str, missing_models: set, missing_libraries:
     """Helper to parse result_data and categorize specific missing dependencies."""
     if not result_data:
         return
+
     try:
         data = json.loads(result_data)
+        if not isinstance(data, dict):
+            return
+
         err = data.get("error", "")
         if "model not found" in err.lower():
             missing_models.add(err)
         elif "llama-cpp-python is not installed" in err:
             missing_libraries.add(err)
-    except (json.JSONDecodeError, TypeError) as e:
-        logger.debug("Failed to parse result_data for error categorization: %s", e)
+    except (json.JSONDecodeError, TypeError):
+        pass
 
 
 async def run_scanner(
