@@ -570,13 +570,15 @@ def _categorize_errors(result_data: str, missing_models: set, missing_libraries:
         return
     try:
         data = json.loads(result_data)
-        err = data.get("error", "")
-        if "model not found" in err.lower():
-            missing_models.add(err)
-        elif "llama-cpp-python is not installed" in err:
-            missing_libraries.add(err)
-    except Exception:
-        pass
+    except (json.JSONDecodeError, TypeError):
+        return
+    if not isinstance(data, dict):
+        return
+    err = data.get("error", "")
+    if "model not found" in err.lower():
+        missing_models.add(err)
+    elif "llama-cpp-python is not installed" in err:
+        missing_libraries.add(err)
 
 
 async def run_scanner(
@@ -1041,8 +1043,8 @@ async def run_scanner(
 
         post_process_semaphore = asyncio.Semaphore(max_concurrent + 1)
 
-        async def check_doc_errors(doc_id):
-            """Sync to FTS and check for specific runtime errors (like missing models)."""
+        async def sync_fts_index(doc_id):
+            """Sync a single document to the FTS index."""
             from src.db.fts import sync_document_to_fts
 
             async with post_process_semaphore:
@@ -1149,10 +1151,10 @@ async def run_scanner(
             if processed:
                 processed_docs.add(doc_id)
                 try:
-                    await check_doc_errors(doc_id)
+                    await sync_fts_index(doc_id)
                 except Exception:
                     logger.exception(
-                        "Post-processing check_doc_errors failed for document %s",
+                        "Post-processing FTS sync failed for document %s",
                         doc_id,
                     )
 
@@ -1202,9 +1204,6 @@ async def run_scanner(
                 await ui_update_task
             except asyncio.CancelledError:
                 pass
-
-    # Let background tasks (like our check_doc_errors quick checks) settle
-    await asyncio.sleep(0.1)
 
     console.print("\n[bold green]✨ Analysis Complete![/bold green]\n")
 

@@ -256,9 +256,9 @@ async def test_ingest_directory_atomic_queueing(db_session, temp_dir):
             # When an item is put in the queue, it MUST be visible to a new session
             async with async_session_maker() as session:
                 doc = await session.get(Document, item)
-                assert doc is not None, (
-                    f"Document {item} was enqueued before it was committed to the DB!"
-                )
+                assert (
+                    doc is not None
+                ), f"Document {item} was enqueued before it was committed to the DB!"
             await real_put(item)
 
         doc_queue.put = wrapped_put
@@ -597,3 +597,65 @@ async def test_run_scanner_chunked_error_checking_integration(db_session, temp_d
     # Validate that we only picked up the error from doc2 (llama-cpp-python), NOT doc1 (model not found)
     assert "llama-cpp-python is not installed" in missing_libraries
     assert not missing_models, "Should not have picked up doc1's old model error"
+
+
+async def test_chunked_error_checking_exceeds_chunk_size(db_session, temp_dir):
+    """Verify that chunked error checking works when processed_docs exceeds SQLite parameter limits."""
+    import json
+    from sqlalchemy import select
+    from src.db.models import Document, DocumentStatus, AnalysisTask, TaskStatus
+    from src.scanner import _categorize_errors
+
+    chunk_size = 900
+    # Create 950 documents (exceeds chunk_size) to exercise the chunking loop
+    num_docs = 950
+    docs = []
+    tasks = []
+    for i in range(num_docs):
+        doc = Document(
+            path=str(temp_dir / f"chunked_doc{i}.txt"),
+            filename=f"chunked_doc{i}.txt",
+            status=DocumentStatus.PENDING,
+        )
+        db_session.add(doc)
+        docs.append(doc)
+
+    await db_session.commit()
+
+    # Add an error task for every other document (odd indices only)
+    for i, doc in enumerate(docs):
+        if i % 2 == 1:  # odd indices get errors
+            task = AnalysisTask(
+                document_id=doc.id,
+                task_name="test_plugin",
+                status=TaskStatus.COMPLETED,
+                result_data=json.dumps({"error": "llama-cpp-python is not installed"}),
+            )
+            db_session.add(task)
+            tasks.append((doc, task))
+
+    await db_session.commit()
+
+    # Simulate processing ALL documents (exceeds chunk_size=900)
+    missing_models = set()
+    missing_libraries = set()
+    processed_docs = {doc.id for doc in docs}  # all 950 docs
+
+    if processed_docs:
+        processed_list = list(processed_docs)
+        for i in range(0, len(processed_list), chunk_size):
+            chunk = processed_list[i : i + chunk_size]
+            result = await db_session.execute(
+                select(AnalysisTask.result_data).where(
+                    AnalysisTask.document_id.in_(chunk),
+                    AnalysisTask.result_data.like('%"error"%'),
+                )
+            )
+            for result_data in result.scalars().all():
+                _categorize_errors(result_data, missing_models, missing_libraries)
+
+    # We added errors for 475 odd-indexed docs (indices 1,3,5,...,949)
+    assert (
+        len(missing_libraries) == 475
+    ), f"Expected 475 library errors from chunked processing, got {len(missing_libraries)}"
+    assert not missing_models
