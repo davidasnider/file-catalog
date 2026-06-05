@@ -622,14 +622,17 @@ async def test_chunked_error_checking_exceeds_chunk_size(db_session, temp_dir):
 
     await db_session.commit()
 
-    # Add an error task for every other document (odd indices only)
+    # Add an error task for every other document (odd indices only).
+    # Use unique error strings per doc to verify individual results across chunks.
     for i, doc in enumerate(docs):
         if i % 2 == 1:  # odd indices get errors
             task = AnalysisTask(
                 document_id=doc.id,
                 task_name="test_plugin",
                 status=TaskStatus.COMPLETED,
-                result_data=json.dumps({"error": "llama-cpp-python is not installed"}),
+                result_data=json.dumps(
+                    {"error": f"llama-cpp-python is not installed (doc {i})"}
+                ),
             )
             db_session.add(task)
             tasks.append((doc, task))
@@ -654,8 +657,10 @@ async def test_chunked_error_checking_exceeds_chunk_size(db_session, temp_dir):
             for result_data in result.scalars().all():
                 _categorize_errors(result_data, missing_models, missing_libraries)
 
-    # We added errors for 475 odd-indexed docs (indices 1,3,5,...,949)
+    # 475 odd-indexed docs (1,3,...,949) get unique error strings.
+    # The first chunk (0-899) covers 450 odd docs; the second chunk (900-949) covers 25.
+    # Verify all 475 unique errors were captured across both chunks.
     assert (
         len(missing_libraries) == 475
-    ), f"Expected 475 library errors from chunked processing, got {len(missing_libraries)}"
-    assert not missing_models
+    ), f"Expected 475 unique library errors from chunked processing, got {len(missing_libraries)}"
+    assert len(missing_models) == 0
