@@ -597,3 +597,85 @@ async def test_run_scanner_chunked_error_checking_integration(db_session, temp_d
     # Validate that we only picked up the error from doc2 (llama-cpp-python), NOT doc1 (model not found)
     assert "llama-cpp-python is not installed" in missing_libraries
     assert not missing_models, "Should not have picked up doc1's old model error"
+
+
+async def test_chunked_error_checking_exceeds_chunk_size(db_session, temp_dir):
+    """Verify that chunked error checking correctly processes errors across multiple chunks.
+
+    Creates 950 documents (exceeding chunk_size=900) with unique error strings per doc.
+    Verifies all 475 library errors are captured across both chunks (0-899 and 900-949).
+    """
+    import json
+
+    from src.db.models import Document, AnalysisTask, TaskStatus
+
+    # Create 950 documents (exceeding chunk_size=900)
+    docs = []
+    for i in range(950):
+        doc = Document(
+            path=str(temp_dir / f"doc{i}.txt"),
+            filename=f"doc{i}.txt",
+            status=DocumentStatus.PENDING,
+        )
+        docs.append(doc)
+
+    db_session.add_all(docs)
+    await db_session.commit()
+
+    # Assign each document a unique error string (50% model, 50% library errors)
+    tasks = []
+    for i, doc in enumerate(docs):
+        if i % 2 == 0:
+            err_str = f"model not found for doc {i}"
+        else:
+            err_str = f"llama-cpp-python is not installed for doc {i}"
+        task = AnalysisTask(
+            document_id=doc.id,
+            task_name="test_plugin",
+            status=TaskStatus.COMPLETED,
+            result_data=json.dumps({"error": err_str}),
+        )
+        tasks.append(task)
+
+    db_session.add_all(tasks)
+    await db_session.commit()
+
+    # Simulate the chunked error checking from run_scanner
+    from sqlalchemy import select
+    from src.scanner import _categorize_errors
+
+    missing_models = set()
+    missing_libraries = set()
+    processed_docs = {doc.id for doc in docs}  # All 950 documents
+
+    if processed_docs:
+        chunk_size = 900
+        processed_list = list(processed_docs)
+        for i in range(0, len(processed_list), chunk_size):
+            chunk = processed_list[i : i + chunk_size]
+            result = await db_session.execute(
+                select(AnalysisTask.result_data).where(
+                    AnalysisTask.document_id.in_(chunk),
+                    AnalysisTask.result_data.like('%"error"%'),
+                )
+            )
+            for result_data in result.scalars().all():
+                _categorize_errors(result_data, missing_models, missing_libraries)
+
+    # Verify all 475 library errors (odd docs: 1,3,5,...,949) are captured
+    assert len(missing_libraries) == 475, (
+        f"Expected 475 library errors, got {len(missing_libraries)}: "
+        f"{sorted(missing_libraries)[:5]}"
+    )
+
+    # Verify all 475 model errors (even docs: 0,2,4,...,948) are captured
+    assert len(missing_models) == 475, (
+        f"Expected 475 model errors, got {len(missing_models)}: "
+        f"{sorted(missing_models)[:5]}"
+    )
+
+    # Verify errors from both chunks are present (doc 899 is in chunk 0, doc 949 is in chunk 1)
+    assert "llama-cpp-python is not installed for doc 899" in missing_libraries
+    assert "llama-cpp-python is not installed for doc 949" in missing_libraries
+    assert "model not found for doc 0" in missing_models
+    assert "model not found for doc 948" in missing_models
