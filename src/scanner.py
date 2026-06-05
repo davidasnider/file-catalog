@@ -1149,7 +1149,7 @@ async def run_scanner(
             if processed:
                 processed_docs.add(doc_id)
                 try:
-                    await sync_fts_index(doc_id)
+                    await sync_fts_index(doc_id)  # noqa: F821 nested async function
                 except Exception:
                     logger.exception(
                         "Post-processing sync_fts_index failed for document %s",
