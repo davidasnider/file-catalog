@@ -1298,8 +1298,11 @@ async def run_standalone_judge():
                         doc_contexts.setdefault(t.document_id, {})[t.task_name] = (
                             json.loads(t.result_data)
                         )
-                    except Exception:
-                        pass
+                    except (json.JSONDecodeError, ValueError) as e:
+                        logger.warning(
+                            f"Failed to parse result_data for task {t.task_name} "
+                            f"(doc {t.document_id}): {e}"
+                        )
 
     failed_count = 0
     passed_count = 0
@@ -1311,7 +1314,11 @@ async def run_standalone_judge():
             try:
                 try:
                     result_data = json.loads(task.result_data)
-                except Exception:
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.warning(
+                        f"Failed to parse result_data for task {task.task_name} "
+                        f"(doc {doc.path}): {e}"
+                    )
                     continue
 
                 context = doc_contexts.get(doc.id, {})
