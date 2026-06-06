@@ -149,6 +149,7 @@ python -m src.scripts.delete_duplicates "/path/to/directory"
 **Flags:**
 - `--dry-run`: Preview deletions without removing files (recommended first step)
 - `--allow-cwd`: Allow scanning the current working directory (blocked by default to prevent accidental self-deletion)
+- `--allow-root`: Allow scanning the filesystem root directory (blocked by default; use with extreme caution)
 - `--yes`: Skip the interactive y/N confirmation prompt before deleting (use with caution)
 
 The script prompts for confirmation before performing real deletions (unless `--yes` is provided).
