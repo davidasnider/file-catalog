@@ -563,25 +563,6 @@ async def _load_and_queue_existing_docs(
         await session.commit()
 
 
-<<<<<<< HEAD
-def _categorize_errors(result_data: str, missing_models: set, missing_libraries: set):
-    """Helper to parse result_data and categorize specific missing dependencies."""
-    if not result_data:
-        return
-
-    try:
-        data = json.loads(result_data)
-        if not isinstance(data, dict):
-            return
-
-        err = data.get("error", "")
-        if "model not found" in err.lower():
-            missing_models.add(err)
-        elif "llama-cpp-python is not installed" in err:
-            missing_libraries.add(err)
-    except (json.JSONDecodeError, TypeError):
-        pass
-=======
 async def _batch_check_doc_errors(
     async_session_maker, processed_doc_ids, missing_models, missing_libraries
 ):
@@ -616,16 +597,16 @@ async def _batch_check_doc_errors(
                     if result_data:
                         try:
                             data = json.loads(result_data)
-                            err = data.get("error", "")
-                            if "model not found" in err.lower():
-                                missing_models.add(err)
-                            elif "llama-cpp-python is not installed" in err:
-                                missing_libraries.add(err)
-                        except json.JSONDecodeError:
+                            if isinstance(data, dict):
+                                err = data.get("error", "")
+                                if "model not found" in err.lower():
+                                    missing_models.add(err)
+                                elif "llama-cpp-python is not installed" in err:
+                                    missing_libraries.add(err)
+                        except (json.JSONDecodeError, TypeError):
                             pass
     except Exception as e:
         logger.exception("Error checking document tasks: %s", e)
->>>>>>> origin/main
 
 
 async def run_scanner(
@@ -1035,11 +1016,7 @@ async def run_scanner(
         completed_count = 0
         missing_models = set()
         missing_libraries = set()
-<<<<<<< HEAD
-        processed_docs = set()
-=======
         processed_doc_ids = set()
->>>>>>> origin/main
 
         def update_waiting():
             nonlocal waiting_tasks
@@ -1094,13 +1071,8 @@ async def run_scanner(
 
         post_process_semaphore = asyncio.Semaphore(max_concurrent + 1)
 
-<<<<<<< HEAD
         async def sync_fts_index(doc_id):
             """Sync document to FTS index."""
-=======
-        async def check_doc_errors(doc_id):
-            """Sync document to the full-text search index."""
->>>>>>> origin/main
             from src.db.fts import sync_document_to_fts
 
             async with post_process_semaphore:
@@ -1205,11 +1177,7 @@ async def run_scanner(
             mime_type = id_to_mime.get(doc_id)
             processed = await task_engine.process_document(doc_id, mime_type=mime_type)
             if processed:
-<<<<<<< HEAD
-                processed_docs.add(doc_id)
-=======
                 processed_doc_ids.add(doc_id)
->>>>>>> origin/main
                 try:
                     await sync_fts_index(doc_id)  # noqa: F821 nested async function
                 except Exception:
@@ -1265,35 +1233,12 @@ async def run_scanner(
             except asyncio.CancelledError:
                 pass
 
-<<<<<<< HEAD
-=======
-    # Let background tasks (like our FTS sync tasks) settle
-    await asyncio.sleep(0.1)
-
     # Batch check for missing models/libraries
     await _batch_check_doc_errors(
         async_session_maker, processed_doc_ids, missing_models, missing_libraries
     )
 
->>>>>>> origin/main
     console.print("\n[bold green]✨ Analysis Complete![/bold green]\n")
-
-    if processed_docs:
-        async with async_session_maker() as session:
-            # Fetch errors only for documents processed in this run to avoid surfacing old errors.
-            chunk_size = 900
-            processed_list = list(processed_docs)
-            for i in range(0, len(processed_list), chunk_size):
-                chunk = processed_list[i : i + chunk_size]
-                result = await session.execute(
-                    select(AnalysisTask.result_data).where(
-                        AnalysisTask.document_id.in_(chunk),
-                        AnalysisTask.result_data.like('%"error"%'),
-                    )
-                )
-
-                for result_data in result.scalars().all():
-                    _categorize_errors(result_data, missing_models, missing_libraries)
 
     if missing_models or missing_libraries:
         console.print(

@@ -256,9 +256,9 @@ async def test_ingest_directory_atomic_queueing(db_session, temp_dir):
             # When an item is put in the queue, it MUST be visible to a new session
             async with async_session_maker() as session:
                 doc = await session.get(Document, item)
-                assert doc is not None, (
-                    f"Document {item} was enqueued before it was committed to the DB!"
-                )
+                assert (
+                    doc is not None
+                ), f"Document {item} was enqueued before it was committed to the DB!"
             await real_put(item)
 
         doc_queue.put = wrapped_put
@@ -532,156 +532,6 @@ def test_mlx_provider_enable_thinking_toggling():
                 asyncio.set_event_loop(None)
 
 
-<<<<<<< HEAD
-@pytest.mark.asyncio
-async def test_run_scanner_chunked_error_checking_integration(db_session, temp_dir):
-    """Verify that chunked error checking only processes errors from the current run."""
-    import json
-    from src.db.models import Document, DocumentStatus, AnalysisTask, TaskStatus
-
-    # Create 2 documents
-    doc1 = Document(
-        path=str(temp_dir / "doc1.txt"),
-        filename="doc1.txt",
-        status=DocumentStatus.PENDING,
-    )
-    doc2 = Document(
-        path=str(temp_dir / "doc2.txt"),
-        filename="doc2.txt",
-        status=DocumentStatus.PENDING,
-    )
-    db_session.add_all([doc1, doc2])
-    await db_session.commit()
-
-    # Add an old error for doc1 (from a previous run)
-    task1_old = AnalysisTask(
-        document_id=doc1.id,
-        task_name="test_plugin",
-        status=TaskStatus.COMPLETED,
-        result_data=json.dumps({"error": "model not found in old run"}),
-    )
-    db_session.add(task1_old)
-    await db_session.commit()
-
-    # Add an error for doc2 in this run
-    task2_new = AnalysisTask(
-        document_id=doc2.id,
-        task_name="test_plugin",
-        status=TaskStatus.COMPLETED,
-        result_data=json.dumps({"error": "llama-cpp-python is not installed"}),
-    )
-    db_session.add(task2_new)
-    await db_session.commit()
-
-    # We will test the exact block of logic that queries these by simulating the end of run_scanner
-    from sqlalchemy import select
-    from src.scanner import _categorize_errors
-
-    missing_models = set()
-    missing_libraries = set()
-    processed_docs = {doc2.id}  # Simulate that ONLY doc2 was processed
-
-    if processed_docs:
-        chunk_size = 900
-        processed_list = list(processed_docs)
-        for i in range(0, len(processed_list), chunk_size):
-            chunk = processed_list[i : i + chunk_size]
-            result = await db_session.execute(
-                select(AnalysisTask.result_data).where(
-                    AnalysisTask.document_id.in_(chunk),
-                    AnalysisTask.result_data.like('%"error"%'),
-                )
-            )
-            for result_data in result.scalars().all():
-                _categorize_errors(result_data, missing_models, missing_libraries)
-
-    # Validate that we only picked up the error from doc2 (llama-cpp-python), NOT doc1 (model not found)
-    assert "llama-cpp-python is not installed" in missing_libraries
-    assert not missing_models, "Should not have picked up doc1's old model error"
-
-
-@pytest.mark.asyncio
-async def test_chunked_error_checking_exceeds_chunk_size(db_session, temp_dir):
-    """Verify that chunked error checking correctly processes errors across multiple chunks.
-
-    Creates 950 documents (exceeding chunk_size=900) with unique error strings per doc.
-    Verifies all 475 library errors are captured across both chunks (0-899 and 900-949).
-    """
-    import json
-
-    from src.db.models import Document, DocumentStatus, AnalysisTask, TaskStatus
-
-    # Create 950 documents (exceeding chunk_size=900)
-    docs = []
-    for i in range(950):
-        doc = Document(
-            path=str(temp_dir / f"doc{i}.txt"),
-            filename=f"doc{i}.txt",
-            status=DocumentStatus.PENDING,
-        )
-        docs.append(doc)
-
-    db_session.add_all(docs)
-    await db_session.commit()
-
-    # Assign each document a unique error string (50% model, 50% library errors)
-    tasks = []
-    for i, doc in enumerate(docs):
-        if i % 2 == 0:
-            err_str = f"model not found for doc {i}"
-        else:
-            err_str = f"llama-cpp-python is not installed for doc {i}"
-        task = AnalysisTask(
-            document_id=doc.id,
-            task_name="test_plugin",
-            status=TaskStatus.COMPLETED,
-            result_data=json.dumps({"error": err_str}),
-        )
-        tasks.append(task)
-
-    db_session.add_all(tasks)
-    await db_session.commit()
-
-    # Simulate the chunked error checking from run_scanner
-    from sqlalchemy import select
-    from src.scanner import _categorize_errors
-
-    missing_models = set()
-    missing_libraries = set()
-    processed_docs = {doc.id for doc in docs}  # All 950 documents
-
-    if processed_docs:
-        chunk_size = 900
-        processed_list = list(processed_docs)
-        for i in range(0, len(processed_list), chunk_size):
-            chunk = processed_list[i : i + chunk_size]
-            result = await db_session.execute(
-                select(AnalysisTask.result_data).where(
-                    AnalysisTask.document_id.in_(chunk),
-                    AnalysisTask.result_data.like('%"error"%'),
-                )
-            )
-            for result_data in result.scalars().all():
-                _categorize_errors(result_data, missing_models, missing_libraries)
-
-    # Verify all 475 library errors (odd docs: 1,3,5,...,949) are captured
-    assert len(missing_libraries) == 475, (
-        f"Expected 475 library errors, got {len(missing_libraries)}: "
-        f"{sorted(missing_libraries)[:5]}"
-    )
-
-    # Verify all 475 model errors (even docs: 0,2,4,...,948) are captured
-    assert len(missing_models) == 475, (
-        f"Expected 475 model errors, got {len(missing_models)}: "
-        f"{sorted(missing_models)[:5]}"
-    )
-
-    # Verify errors from both chunks are present (doc 899 is in chunk 0, doc 949 is in chunk 1)
-    assert "llama-cpp-python is not installed for doc 899" in missing_libraries
-    assert "llama-cpp-python is not installed for doc 949" in missing_libraries
-    assert "model not found for doc 0" in missing_models
-    assert "model not found for doc 948" in missing_models
-=======
 # ── Batch doc-error regression tests ──────────────────────────────
 
 
@@ -747,9 +597,9 @@ async def test_batch_check_doc_errors_detects_model_and_library_errors(db_sessio
     )
 
     # model-not-found errors (case-insensitive): docs 1 and 4
-    assert len(missing_models) == 2, (
-        f"expected 2 missing-model errors, got {len(missing_models)}: {missing_models}"
-    )
+    assert (
+        len(missing_models) == 2
+    ), f"expected 2 missing-model errors, got {len(missing_models)}: {missing_models}"
     assert any("llama-3.2-3b" in err for err in missing_models)
     assert any("another-model" in err for err in missing_models)
 
@@ -801,9 +651,9 @@ async def test_batch_check_doc_errors_chunks_large_sets(db_session):
     )
 
     # All 1200 documents have the same model-not-found error
-    assert len(missing_models) == N, (
-        f"expected {N} missing-model errors, got {len(missing_models)}"
-    )
+    assert (
+        len(missing_models) == N
+    ), f"expected {N} missing-model errors, got {len(missing_models)}"
     assert len(missing_libraries) == 0
 
 
@@ -829,4 +679,3 @@ async def test_batch_check_doc_errors_empty_ids_is_noop(db_session):
 
     assert len(missing_models) == 0
     assert len(missing_libraries) == 0
->>>>>>> origin/main
