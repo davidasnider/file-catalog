@@ -1026,7 +1026,7 @@ async def run_scanner(
         post_process_semaphore = asyncio.Semaphore(max_concurrent + 1)
 
         async def check_doc_errors(doc_id):
-            """Sync to FTS and check for specific runtime errors (like missing models)."""
+            """Sync document to the full-text search index."""
             from src.db.fts import sync_document_to_fts
 
             async with post_process_semaphore:
@@ -1187,7 +1187,7 @@ async def run_scanner(
             except asyncio.CancelledError:
                 pass
 
-    # Let background tasks (like our check_doc_errors quick checks) settle
+    # Let background tasks (like our FTS sync tasks) settle
     await asyncio.sleep(0.1)
 
     # Batch check for missing models/libraries
@@ -1213,10 +1213,10 @@ async def run_scanner(
                                     missing_models.add(err)
                                 elif "llama-cpp-python is not installed" in err:
                                     missing_libraries.add(err)
-                            except Exception:
+                            except json.JSONDecodeError:
                                 pass
         except Exception as e:
-            logger.error(f"Error checking document tasks: {e}")
+            logger.exception(f"Error checking document tasks: {e}")
 
     console.print("\n[bold green]✨ Analysis Complete![/bold green]\n")
 
