@@ -3,12 +3,11 @@ import asyncio
 from sqlmodel import select
 import pandas as pd
 import json
-import html
-import re
+from src.ui.snippets import render_snippet
 
 from src.db.engine import async_session_maker
 from src.db.models import Document, AnalysisTask
-from src.db.fts import search_fts, FTS_HL_START, FTS_HL_END
+from src.db.fts import search_fts
 from src.core.analyzer_names import (
     TEXT_EXTRACTOR_NAME,
     SUMMARIZER_NAME,
@@ -176,56 +175,6 @@ def get_task_status_color(task: AnalysisTask) -> str:
             pass
 
     return get_status_color(task.status.name)
-
-
-def render_snippet(snippet_text: str):
-    """
-    Escapes HTML and Markdown in a snippet while preserving bolding for highlights.
-
-    Processes FTS highlight markers statefully so that unmatched, nested, or
-    out-of-sequence markers are treated as literal text instead of producing
-    unbalanced ``**`` that would corrupt surrounding Markdown rendering.
-    """
-    if not snippet_text:
-        return ""
-
-    # 1. Escape HTML (using quote=False to avoid UI regression with &#x27;)
-    escaped = html.escape(snippet_text, quote=False)
-
-    # 2. Split by highlight markers to avoid escaping our own bolding
-    # We use a regex that captures the markers so we can distinguish them
-    parts = re.split(f"({re.escape(FTS_HL_START)}|{re.escape(FTS_HL_END)})", escaped)
-
-    result = []
-    in_highlight = False
-    for part in parts:
-        if part == FTS_HL_START:
-            if not in_highlight:
-                result.append("**")
-                in_highlight = True
-            else:
-                # Nested start marker — treat as literal text
-                escaped_part = re.sub(r"([\\`*_{}\[\]()#+\-.!])", r"\\\1", part)
-                result.append(escaped_part)
-        elif part == FTS_HL_END:
-            if in_highlight:
-                result.append("**")
-                in_highlight = False
-            else:
-                # Unmatched end marker — treat as literal text
-                escaped_part = re.sub(r"([\\`*_{}\[\]()#+\-.!])", r"\\\1", part)
-                result.append(escaped_part)
-        else:
-            # Escape Markdown special characters in the content part
-            # Characters to escape: \ ` * _ { } [ ] ( ) # + - . !
-            escaped_part = re.sub(r"([\\`*_{}\[\]()#+\-.!])", r"\\\1", part)
-            result.append(escaped_part)
-
-    # Close any unclosed highlight (truncated snippet)
-    if in_highlight:
-        result.append("**")
-
-    return "".join(result)
 
 
 def main():

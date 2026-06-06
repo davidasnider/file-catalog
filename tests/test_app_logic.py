@@ -1,4 +1,4 @@
-from app import render_snippet
+from src.ui.snippets import render_snippet
 from src.db.fts import FTS_HL_START, FTS_HL_END
 
 
