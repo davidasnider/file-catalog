@@ -3,6 +3,7 @@ import asyncio
 from sqlmodel import select
 import pandas as pd
 import json
+from src.ui.snippets import render_snippet
 
 from src.db.engine import async_session_maker
 from src.db.models import Document, AnalysisTask
@@ -55,7 +56,6 @@ st.markdown(
     }
 </style>
 """,
-    unsafe_allow_html=True,
 )
 
 
@@ -426,13 +426,11 @@ def main():
 
             if match.get("summary_snippet"):
                 st.markdown(
-                    f"**In Summary:** ...{match['summary_snippet']}...",
-                    unsafe_allow_html=True,
+                    f"**In Summary:** ...{render_snippet(match['summary_snippet'])}...",
                 )
             if match.get("content_snippet"):
                 st.markdown(
-                    f"**In Content:** ...{match['content_snippet']}...",
-                    unsafe_allow_html=True,
+                    f"**In Content:** ...{render_snippet(match['content_snippet'])}...",
                 )
             st.divider()
         selected_doc = next((d for d in filtered_docs if d.id == doc_id), None)
