@@ -210,7 +210,7 @@ def main():
             "to prevent accidental self-deletion. Use --allow-cwd to override."
         )
 
-    if base_path == Path("/").resolve() and not args.allow_root:
+    if base_path.parent == base_path and not args.allow_root:
         parser.error(
             "Scanning the filesystem root directory is not allowed by default "
             "as it could lead to accidental large-scale deletions. "

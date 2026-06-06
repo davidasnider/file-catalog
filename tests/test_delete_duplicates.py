@@ -30,7 +30,7 @@ def test_find_duplicates_cwd_rejected_without_allow_cwd(tmp_path, monkeypatch):
         assert excinfo.value.code == 2
 
 
-def test_find_duplicates_cwd_accepted_with_allow_cwd(tmp_path, monkeypatch, caplog):
+def test_find_duplicates_cwd_accepted_with_allow_cwd(tmp_path, monkeypatch):
     """CLI accepts Path.cwd() when --allow-cwd is provided."""
     import sys
     from src.scripts.delete_duplicates import main
