@@ -26,7 +26,7 @@ SUPPORTED_IMAGE_TYPES = {
 }
 
 
-@register_analyzer(name=TEXT_EXTRACTOR_NAME, depends_on=[], version="1.10")
+@register_analyzer(name=TEXT_EXTRACTOR_NAME, depends_on=[], version="1.9")
 class TextExtractorPlugin(AnalyzerBase):
     """
     Extracts raw text from common document types (PDFs, docs) and images (OCR).
@@ -93,12 +93,34 @@ class TextExtractorPlugin(AnalyzerBase):
                         extracted_text = pytesseract.image_to_string(img)
                 except Exception as e:
                     logger.warning(f"Pytesseract failed for {file_path}: {e}")
-                    return {
-                        "text": "",
-                        "extracted": False,
-                        "error": f"OCR failed: {e}",
-                        "source": TEXT_EXTRACTOR_NAME,
-                    }
+                    extracted_text = ""
+
+                # If pytesseract failed or found nothing, fallback to Vision LLM
+                if not extracted_text.strip():
+                    logger.info(f"Falling back to Vision LLM for {file_path}")
+                    from src.llm.factory import get_llm_provider
+
+                    llm = get_llm_provider(is_vision=True)
+                    if llm and not isinstance(llm, str):
+                        try:
+                            vision_prompt = (
+                                "Extract all visible text from this image. "
+                                "If there is no text, provide a concise, high-quality description of what is in the image "
+                                "so it can be indexed for search."
+                            )
+                            model_max = await llm.get_max_output_tokens()
+                            extracted_text = await llm.process_image(
+                                image_path=file_path,
+                                prompt=vision_prompt,
+                                max_tokens=model_max,
+                            )
+                            logger.info(
+                                f"Vision LLM successfully described/extracted text for {file_path}"
+                            )
+                        except Exception as ve:
+                            logger.error(
+                                f"Vision LLM fallback failed for {file_path}: {ve}"
+                            )
             elif mime_type == "text/rtf":
                 from striprtf.striprtf import rtf_to_text
 
@@ -303,21 +325,12 @@ class TextExtractorPlugin(AnalyzerBase):
                 )
 
             extracted_content = extracted_text.strip()
-            is_extracted = bool(extracted_content)
-
-            if not is_extracted:
-                if mime_type in SUPPORTED_IMAGE_TYPES:
-                    logger.info(
-                        f"No text extracted from image {file_path}, but skipping ValueError to prevent retries."
-                    )
-                else:
-                    raise ValueError(
-                        f"No text extracted (MIME: {mime_type or 'unknown'})"
-                    )
+            if not extracted_content:
+                raise ValueError(f"No text extracted (MIME: {mime_type or 'unknown'})")
 
             return {
                 "text": extracted_content,
-                "extracted": is_extracted,
+                "extracted": True,
                 "source": TEXT_EXTRACTOR_NAME,
             }
 

@@ -77,11 +77,3 @@ Rebuild the application from the ground up to address robustness, extensibility,
 - **Plugin Test:**
   1. Drop a new dummy Python plugin into the plugins folder.
   2. Verify it is executed in the pipeline without touching the main orchestration engine.
-
-### 4. Maintenance & Utility Ecosystem
-- **Requirement:** The system must provide standalone utilities for data pre-processing and repository maintenance.
-- **Implementation:** A suite of scripts in `src/scripts/` handles:
-  1. **Archive/Mailbox Extraction:** Converting `.zip` and `.mbox` files into ingestible formats.
-  2. **Deduplication:** A standalone `Duplicate Remover` to clean the filesystem before or after ingestion.
-  3. **Index Management:** Tools for manually syncing the FTS5 index and purging noise records (e.g., XML).
-  4. **Diagnostic Tools:** Performance benchmarking and evaluation of AI-generated summaries.
