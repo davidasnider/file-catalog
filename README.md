@@ -30,7 +30,8 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 
 ### 5. Rich Text & Metadata Extraction
 - **Broad File Support**: Extract metadata and content from PDFs (`pdfplumber`), Word Docs (`python-docx`), HTML web pages (`BeautifulSoup4`), and standard text/code files.
-- **Optical Character Recognition (OCR) & Vision Analysis**: Automatically detects images and extracts text using Tesseract OCR (`pytesseract`). The `TextExtractorPlugin` falls back to a multimodal Vision LLM when Tesseract returns no text. A separate `VisionAnalyzerPlugin` runs on all images for visual descriptions and NSFW/SFW scoring. The `OCRConfidenceScorerPlugin` scores the quality of the extraction.
+- **Optical Character Recognition (OCR)**: `TextExtractorPlugin` automatically detects images and extracts text using Tesseract OCR (`pytesseract`). When Tesseract produces no text, it falls back to a multimodal Vision LLM to describe the image content for indexing and search. The `OCRConfidenceScorerPlugin` scores the quality of the OCR output.
+- **Multimodal Vision Analysis**: `VisionAnalyzerPlugin` uses a multimodal Vision LLM to describe image content and categorize it as SFW or NSFW for content moderation.
 - **Vision Memory Safeguards**: Implements proactive image resizing (configurable via `VISION_MAX_PIXELS`) to prevent out-of-memory (OOM) crashes during local inference of high-resolution scans.
 
 ### 6. Interactive Visualization & Monitoring
