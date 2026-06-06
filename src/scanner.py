@@ -1039,21 +1039,23 @@ async def run_scanner(
                 # After syncing to FTS, perform non-indexed reads to check for runtime errors
                 async with async_session_maker() as session:
                     result = await session.execute(
-                        select(AnalysisTask).where(AnalysisTask.document_id == doc_id)
+                        select(AnalysisTask.result_data).where(
+                            AnalysisTask.document_id == doc_id,
+                            AnalysisTask.result_data.isnot(None),
+                        )
                     )
                     import json
 
-                    for t in result.scalars().all():
-                        if t.result_data:
-                            try:
-                                data = json.loads(t.result_data)
-                                err = data.get("error", "")
-                                if "model not found" in err.lower():
-                                    missing_models.add(err)
-                                elif "llama-cpp-python is not installed" in err:
-                                    missing_libraries.add(err)
-                            except Exception:
-                                pass
+                    for result_data in result.scalars().all():
+                        try:
+                            data = json.loads(result_data)
+                            err = data.get("error", "")
+                            if "model not found" in err.lower():
+                                missing_models.add(err)
+                            elif "llama-cpp-python is not installed" in err:
+                                missing_libraries.add(err)
+                        except json.JSONDecodeError:
+                            pass
 
         def on_doc_end(doc_id):
             nonlocal completed_count
