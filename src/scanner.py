@@ -99,7 +99,6 @@ class CustomJsonFormatter(logging.Formatter):
     """Simple JSON formatter for structured logging."""
 
     def format(self, record: logging.LogRecord) -> str:
-        import json
         from datetime import datetime
 
         log_record = {
@@ -1248,7 +1247,6 @@ async def run_standalone_judge():
     from sqlmodel import select
     from rich.console import Console
     from datetime import datetime, timezone
-    import json
 
     # Force enable judge for standalone execution
     config.judge_enabled = True
