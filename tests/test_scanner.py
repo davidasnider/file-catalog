@@ -2,9 +2,8 @@ import asyncio
 import json
 
 import pytest
-from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from sqlmodel import select
-from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.db.models import AnalysisTask, Document, DocumentStatus, TaskStatus
 from src.scanner import _batch_check_doc_errors, compute_file_hash, ingest_directory
