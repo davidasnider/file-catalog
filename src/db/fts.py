@@ -17,8 +17,8 @@ from src.core.analyzer_names import (
 
 logger = logging.getLogger(__name__)
 
-FTS_HL_START = "[HL_START]"
-FTS_HL_END = "[HL_END]"
+FTS_HL_START = "\x01"
+FTS_HL_END = "\x02"
 
 # Global semaphore to serialize FTS writes and prevent "database is locked" errors.
 # SQLite allows multiple concurrent readers but only one writer.

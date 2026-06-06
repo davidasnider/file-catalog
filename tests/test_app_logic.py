@@ -40,8 +40,9 @@ def test_render_snippet_double_quote():
 def test_render_snippet_unmatched_end_marker():
     """Unmatched end marker outside highlight gets escaped as literal text."""
     text = f"Hello world{FTS_HL_END}"
-    # [HL_END] contains [, ], _ which are Markdown special chars
-    expected = r"Hello world\[HL\_END\]"
+    # Control chars \x01/\x02 contain no Markdown special chars,
+    # so they pass through the escaping regex unchanged.
+    expected = f"Hello world{FTS_HL_END}"
     assert render_snippet(text) == expected
 
 
@@ -55,12 +56,12 @@ def test_render_snippet_unmatched_start_marker():
 def test_render_snippet_nested_start_marker():
     """Nested start marker inside a highlight is escaped as literal text."""
     text = f"Text {FTS_HL_START}inner {FTS_HL_START}still{FTS_HL_END} here"
-    expected = r"Text **inner \[HL\_START\]still** here"
+    expected = f"Text **inner {FTS_HL_START}still** here"
     assert render_snippet(text) == expected
 
 
 def test_render_snippet_missing_start_then_end():
     """End marker before any start is escaped, then normal pair works."""
     text = f"Before{FTS_HL_END} mid {FTS_HL_START}found{FTS_HL_END} after"
-    expected = r"Before\[HL\_END\] mid **found** after"
+    expected = f"Before{FTS_HL_END} mid **found** after"
     assert render_snippet(text) == expected
