@@ -651,6 +651,7 @@ async def test_chunked_error_checking_exceeds_chunk_size(db_session, temp_dir):
 
     if processed_docs:
         chunk_size = 900
+
         processed_list = list(processed_docs)
         for i in range(0, len(processed_list), chunk_size):
             chunk = processed_list[i : i + chunk_size]
