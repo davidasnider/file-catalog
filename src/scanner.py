@@ -1,3 +1,4 @@
+import json
 import argparse
 import asyncio
 import hashlib
@@ -561,6 +562,51 @@ async def _load_and_queue_existing_docs(
                     f"Failed to remove {len(missing_doc_ids)} missing docs from FTS"
                 )
         await session.commit()
+
+
+async def _batch_check_doc_errors(
+    async_session_maker, processed_doc_ids, missing_models, missing_libraries
+):
+    """Batch check processed documents for missing model/library runtime errors.
+
+    Queries AnalysisTask.result_data in chunks (to avoid SQLite variable limits)
+    for error strings indicating missing models or libraries, collecting them
+    into the provided sets for final reporting.
+
+    Args:
+        async_session_maker: Session factory for async DB access.
+        processed_doc_ids: Set of document IDs that were successfully processed.
+        missing_models: Set[str] to collect missing-model errors into.
+        missing_libraries: Set[str] to collect missing-library errors into.
+    """
+    if not processed_doc_ids:
+        return
+
+    try:
+        async with async_session_maker() as session:
+            # Use chunk_size = 900 to stay under SQLite's maximum parameter limit (999).
+            doc_ids_list = list(processed_doc_ids)
+            chunk_size = 900
+            for i in range(0, len(doc_ids_list), chunk_size):
+                chunk = doc_ids_list[i : i + chunk_size]
+                result = await session.execute(
+                    select(AnalysisTask.result_data)
+                    .where(AnalysisTask.document_id.in_(chunk))
+                    .where(AnalysisTask.result_data.isnot(None))
+                )
+                for result_data in result.scalars().all():
+                    if result_data:
+                        try:
+                            data = json.loads(result_data)
+                            err = data.get("error", "")
+                            if "model not found" in err.lower():
+                                missing_models.add(err)
+                            elif "llama-cpp-python is not installed" in err:
+                                missing_libraries.add(err)
+                        except json.JSONDecodeError:
+                            pass
+    except Exception as e:
+        logger.exception("Error checking document tasks: %s", e)
 
 
 async def run_scanner(
@@ -1191,34 +1237,9 @@ async def run_scanner(
     await asyncio.sleep(0.1)
 
     # Batch check for missing models/libraries
-    if processed_doc_ids:
-        import json
-
-        try:
-            async with async_session_maker() as session:
-                # Chunking to avoid sqlite variable limits (usually 999)
-                doc_ids_list = list(processed_doc_ids)
-                chunk_size = 900
-                for i in range(0, len(doc_ids_list), chunk_size):
-                    chunk = doc_ids_list[i : i + chunk_size]
-                    result = await session.execute(
-                        select(AnalysisTask.result_data)
-                        .where(AnalysisTask.document_id.in_(chunk))
-                        .where(AnalysisTask.result_data.isnot(None))
-                    )
-                    for result_data in result.scalars().all():
-                        if result_data:
-                            try:
-                                data = json.loads(result_data)
-                                err = data.get("error", "")
-                                if "model not found" in err.lower():
-                                    missing_models.add(err)
-                                elif "llama-cpp-python is not installed" in err:
-                                    missing_libraries.add(err)
-                            except json.JSONDecodeError:
-                                pass
-        except Exception as e:
-            logger.exception(f"Error checking document tasks: {e}")
+    await _batch_check_doc_errors(
+        async_session_maker, processed_doc_ids, missing_models, missing_libraries
+    )
 
     console.print("\n[bold green]✨ Analysis Complete![/bold green]\n")
 
