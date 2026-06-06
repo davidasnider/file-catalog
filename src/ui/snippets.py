@@ -6,7 +6,7 @@ import re
 from src.db.fts import FTS_HL_START, FTS_HL_END
 
 
-def render_snippet(snippet_text: str):
+def render_snippet(snippet_text: str) -> str:
     """
     Escapes HTML and Markdown in a snippet while preserving bolding for highlights.
 
