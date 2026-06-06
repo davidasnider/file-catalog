@@ -99,7 +99,6 @@ class CustomJsonFormatter(logging.Formatter):
     """Simple JSON formatter for structured logging."""
 
     def format(self, record: logging.LogRecord) -> str:
-        import json
         from datetime import datetime
 
         log_record = {
@@ -593,17 +592,19 @@ async def _batch_check_doc_errors(
                     select(AnalysisTask.result_data)
                     .where(AnalysisTask.document_id.in_(chunk))
                     .where(AnalysisTask.result_data.isnot(None))
+                    .where(AnalysisTask.result_data.like('%"error"%'))
                 )
                 for result_data in result.scalars().all():
                     if result_data:
                         try:
                             data = json.loads(result_data)
-                            err = data.get("error", "")
-                            if "model not found" in err.lower():
-                                missing_models.add(err)
-                            elif "llama-cpp-python is not installed" in err:
-                                missing_libraries.add(err)
-                        except json.JSONDecodeError:
+                            if isinstance(data, dict):
+                                err = data.get("error", "")
+                                if "model not found" in err.lower():
+                                    missing_models.add(err)
+                                elif "llama-cpp-python is not installed" in err:
+                                    missing_libraries.add(err)
+                        except (json.JSONDecodeError, TypeError):
                             pass
     except Exception as e:
         logger.exception("Error checking document tasks: %s", e)
@@ -1071,17 +1072,13 @@ async def run_scanner(
 
         post_process_semaphore = asyncio.Semaphore(max_concurrent + 1)
 
-        async def check_doc_errors(doc_id):
-            """Sync document to the full-text search index."""
+        async def sync_fts_index(doc_id):
+            """Sync document to FTS index."""
             from src.db.fts import sync_document_to_fts
 
             async with post_process_semaphore:
                 async with async_session_maker() as session:
-                    # Sync to FTS index
-                    try:
-                        await sync_document_to_fts(session, doc_id)
-                    except Exception as e:
-                        logger.error(f"FTS sync failed for doc {doc_id}: {e}")
+                    await sync_document_to_fts(session, doc_id)
 
         def on_doc_end(doc_id):
             nonlocal completed_count
@@ -1179,10 +1176,10 @@ async def run_scanner(
             if processed:
                 processed_doc_ids.add(doc_id)
                 try:
-                    await check_doc_errors(doc_id)
+                    await sync_fts_index(doc_id)
                 except Exception:
                     logger.exception(
-                        "Post-processing check_doc_errors failed for document %s",
+                        "Post-processing sync_fts_index failed for document %s",
                         doc_id,
                     )
 
@@ -1233,9 +1230,6 @@ async def run_scanner(
             except asyncio.CancelledError:
                 pass
 
-    # Let background tasks (like our FTS sync tasks) settle
-    await asyncio.sleep(0.1)
-
     # Batch check for missing models/libraries
     await _batch_check_doc_errors(
         async_session_maker, processed_doc_ids, missing_models, missing_libraries
@@ -1265,7 +1259,6 @@ async def run_standalone_judge():
     from sqlmodel import select
     from rich.console import Console
     from datetime import datetime, timezone
-    import json
 
     # Force enable judge for standalone execution
     config.judge_enabled = True
