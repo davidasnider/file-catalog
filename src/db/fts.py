@@ -207,12 +207,12 @@ async def search_fts(session: AsyncSession, query: str, limit: int = 50):
     if not query or not query.strip():
         return []
 
-    search_sql = f"""
+    search_sql = """
         SELECT
             document_id,
             path,
-            snippet(document_fts, 2, '{FTS_HL_START}', '{FTS_HL_END}', '...', 64) as content_snippet,
-            snippet(document_fts, 3, '{FTS_HL_START}', '{FTS_HL_END}', '...', 64) as summary_snippet,
+            snippet(document_fts, 2, :hl_start, :hl_end, '...', 64) as content_snippet,
+            snippet(document_fts, 3, :hl_start, :hl_end, '...', 64) as summary_snippet,
             rank
         FROM document_fts
         WHERE document_fts MATCH :query
@@ -226,7 +226,13 @@ async def search_fts(session: AsyncSession, query: str, limit: int = 50):
 
     try:
         result = await session.execute(
-            text(search_sql), {"query": safe_query, "limit": limit}
+            text(search_sql),
+            {
+                "query": safe_query,
+                "limit": limit,
+                "hl_start": FTS_HL_START,
+                "hl_end": FTS_HL_END,
+            },
         )
         return [dict(row._mapping) for row in result.fetchall()]
     except Exception as e:
