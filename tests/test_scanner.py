@@ -772,12 +772,12 @@ async def test_batch_check_doc_errors_invalid_json_handled(
 async def test_batch_check_doc_errors_typeerror_handled(
     async_session_maker, db_session, seeded_db
 ):
-    """Non-string/non-dict JSON (e.g. a list) is caught (TypeError) and skipped."""
+    """Non-dict JSON (e.g. a list) is silently skipped via isinstance check."""
     await _create_analysis_task(
         db_session,
         seeded_db[0],
         "summarize",
-        json.dumps([1, 2, 3]),  # List, not dict — .get("error") will TypeError
+        json.dumps([1, 2, 3]),  # List, not dict — silently skipped via isinstance check
     )
     await _create_analysis_task(
         db_session,
