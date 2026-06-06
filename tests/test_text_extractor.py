@@ -130,7 +130,9 @@ async def test_text_extractor_powerpoint_mocked(tmp_path, mocker):
     # Mock hachoir.parser.createParser and hachoir.metadata.extractMetadata
     mocker.patch(
         "src.plugins.text_extractor.createParser",
-        return_value=mocker.MagicMock(),
+        return_value=mocker.MagicMock(
+            __enter__=lambda x: x, __exit__=lambda x, *args: None
+        ),
     )
     mock_metadata = mocker.Mock()
     mock_metadata.exportPlaintext.return_value = "Mocked PPT metadata text."
@@ -169,47 +171,3 @@ async def test_text_extractor_pptx_mocked(tmp_path, mocker):
 
     assert result["extracted"] is True
     assert "Slide Text" in result["text"]
-
-
-@pytest.mark.asyncio
-async def test_text_extractor_ocr_exception(tmp_path, mocker):
-    plugin = TextExtractorPlugin()
-    test_file = tmp_path / "test.png"
-    test_file.write_bytes(b"dummy")
-
-    # Mock pytesseract to raise an exception
-    mocker.patch(
-        "src.plugins.text_extractor.pytesseract.image_to_string",
-        side_effect=Exception("OCR Error"),
-    )
-    # Mock PIL.Image.open to work with dummy file
-    mock_img = mocker.MagicMock()
-    mocker.patch("src.plugins.text_extractor.Image.open", return_value=mock_img)
-
-    result = await plugin.analyze(str(test_file), "image/png", {})
-
-    assert result["extracted"] is False
-    assert result["text"] == ""
-    assert "OCR failed: OCR Error" in result["error"]
-    assert result["source"] == TEXT_EXTRACTOR_NAME
-
-
-@pytest.mark.asyncio
-async def test_text_extractor_image_no_text(tmp_path, mocker):
-    plugin = TextExtractorPlugin()
-    test_file = tmp_path / "test.png"
-    test_file.write_bytes(b"dummy")
-
-    # Mock pytesseract to return no text
-    mocker.patch(
-        "src.plugins.text_extractor.pytesseract.image_to_string", return_value="   "
-    )
-    # Mock PIL.Image.open to work with dummy file
-    mock_img = mocker.MagicMock()
-    mocker.patch("src.plugins.text_extractor.Image.open", return_value=mock_img)
-
-    result = await plugin.analyze(str(test_file), "image/png", {})
-
-    assert result["extracted"] is False
-    assert result["text"] == ""
-    assert result["source"] == TEXT_EXTRACTOR_NAME

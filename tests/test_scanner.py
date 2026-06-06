@@ -530,3 +530,152 @@ def test_mlx_provider_enable_thinking_toggling():
                 asyncio.set_event_loop(original_loop)
             else:
                 asyncio.set_event_loop(None)
+
+
+# ── Batch doc-error regression tests ──────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_batch_check_doc_errors_detects_model_and_library_errors(db_session):
+    """Regression: _batch_check_doc_errors must detect model/library errors in
+    AnalysisTask.result_data using batched queries (not per-document N+1)."""
+    import json
+
+    from src.scanner import _batch_check_doc_errors
+    from src.db.models import AnalysisTask
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.orm import sessionmaker
+
+    # Create documents and AnalysisTasks with varying result_data payloads
+    tasks = [
+        AnalysisTask(
+            document_id=1,
+            task_name="summarize",
+            result_data=json.dumps({"error": "model not found: llama-3.2-3b"}),
+        ),
+        AnalysisTask(
+            document_id=2,
+            task_name="ocr",
+            result_data=json.dumps({"error": "llama-cpp-python is not installed"}),
+        ),
+        AnalysisTask(
+            document_id=3,
+            task_name="extract",
+            result_data=json.dumps({"summary": "all good"}),
+        ),
+        AnalysisTask(
+            document_id=4,
+            task_name="classify",
+            result_data=json.dumps({"error": "MODEL NOT FOUND: another-model"}),
+        ),
+        AnalysisTask(
+            document_id=5,
+            task_name="parse",
+            result_data=None,  # NULL result_data — should be skipped
+        ),
+        AnalysisTask(
+            document_id=6,
+            task_name="analyze",
+            result_data="not valid json at all",  # invalid JSON — should be skipped
+        ),
+    ]
+    for t in tasks:
+        db_session.add(t)
+    await db_session.commit()
+
+    # Build a session maker that yields our test session
+    async_session_maker = sessionmaker(
+        db_session.bind, class_=AsyncSession, expire_on_commit=False
+    )
+
+    processed_doc_ids = {1, 2, 3, 4, 5, 6}
+    missing_models = set()
+    missing_libraries = set()
+
+    await _batch_check_doc_errors(
+        async_session_maker, processed_doc_ids, missing_models, missing_libraries
+    )
+
+    # model-not-found errors (case-insensitive): docs 1 and 4
+    assert len(missing_models) == 2, (
+        f"expected 2 missing-model errors, got {len(missing_models)}: {missing_models}"
+    )
+    assert any("llama-3.2-3b" in err for err in missing_models)
+    assert any("another-model" in err for err in missing_models)
+
+    # library-not-installed: doc 2 only
+    assert len(missing_libraries) == 1
+    assert any("llama-cpp-python" in err for err in missing_libraries)
+
+    # Docs 3, 5, 6 should NOT produce errors
+    # (clean result, NULL result_data, invalid JSON)
+
+
+@pytest.mark.asyncio
+async def test_batch_check_doc_errors_chunks_large_sets(db_session):
+    """Regression: _batch_check_doc_errors must split large document-id sets
+    into chunks ≤ 900 to stay under SQLite's max-variable limit."""
+    import json
+
+    from src.scanner import _batch_check_doc_errors
+    from src.db.models import AnalysisTask
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.orm import sessionmaker
+
+    # Create 1200 documents — enough to force 2 chunks (900 + 300)
+    # Give each task a unique error string so the set captures all of them
+    N = 1200
+    tasks = []
+    for i in range(1, N + 1):
+        tasks.append(
+            AnalysisTask(
+                document_id=i,
+                task_name="test",
+                result_data=json.dumps({"error": f"model not found: test-model-{i}"}),
+            )
+        )
+    for t in tasks:
+        db_session.add(t)
+    await db_session.commit()
+
+    async_session_maker = sessionmaker(
+        db_session.bind, class_=AsyncSession, expire_on_commit=False
+    )
+
+    processed_doc_ids = set(range(1, N + 1))
+    missing_models = set()
+    missing_libraries = set()
+
+    await _batch_check_doc_errors(
+        async_session_maker, processed_doc_ids, missing_models, missing_libraries
+    )
+
+    # All 1200 documents have the same model-not-found error
+    assert len(missing_models) == N, (
+        f"expected {N} missing-model errors, got {len(missing_models)}"
+    )
+    assert len(missing_libraries) == 0
+
+
+@pytest.mark.asyncio
+async def test_batch_check_doc_errors_empty_ids_is_noop(db_session):
+    """_batch_check_doc_errors with an empty processed_doc_ids set must return
+    immediately without querying the database."""
+    from src.scanner import _batch_check_doc_errors
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.orm import sessionmaker
+
+    async_session_maker = sessionmaker(
+        db_session.bind, class_=AsyncSession, expire_on_commit=False
+    )
+
+    missing_models = set()
+    missing_libraries = set()
+
+    # Should complete without error
+    await _batch_check_doc_errors(
+        async_session_maker, set(), missing_models, missing_libraries
+    )
+
+    assert len(missing_models) == 0
+    assert len(missing_libraries) == 0

@@ -16,4 +16,3 @@ scanner.log
 scratch_response.json
 threads_debug.json
 *.json
-.hermes/

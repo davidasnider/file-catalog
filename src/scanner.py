@@ -1,3 +1,4 @@
+import json
 import argparse
 import asyncio
 import hashlib
@@ -563,6 +564,51 @@ async def _load_and_queue_existing_docs(
         await session.commit()
 
 
+async def _batch_check_doc_errors(
+    async_session_maker, processed_doc_ids, missing_models, missing_libraries
+):
+    """Batch check processed documents for missing model/library runtime errors.
+
+    Queries AnalysisTask.result_data in chunks (to avoid SQLite variable limits)
+    for error strings indicating missing models or libraries, collecting them
+    into the provided sets for final reporting.
+
+    Args:
+        async_session_maker: Session factory for async DB access.
+        processed_doc_ids: Set of document IDs that were successfully processed.
+        missing_models: Set[str] to collect missing-model errors into.
+        missing_libraries: Set[str] to collect missing-library errors into.
+    """
+    if not processed_doc_ids:
+        return
+
+    try:
+        async with async_session_maker() as session:
+            # Use chunk_size = 900 to stay under SQLite's maximum parameter limit (999).
+            doc_ids_list = list(processed_doc_ids)
+            chunk_size = 900
+            for i in range(0, len(doc_ids_list), chunk_size):
+                chunk = doc_ids_list[i : i + chunk_size]
+                result = await session.execute(
+                    select(AnalysisTask.result_data)
+                    .where(AnalysisTask.document_id.in_(chunk))
+                    .where(AnalysisTask.result_data.isnot(None))
+                )
+                for result_data in result.scalars().all():
+                    if result_data:
+                        try:
+                            data = json.loads(result_data)
+                            err = data.get("error", "")
+                            if "model not found" in err.lower():
+                                missing_models.add(err)
+                            elif "llama-cpp-python is not installed" in err:
+                                missing_libraries.add(err)
+                        except json.JSONDecodeError:
+                            pass
+    except Exception as e:
+        logger.exception("Error checking document tasks: %s", e)
+
+
 async def run_scanner(
     directory: str,
     max_concurrent: int,
@@ -970,6 +1016,7 @@ async def run_scanner(
         completed_count = 0
         missing_models = set()
         missing_libraries = set()
+        processed_doc_ids = set()
 
         def update_waiting():
             nonlocal waiting_tasks
@@ -1025,7 +1072,7 @@ async def run_scanner(
         post_process_semaphore = asyncio.Semaphore(max_concurrent + 1)
 
         async def check_doc_errors(doc_id):
-            """Sync to FTS and check for specific runtime errors (like missing models)."""
+            """Sync document to the full-text search index."""
             from src.db.fts import sync_document_to_fts
 
             async with post_process_semaphore:
@@ -1035,25 +1082,6 @@ async def run_scanner(
                         await sync_document_to_fts(session, doc_id)
                     except Exception as e:
                         logger.error(f"FTS sync failed for doc {doc_id}: {e}")
-
-                # After syncing to FTS, perform non-indexed reads to check for runtime errors
-                async with async_session_maker() as session:
-                    result = await session.execute(
-                        select(AnalysisTask).where(AnalysisTask.document_id == doc_id)
-                    )
-                    import json
-
-                    for t in result.scalars().all():
-                        if t.result_data:
-                            try:
-                                data = json.loads(t.result_data)
-                                err = data.get("error", "")
-                                if "model not found" in err.lower():
-                                    missing_models.add(err)
-                                elif "llama-cpp-python is not installed" in err:
-                                    missing_libraries.add(err)
-                            except Exception:
-                                pass
 
         def on_doc_end(doc_id):
             nonlocal completed_count
@@ -1149,6 +1177,7 @@ async def run_scanner(
             mime_type = id_to_mime.get(doc_id)
             processed = await task_engine.process_document(doc_id, mime_type=mime_type)
             if processed:
+                processed_doc_ids.add(doc_id)
                 try:
                     await check_doc_errors(doc_id)
                 except Exception:
@@ -1204,8 +1233,13 @@ async def run_scanner(
             except asyncio.CancelledError:
                 pass
 
-    # Let background tasks (like our check_doc_errors quick checks) settle
+    # Let background tasks (like our FTS sync tasks) settle
     await asyncio.sleep(0.1)
+
+    # Batch check for missing models/libraries
+    await _batch_check_doc_errors(
+        async_session_maker, processed_doc_ids, missing_models, missing_libraries
+    )
 
     console.print("\n[bold green]✨ Analysis Complete![/bold green]\n")
 
