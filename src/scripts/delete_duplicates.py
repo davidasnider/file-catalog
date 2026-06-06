@@ -192,6 +192,11 @@ def main():
         action="store_true",
         help="Skip the interactive confirmation prompt before deleting files.",
     )
+    parser.add_argument(
+        "--allow-root",
+        action="store_true",
+        help="Allow scanning the filesystem root directory (use with extreme caution).",
+    )
 
     args = parser.parse_args()
 
@@ -203,6 +208,13 @@ def main():
         parser.error(
             "Scanning the current directory without --allow-cwd is not allowed "
             "to prevent accidental self-deletion. Use --allow-cwd to override."
+        )
+
+    if base_path == Path("/").resolve() and not args.allow_root:
+        parser.error(
+            "Scanning the filesystem root directory is not allowed by default "
+            "as it could lead to accidental large-scale deletions. "
+            "Use --allow-root to override."
         )
 
     hashes = find_duplicates(args.directory)

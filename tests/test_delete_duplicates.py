@@ -157,3 +157,33 @@ def test_main_confirmation_y(tmp_path, monkeypatch):
             main()
 
     assert f1.exists() != f2.exists()  # One was deleted
+
+
+def test_root_directory_rejected_without_allow_root(monkeypatch):
+    """CLI refuses to scan filesystem root '/' unless --allow-root is provided."""
+    import sys
+    from src.scripts.delete_duplicates import main
+    from unittest.mock import patch
+    import pytest
+
+    # Change cwd away from / so the CWD guard doesn't fire first
+    monkeypatch.chdir("/tmp")
+    args = [sys.argv[0], "/"]
+    with patch.object(sys, "argv", args):
+        with pytest.raises(SystemExit) as excinfo:
+            main()
+        assert excinfo.value.code == 2
+
+
+def test_root_directory_accepted_with_allow_root(monkeypatch):
+    """CLI accepts '/' when --allow-root is provided (guard bypassed)."""
+    import sys
+    from src.scripts.delete_duplicates import main
+    from unittest.mock import patch
+
+    monkeypatch.chdir("/tmp")
+    args = [sys.argv[0], "/", "--allow-root", "--dry-run"]
+    with patch.object(sys, "argv", args):
+        with patch("src.scripts.delete_duplicates.find_duplicates", return_value={}):
+            # Should not raise SystemExit(2)
+            main()

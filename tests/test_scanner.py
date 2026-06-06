@@ -1,10 +1,13 @@
 import asyncio
+import json
+
 import pytest
-
+from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
-from src.db.models import Document, DocumentStatus
-from src.scanner import compute_file_hash, ingest_directory
+from src.db.models import AnalysisTask, Document, DocumentStatus, TaskStatus
+from src.scanner import _batch_check_doc_errors, compute_file_hash, ingest_directory
 
 
 @pytest.fixture
@@ -530,3 +533,369 @@ def test_mlx_provider_enable_thinking_toggling():
                 asyncio.set_event_loop(original_loop)
             else:
                 asyncio.set_event_loop(None)
+
+
+# ── _batch_check_doc_errors tests ──────────────────────────────────────
+
+
+@pytest.fixture
+def async_session_maker(test_engine):
+    """Session factory for _batch_check_doc_errors tests."""
+    return async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+
+
+@pytest.fixture
+async def seeded_db(db_session):
+    """Seed the test DB with Documents for _batch_check_doc_errors tests."""
+    docs = [
+        Document(
+            id=i,
+            path=f"/tmp/test_{i}.txt",
+            mime_type="text/plain",
+            file_hash=f"hash_{i}",
+            file_size=100,
+            mtime=0,
+            status=DocumentStatus.COMPLETED,
+        )
+        for i in range(1, 11)
+    ]
+    for doc in docs:
+        db_session.add(doc)
+    await db_session.commit()
+    return [d.id for d in docs]
+
+
+async def _create_analysis_task(db_session, doc_id, task_name, result_data):
+    """Helper to create an AnalysisTask with the given result_data JSON."""
+    task = AnalysisTask(
+        document_id=doc_id,
+        task_name=task_name,
+        status=TaskStatus.COMPLETED,
+        result_data=result_data,
+    )
+    db_session.add(task)
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_batch_check_doc_errors_empty_ids(async_session_maker):
+    """Empty processed_doc_ids should return early without queries."""
+    missing_models = set()
+    missing_libraries = set()
+    await _batch_check_doc_errors(
+        async_session_maker, set(), missing_models, missing_libraries
+    )
+    assert len(missing_models) == 0
+    assert len(missing_libraries) == 0
+
+
+@pytest.mark.asyncio
+async def test_batch_check_doc_errors_model_not_found(
+    async_session_maker, db_session, seeded_db
+):
+    """Documents with 'model not found' errors are collected."""
+    await _create_analysis_task(
+        db_session,
+        seeded_db[0],
+        "summarize",
+        json.dumps({"error": "model not found: llama-3.2-3b"}),
+    )
+    await _create_analysis_task(
+        db_session,
+        seeded_db[1],
+        "summarize",
+        json.dumps({"error": "MODEL NOT FOUND: mistral-7b"}),
+    )
+    # This one should NOT match (no error key)
+    await _create_analysis_task(
+        db_session,
+        seeded_db[2],
+        "ocr",
+        json.dumps({"text": "some extracted text"}),
+    )
+
+    missing_models = set()
+    missing_libraries = set()
+    await _batch_check_doc_errors(
+        async_session_maker, set(seeded_db), missing_models, missing_libraries
+    )
+
+    assert len(missing_models) == 2
+    assert any("llama-3.2-3b" in m for m in missing_models)
+    assert any("mistral-7b" in m for m in missing_models)
+    assert len(missing_libraries) == 0
+
+
+@pytest.mark.asyncio
+async def test_batch_check_doc_errors_library_not_installed(
+    async_session_maker, db_session, seeded_db
+):
+    """Documents with 'llama-cpp-python is not installed' are collected."""
+    await _create_analysis_task(
+        db_session,
+        seeded_db[0],
+        "summarize",
+        json.dumps({"error": "llama-cpp-python is not installed"}),
+    )
+
+    missing_models = set()
+    missing_libraries = set()
+    await _batch_check_doc_errors(
+        async_session_maker, set(seeded_db), missing_models, missing_libraries
+    )
+
+    assert len(missing_models) == 0
+    assert len(missing_libraries) == 1
+    assert "llama-cpp-python is not installed" in next(iter(missing_libraries))
+
+
+@pytest.mark.asyncio
+async def test_batch_check_doc_errors_other_errors_ignored(
+    async_session_maker, db_session, seeded_db
+):
+    """Errors unrelated to models/libraries are not collected."""
+    await _create_analysis_task(
+        db_session,
+        seeded_db[0],
+        "summarize",
+        json.dumps({"error": "timeout exceeded"}),
+    )
+    await _create_analysis_task(
+        db_session,
+        seeded_db[1],
+        "ocr",
+        json.dumps({"error": "unsupported file format"}),
+    )
+
+    missing_models = set()
+    missing_libraries = set()
+    await _batch_check_doc_errors(
+        async_session_maker, set(seeded_db), missing_models, missing_libraries
+    )
+
+    assert len(missing_models) == 0
+    assert len(missing_libraries) == 0
+
+
+@pytest.mark.asyncio
+async def test_batch_check_doc_errors_null_result_data_filtered(
+    async_session_maker, db_session, seeded_db
+):
+    """Documents with NULL result_data are filtered at SQL level."""
+    await _create_analysis_task(
+        db_session,
+        seeded_db[0],
+        "summarize",
+        json.dumps({"error": "model not found: phi-3"}),
+    )
+    # Doc 1 has NULL result_data — should be filtered by .isnot(None) in SQL
+    task_null = AnalysisTask(
+        document_id=seeded_db[1],
+        task_name="ocr",
+        status=TaskStatus.COMPLETED,
+        result_data=None,
+    )
+    db_session.add(task_null)
+    await db_session.commit()
+
+    missing_models = set()
+    missing_libraries = set()
+    await _batch_check_doc_errors(
+        async_session_maker, set(seeded_db), missing_models, missing_libraries
+    )
+
+    # Only the model-not-found error should be collected
+    assert len(missing_models) == 1
+    assert "phi-3" in next(iter(missing_models))
+
+
+@pytest.mark.asyncio
+async def test_batch_check_doc_errors_no_error_substring_filtered(
+    async_session_maker, db_session, seeded_db
+):
+    """result_data without '\"error\"' substring is filtered at SQL level."""
+    await _create_analysis_task(
+        db_session,
+        seeded_db[0],
+        "ocr",
+        json.dumps({"text": "no error here"}),
+    )
+    await _create_analysis_task(
+        db_session,
+        seeded_db[1],
+        "summarize",
+        json.dumps({"error": "model not found: gemma-2b"}),
+    )
+
+    missing_models = set()
+    missing_libraries = set()
+    await _batch_check_doc_errors(
+        async_session_maker, set(seeded_db), missing_models, missing_libraries
+    )
+
+    # Only the doc with 'error' substring should be scanned
+    assert len(missing_models) == 1
+    assert "gemma-2b" in next(iter(missing_models))
+    assert len(missing_libraries) == 0
+
+
+@pytest.mark.asyncio
+async def test_batch_check_doc_errors_invalid_json_handled(
+    async_session_maker, db_session, seeded_db
+):
+    """Invalid JSON in result_data is caught (JSONDecodeError) and skipped."""
+    await _create_analysis_task(
+        db_session,
+        seeded_db[0],
+        "summarize",
+        '{"error": "model not found: qwen", broken json',
+    )
+    await _create_analysis_task(
+        db_session,
+        seeded_db[1],
+        "summarize",
+        json.dumps({"error": "model not found: phi-3"}),
+    )
+
+    missing_models = set()
+    missing_libraries = set()
+    await _batch_check_doc_errors(
+        async_session_maker, set(seeded_db), missing_models, missing_libraries
+    )
+
+    # Invalid JSON is ignored; valid error is collected
+    assert len(missing_models) == 1
+    assert "phi-3" in next(iter(missing_models))
+
+
+@pytest.mark.asyncio
+async def test_batch_check_doc_errors_typeerror_handled(
+    async_session_maker, db_session, seeded_db
+):
+    """Non-string/non-dict JSON (e.g. a list) is caught (TypeError) and skipped."""
+    await _create_analysis_task(
+        db_session,
+        seeded_db[0],
+        "summarize",
+        json.dumps([1, 2, 3]),  # List, not dict — .get("error") will TypeError
+    )
+    await _create_analysis_task(
+        db_session,
+        seeded_db[1],
+        "summarize",
+        json.dumps({"error": "model not found: phi-3"}),
+    )
+
+    missing_models = set()
+    missing_libraries = set()
+    await _batch_check_doc_errors(
+        async_session_maker, set(seeded_db), missing_models, missing_libraries
+    )
+
+    # List result_data is skipped; valid error is collected
+    assert len(missing_models) == 1
+    assert "phi-3" in next(iter(missing_models))
+
+
+@pytest.mark.asyncio
+async def test_batch_check_doc_errors_chunking(
+    async_session_maker, db_session, test_engine
+):
+    """Documents beyond the 900-chunk boundary are still checked."""
+    # Create 950 documents, each with an AnalysisTask
+
+    docs = [
+        Document(
+            id=i,
+            path=f"/tmp/chunk_{i}.txt",
+            mime_type="text/plain",
+            file_hash=f"chunk_hash_{i}",
+            file_size=100,
+            mtime=0,
+            status=DocumentStatus.COMPLETED,
+        )
+        for i in range(1, 951)
+    ]
+    for doc in docs:
+        db_session.add(doc)
+    await db_session.commit()
+
+    # Add error to doc #1 (first chunk) and doc #950 (second chunk)
+    await _create_analysis_task(
+        db_session,
+        1,
+        "summarize",
+        json.dumps({"error": "model not found: first-chunk-model"}),
+    )
+    await _create_analysis_task(
+        db_session,
+        950,
+        "summarize",
+        json.dumps({"error": "llama-cpp-python is not installed"}),
+    )
+
+    doc_ids = set(range(1, 951))
+    missing_models = set()
+    missing_libraries = set()
+    await _batch_check_doc_errors(
+        async_session_maker, doc_ids, missing_models, missing_libraries
+    )
+
+    assert len(missing_models) == 1
+    assert "first-chunk-model" in next(iter(missing_models))
+    assert len(missing_libraries) == 1
+
+
+@pytest.mark.asyncio
+async def test_batch_check_doc_errors_mixed_scenario(
+    async_session_maker, db_session, seeded_db
+):
+    """Mixed scenario: model errors, library errors, NULLs, and valid data."""
+    # Model error
+    await _create_analysis_task(
+        db_session,
+        seeded_db[0],
+        "summarize",
+        json.dumps({"error": "model not found: tinyllama"}),
+    )
+    # Library error
+    await _create_analysis_task(
+        db_session,
+        seeded_db[1],
+        "estate",
+        json.dumps({"error": "llama-cpp-python is not installed"}),
+    )
+    # NULL result_data
+    task_null = AnalysisTask(
+        document_id=seeded_db[2],
+        task_name="ocr",
+        status=TaskStatus.COMPLETED,
+        result_data=None,
+    )
+    db_session.add(task_null)
+    # Valid result — no error substring
+    await _create_analysis_task(
+        db_session,
+        seeded_db[3],
+        "ocr",
+        json.dumps({"text": "extracted ok"}),
+    )
+    # Unrelated error
+    await _create_analysis_task(
+        db_session,
+        seeded_db[4],
+        "pii",
+        json.dumps({"error": "permission denied"}),
+    )
+    await db_session.commit()
+
+    missing_models = set()
+    missing_libraries = set()
+    await _batch_check_doc_errors(
+        async_session_maker, set(seeded_db), missing_models, missing_libraries
+    )
+
+    assert len(missing_models) == 1
+    assert "tinyllama" in next(iter(missing_models))
+    assert len(missing_libraries) == 1
+    assert "llama-cpp-python is not installed" in next(iter(missing_libraries))
