@@ -1202,12 +1202,14 @@ async def run_scanner(
                 for i in range(0, len(doc_ids_list), chunk_size):
                     chunk = doc_ids_list[i : i + chunk_size]
                     result = await session.execute(
-                        select(AnalysisTask).where(AnalysisTask.document_id.in_(chunk))
+                        select(AnalysisTask.result_data)
+                        .where(AnalysisTask.document_id.in_(chunk))
+                        .where(AnalysisTask.result_data.isnot(None))
                     )
-                    for t in result.scalars().all():
-                        if t.result_data:
+                    for result_data in result.scalars().all():
+                        if result_data:
                             try:
-                                data = json.loads(t.result_data)
+                                data = json.loads(result_data)
                                 err = data.get("error", "")
                                 if "model not found" in err.lower():
                                     missing_models.add(err)
