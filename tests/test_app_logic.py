@@ -35,3 +35,32 @@ def test_render_snippet_quote_regression():
 def test_render_snippet_double_quote():
     text = f'He said "hello" {FTS_HL_START}now{FTS_HL_END}'
     assert render_snippet(text) == 'He said "hello" **now**'
+
+
+def test_render_snippet_unmatched_end_marker():
+    """Unmatched end marker outside highlight gets escaped as literal text."""
+    text = f"Hello world{FTS_HL_END}"
+    # [HL_END] contains [, ], _ which are Markdown special chars
+    expected = r"Hello world\[HL\_END\]"
+    assert render_snippet(text) == expected
+
+
+def test_render_snippet_unmatched_start_marker():
+    """Unmatched start marker (truncated snippet) gets closed at end."""
+    text = f"Find this: {FTS_HL_START}important term"
+    expected = r"Find this: **important term**"
+    assert render_snippet(text) == expected
+
+
+def test_render_snippet_nested_start_marker():
+    """Nested start marker inside a highlight is escaped as literal text."""
+    text = f"Text {FTS_HL_START}inner {FTS_HL_START}still{FTS_HL_END} here"
+    expected = r"Text **inner \[HL\_START\]still** here"
+    assert render_snippet(text) == expected
+
+
+def test_render_snippet_missing_start_then_end():
+    """End marker before any start is escaped, then normal pair works."""
+    text = f"Before{FTS_HL_END} mid {FTS_HL_START}found{FTS_HL_END} after"
+    expected = r"Before\[HL\_END\] mid **found** after"
+    assert render_snippet(text) == expected

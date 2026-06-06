@@ -181,6 +181,10 @@ def get_task_status_color(task: AnalysisTask) -> str:
 def render_snippet(snippet_text: str):
     """
     Escapes HTML and Markdown in a snippet while preserving bolding for highlights.
+
+    Processes FTS highlight markers statefully so that unmatched, nested, or
+    out-of-sequence markers are treated as literal text instead of producing
+    unbalanced ``**`` that would corrupt surrounding Markdown rendering.
     """
     if not snippet_text:
         return ""
@@ -193,14 +197,33 @@ def render_snippet(snippet_text: str):
     parts = re.split(f"({re.escape(FTS_HL_START)}|{re.escape(FTS_HL_END)})", escaped)
 
     result = []
+    in_highlight = False
     for part in parts:
-        if part == FTS_HL_START or part == FTS_HL_END:
-            result.append("**")
+        if part == FTS_HL_START:
+            if not in_highlight:
+                result.append("**")
+                in_highlight = True
+            else:
+                # Nested start marker — treat as literal text
+                escaped_part = re.sub(r"([\\`*_{}\[\]()#+\-.!])", r"\\\1", part)
+                result.append(escaped_part)
+        elif part == FTS_HL_END:
+            if in_highlight:
+                result.append("**")
+                in_highlight = False
+            else:
+                # Unmatched end marker — treat as literal text
+                escaped_part = re.sub(r"([\\`*_{}\[\]()#+\-.!])", r"\\\1", part)
+                result.append(escaped_part)
         else:
             # Escape Markdown special characters in the content part
             # Characters to escape: \ ` * _ { } [ ] ( ) # + - . !
             escaped_part = re.sub(r"([\\`*_{}\[\]()#+\-.!])", r"\\\1", part)
             result.append(escaped_part)
+
+    # Close any unclosed highlight (truncated snippet)
+    if in_highlight:
+        result.append("**")
 
     return "".join(result)
 
