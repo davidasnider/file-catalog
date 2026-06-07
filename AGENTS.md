@@ -57,6 +57,9 @@ pytest
 
 ### Utilities
 ```bash
+# Find and delete duplicate files based on SHA-256 hashes
+python -m src.scripts.delete_duplicates "/path/to/directory"
+
 # Extract .mbox files into individual .eml files before scanning
 python -m src.scripts.extract_and_cleanup_mbox /path/to/mailboxes
 
