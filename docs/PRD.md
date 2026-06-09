@@ -47,7 +47,7 @@ Rebuild the application from the ground up to address robustness, extensibility,
 - **Problem:** "Multiple touchpoints" required to add a new analyzer.
 - **Solution:** Implement a dynamic plugin loader.
   - Create an `AnalyzerBase` class.
-  - Developers simply create a new file in `src/plugins/` and decorate their class with `@register_analyzer(name=ESTATE_ANALYZER_NAME, depends_on=[TEXT_EXTRACTOR_NAME])`.
+  - Developers simply create a new file in `src/plugins/` and decorate their class with `@register_analyzer(name=ESTATE_ANALYZER_NAME, depends_on=[TEXT_EXTRACTOR_NAME])`. (e.g. `DocumentAIExtractor` conditionally replaces local extraction if `config.use_document_ai` is set).
   - Analyzer names are centralized as exported constants (e.g., `ESTATE_ANALYZER_NAME` in `src/core/analyzer_names.py`) to maintain consistency across the codebase.
   - The core engine and the UI automatically discover, run, and render these plugins without any core code changes.
   - Plugins use the `get_all_extracted_text` utility function from `src.core.text_utils` as the standard way to aggregate text results from all upstream analyzers stored in the execution context.
