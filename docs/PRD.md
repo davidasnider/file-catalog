@@ -85,3 +85,4 @@ Rebuild the application from the ground up to address robustness, extensibility,
   2. **Deduplication:** A standalone `Duplicate Remover` to clean the filesystem before or after ingestion.
   3. **Index Management:** Tools for manually syncing the FTS5 index and purging noise records (e.g., XML).
   4. **Diagnostic Tools:** Performance benchmarking and evaluation of AI-generated summaries.
+  5. **Operations & Maintenance:** Scripts for removing XML records, reporting pipeline failures, scanning for text extraction failures, and inspecting file database records.

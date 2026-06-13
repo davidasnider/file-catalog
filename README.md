@@ -69,7 +69,7 @@ The system implements a **Quick Skip** mechanism. It tracks the `file_size` and 
 Additionally, when resuming scans, a **Priority-Based Hydration** logic is used to aggressively push incomplete tasks forward: unprocessed files are prioritized first, followed by failed files, and finally partially processed/retrying files. For evaluation, use `python src/scanner.py --judge` to run a standalone LLM-as-a-Judge on unjudged/older tasks to track analysis quality.
 
 ## Utility Scripts
-For more details on utility scripts such as MBOX Exploder, Archive Extractor, FTS Index Synchronizer, Duplicate Remover, and Inspect File with YAML output, please refer to the [utility scripts README](src/scripts/README.md).
+For more details on utility scripts such as MBOX Exploder, Archive Extractor, FTS Index Synchronizer, Performance Benchmarking, Summary Evaluation, Inspect File, Remove XML Records, Report Failures, Scan Text Extraction Failures, and Duplicate Remover, please refer to the [utility scripts README](src/scripts/README.md).
 
 ---
 *Built with Python, SQLite (SQLModel), Streamlit, and Llama.cpp.*
