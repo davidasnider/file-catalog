@@ -117,7 +117,7 @@ class MLXProvider(LLMProvider):
 
         # Default to enable_thinking=False for all tasks, unless explicitly requested
         enable_thinking = kwargs.pop("enable_thinking", False)
-        chat_template_kwargs = {"enable_thinking": enable_thinking}
+        chat_template_kwargs = {"enable_thinking": True} if enable_thinking else {}
 
         if self.use_chat_template:
             messages = [
@@ -164,7 +164,7 @@ class MLXProvider(LLMProvider):
 
         # Default to enable_thinking=False for all tasks, unless explicitly requested
         enable_thinking = kwargs.pop("enable_thinking", False)
-        chat_template_kwargs = {"enable_thinking": enable_thinking}
+        chat_template_kwargs = {"enable_thinking": True} if enable_thinking else {}
 
         if self.use_chat_template:
             messages = [
@@ -219,7 +219,7 @@ class MLXProvider(LLMProvider):
 
         # Default to enable_thinking=False for all tasks, unless explicitly requested
         enable_thinking = kwargs.pop("enable_thinking", False)
-        chat_template_kwargs = {"enable_thinking": enable_thinking}
+        chat_template_kwargs = {"enable_thinking": True} if enable_thinking else {}
 
         def _run_sync():
             try:
