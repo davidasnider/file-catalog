@@ -19,7 +19,7 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 
 ### 4. Specialized Analytical Pipelines
 - **Audio & Video Analysis**: Features an `AudioTranscriberPlugin` to extract transcripts from audio files and a `VideoAnalyzerPlugin` (v2.0) that performs 100-frame uniform sampling, batching, and synthesis to provide detailed video content descriptions.
-- **Metadata & Language Detection**: Features a `LanguageDetectorPlugin` to tag document language and a `DuplicateDetectorPlugin` to find exact-duplicate files using hashes.
+- **Metadata & Language Detection**: Features a `MetadataExtractorPlugin` to extract basic file metadata, a `LanguageDetectorPlugin` to tag document language, and a `DuplicateDetectorPlugin` to find exact-duplicate files using hashes.
 - **Two-Tier Summarization**:
   - **Universal Short Summary**: A lightning-fast, 3-sentence summary generated for *every* standard document. Supports summaries of parsed `.eml` and `.mbox` files.
   - **Deep Map-Reduce Summarization**: A specialized `DeepSummarizerPlugin` built for massive documents. It dynamically chunks text exceeding the context window, summarizes each chunk sequentially (Map), and synthesizes a final cohesive report (Reduce).
@@ -29,7 +29,7 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 - **Data Parsing & Spreadsheets**: An `EmailParserPlugin` accurately parses `.eml` and `.mbox` files (note: `.mbox` and `.xml` files are ignored by the scanner by default; `.mbox` must be extracted into `.eml` format first to be parsed), while the `SpreadsheetAnalyzerPlugin` extracts and summarizes tabular data from `.xlsx`, `.csv`, and `.ods`.
 
 ### 5. Rich Text & Metadata Extraction
-- **Broad File Support**: Extract metadata and content from PDFs (`pdfplumber`), Word Docs (`python-docx`), HTML web pages (`BeautifulSoup4`), and standard text/code files.
+- **Broad File Support**: Extract metadata and content from PDFs (`pdfplumber`), Word Docs (`python-docx`), HTML web pages (`BeautifulSoup4`), and standard text/code files. Includes a `DocumentAIExtractorPlugin` for optional cloud-based extraction using Google Cloud Document AI.
 - **Optical Character Recognition (OCR) & Vision Analysis**: Automatically detects images and extracts text using Tesseract OCR (`pytesseract`). The `OCRConfidenceScorerPlugin` scores the quality of the extraction. Separately, `VisionAnalyzerPlugin` unconditionally runs on all images to utilize a multimodal Vision LLM to describe the visual content, maintaining a clear separation of concerns.
 - **Vision Memory Safeguards**: Implements proactive image resizing (configurable via `VISION_MAX_PIXELS`) to prevent out-of-memory (OOM) crashes during local inference of high-resolution scans.
 
@@ -55,6 +55,10 @@ The scanner can be configured via environment variables (in a `.env` file) or CL
 ### Key Configuration Options:
 Configuration is centrally managed via `pydantic-settings`.
 - `LLM_PROVIDER` / `VISION_PROVIDER`: Choose `openai`, `mlx`, `llama_cpp`, or `gemini` (defaults to `openai`).
+- `USE_DOCUMENT_AI`: Enable Google Cloud Document AI extraction.
+- `DOC_AI_PROCESSOR_ID`: Processor ID for Google Cloud Document AI.
+- `GOOGLE_CLOUD_PROJECT`: Google Cloud project ID for Document AI.
+- `DOCUMENT_AI_LOCATION`: Location for Document AI (e.g., 'us', 'eu').
 - `OPENAI_BASE_URL`: Base URL of the OpenAI-compatible endpoint when using the `openai` provider (default: `http://127.0.0.1:8000/v1`). Point this at your local vLLM, Ollama, or LM Studio server.
 - `OPENAI_API_KEY`: API key sent with each request to the OpenAI-compatible endpoint (default: `sk-no-key-required`). Most local servers accept any non-empty value.
 - `LLM_MODEL_PATH` / `VISION_MODEL_PATH`: When using the `openai` provider these values are passed as the model name in the API request (e.g. `qwen3`, `llava`). For `llama_cpp` they are treated as file-system paths to GGUF weights; for `mlx` they are HuggingFace model identifiers.
