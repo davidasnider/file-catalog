@@ -249,3 +249,44 @@ def test_path_traversal_7z_symlink_mocked(tmp_path, mocker):
     archive_path.write_text("dummy")
 
     assert extract_archive(archive_path, tmp_path / "out") is False
+
+
+def test_main_with_yes(tmp_path, mocker):
+    from src.scripts.extract_and_cleanup_archives import main
+
+    # Create a zip file
+    zip_path = tmp_path / "test.zip"
+    with zipfile.ZipFile(zip_path, "w") as z:
+        z.writestr("file1.txt", "content1")
+
+    # Mock sys.argv
+    mocker.patch(
+        "sys.argv", ["extract_and_cleanup_archives.py", str(tmp_path), "--yes"]
+    )
+
+    # Mock input to raise an error if it's called
+    mocker.patch("builtins.input", side_effect=AssertionError("input() was called!"))
+
+    main()
+
+    # Original should be deleted since keep defaults to False
+    assert not zip_path.exists()
+    # Extracted directory should exist
+    extracted = tmp_path / "test_extracted"
+    assert extracted.exists()
+
+
+def test_main_no_yes_cancel(tmp_path, mocker):
+    from src.scripts.extract_and_cleanup_archives import main
+
+    zip_path = tmp_path / "test.zip"
+    with zipfile.ZipFile(zip_path, "w") as z:
+        z.writestr("file1.txt", "content1")
+
+    mocker.patch("sys.argv", ["extract_and_cleanup_archives.py", str(tmp_path)])
+    mocker.patch("builtins.input", return_value="n")
+
+    main()
+
+    # Since they cancelled, the archive file should still exist
+    assert zip_path.exists()

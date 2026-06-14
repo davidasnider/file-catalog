@@ -3,7 +3,7 @@ import json
 from sqlmodel import text
 from src.db.models import Document, AnalysisTask, DocumentStatus, TaskStatus
 from src.db.fts import sync_document_to_fts, search_fts, FTS_HL_START, FTS_HL_END
-from src.core.analyzer_names import TEXT_EXTRACTOR_NAME
+from src.core.analyzer_names import TEXT_EXTRACTOR_NAME, EMAIL_PARSER_NAME
 
 
 @pytest.fixture
@@ -82,6 +82,63 @@ async def test_sync_document_to_fts(fts_setup):
 
     # Summary should be extracted to the summary column
     assert "primarily about a quick fox" in summary
+
+
+@pytest.mark.asyncio
+async def test_sync_email_document_to_fts(fts_setup):
+    """Test that a completed email document syncs correctly to FTS."""
+    session = fts_setup
+
+    doc = Document(path="/test/fts/email.eml", status=DocumentStatus.COMPLETED)
+    session.add(doc)
+    await session.commit()
+    await session.refresh(doc)
+
+    task = AnalysisTask(
+        document_id=doc.id,
+        task_name=EMAIL_PARSER_NAME,
+        status=TaskStatus.COMPLETED,
+        result_data=json.dumps(
+            {
+                "emails": [
+                    {
+                        "from": "alice@example.com",
+                        "to": "bob@example.com",
+                        "subject": "Greetings",
+                        "body_text": "Hello Bob, hope you are doing well.",
+                    },
+                    {
+                        "from": "bob@example.com",
+                        "to": "alice@example.com",
+                        "subject": "Re: Greetings",
+                        "body_text": "Thanks Alice! I am doing great.",
+                    },
+                ],
+                "total_emails": 2,
+                "source": "email_parser",
+            }
+        ),
+    )
+    session.add(task)
+    await session.commit()
+
+    # Trigger FTS sync
+    await sync_document_to_fts(session, doc.id)
+
+    # Verify FTS entry exists and contains aggregated data
+    result = await session.execute(
+        text("SELECT content FROM document_fts WHERE document_id = :doc_id"),
+        {"doc_id": doc.id},
+    )
+    row = result.fetchone()
+
+    assert row is not None
+    content = row[0]
+
+    assert "Subject: Greetings" in content
+    assert "Hello Bob, hope you are doing well." in content
+    assert "Subject: Re: Greetings" in content
+    assert "Thanks Alice! I am doing great." in content
 
 
 @pytest.mark.asyncio

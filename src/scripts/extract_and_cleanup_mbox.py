@@ -515,6 +515,12 @@ def main():
         action="store_true",
         help="Extract mailboxes but do NOT delete the original source files.",
     )
+    parser.add_argument(
+        "--yes",
+        "-y",
+        action="store_true",
+        help="Skip confirmation prompt and proceed.",
+    )
 
     args = parser.parse_args()
 
@@ -528,8 +534,13 @@ def main():
         msg += " and DELETE the originals"
     msg += ". Are you sure? (y/N): "
 
-    confirm = input(msg)
-    if confirm.lower() == "y":
+    if args.yes:
+        proceed = True
+    else:
+        confirm = input(msg)
+        proceed = confirm.lower() == "y"
+
+    if proceed:
         process_directory(args.directory, args.recursive, dry_run=False, keep=args.keep)
     else:
         logger.info("Operation cancelled.")

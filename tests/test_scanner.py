@@ -510,7 +510,6 @@ def test_mlx_provider_enable_thinking_toggling():
                     ],
                     tokenize=False,
                     add_generation_prompt=True,
-                    enable_thinking=False,
                 )
 
                 # Explicit enable_thinking=True
