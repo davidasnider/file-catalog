@@ -26,6 +26,18 @@
 - [x] Upgrade vision model — replace LLaVA 1.5-7B with a more capable multimodal model (Qwen 3 VL).
 
 ## New Plugins
+- [x] **Metadata Extractor Plugin** — extracts file system metadata (size, created_at, modified_at).
+- [x] **Document AI Extractor Plugin** — extracts text using Google Cloud Document AI.
+- [x] **Text Extractor Plugin** — handles robust text extraction via various libraries.
+- [x] **Password Extractor Plugin** — identifies authentication passwords and secrets.
+- [x] **Router Plugin** — categorizes documents for conditional plugin execution.
+- [x] **PII Harvester Plugin** — extracts PII entities from text.
+- [x] **Deep Summarizer Plugin** — dynamically chunks and summarizes massive documents.
+- [x] **Video Analyzer Plugin** — uniformly samples and describes video content.
+- [x] **Estate Analyzer Plugin** — identifies estate planning documents.
+- [x] **Audio Transcriber Plugin** — extracts transcripts from audio files.
+- [x] **Vision Analyzer Plugin** — provides multimodal descriptions for images.
+- [x] **Summarizer Plugin** — generates short summaries for all documents.
 - [x] **Duplicate Detector Plugin** — use file hashes and/or semantic similarity to surface duplicate or near-duplicate files across the archive.
 - [x] **Language Detector Plugin** — detect the primary language of each document and store it as metadata (useful for multilingual archives).
 - [x] **Spreadsheet Analyzer Plugin** — extract and summarize data from `.xlsx`, `.csv`, and `.ods` files (tables, column headers, key stats).
