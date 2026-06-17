@@ -11,7 +11,7 @@ A robust, local-first AI document analysis pipeline that ingests heterogeneous a
   - `mlx-lm` / `mlx-vlm` (Apple Silicon optimized)
   - `google-genai` (Cloud fallback)
 - **Processing:** `asyncio` Task Engine with bounded concurrency.
-- **Extraction:** `pdfplumber`, `python-docx`, `Tesseract OCR`, `BeautifulSoup4`, `Faster-Whisper`.
+- **Extraction:** `pdfplumber`, `python-docx`, `Tesseract OCR`, `BeautifulSoup4`, `Faster-Whisper`, `Google Cloud Document AI`.
 
 ## 📂 Project Structure
 - `src/scanner.py`: Main CLI entry point for directory ingestion and analysis.
@@ -97,6 +97,8 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 ## ⚙️ Configuration
 Settings are managed in `.env` or via CLI arguments in `scanner.py`.
 - `LLM_PROVIDER`: `mlx` (default), `llama_cpp`, or `gemini`.
+- `USE_DOCUMENT_AI`: Set to `True` to use Google Cloud Document AI for advanced text extraction.
+- `DOC_AI_PROCESSOR_ID`: The processor ID for Google Cloud Document AI.
 - `MAX_CONCURRENT`: Number of files to process in parallel.
 - `VISION_MAX_PIXELS`: Limit image resolution to prevent OOM on local GPU/NPU.
 - `USE_CLOUD_FALLBACK`: Set to `True` to allow Gemini fallback for complex reasoning tasks.
