@@ -26,6 +26,8 @@
 - [x] Upgrade vision model — replace LLaVA 1.5-7B with a more capable multimodal model (Qwen 3 VL).
 
 ## New Plugins
+- [x] **Metadata Extractor Plugin** — extracts simple file system metadata like file size and timestamps.
+- [x] **Document AI Extractor Plugin** — extracts text using Google Cloud Document AI as a cloud-based alternative to local OCR.
 - [x] **Duplicate Detector Plugin** — use file hashes and/or semantic similarity to surface duplicate or near-duplicate files across the archive.
 - [x] **Language Detector Plugin** — detect the primary language of each document and store it as metadata (useful for multilingual archives).
 - [x] **Spreadsheet Analyzer Plugin** — extract and summarize data from `.xlsx`, `.csv`, and `.ods` files (tables, column headers, key stats).

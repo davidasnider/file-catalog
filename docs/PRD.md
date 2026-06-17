@@ -45,7 +45,7 @@ Rebuild the application from the ground up to address robustness, extensibility,
 
 ### 2.4 Dynamic Plugin Registry
 - **Problem:** "Multiple touchpoints" required to add a new analyzer.
-- **Solution:** Implement a dynamic plugin loader.
+- **Solution:** Implement a dynamic plugin loader (supporting diverse examples like `MetadataExtractor`, `DocumentAIExtractor`, or `EstateAnalyzer`).
   - Create an `AnalyzerBase` class.
   - Developers simply create a new file in `src/plugins/` and decorate their class with `@register_analyzer(name=ESTATE_ANALYZER_NAME, depends_on=[TEXT_EXTRACTOR_NAME])`.
   - Analyzer names are centralized as exported constants (e.g., `ESTATE_ANALYZER_NAME` in `src/core/analyzer_names.py`) to maintain consistency across the codebase.

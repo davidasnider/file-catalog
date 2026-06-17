@@ -29,8 +29,8 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 - **Data Parsing & Spreadsheets**: An `EmailParserPlugin` accurately parses `.eml` and `.mbox` files (note: `.mbox` and `.xml` files are ignored by the scanner by default; `.mbox` must be extracted into `.eml` format first to be parsed), while the `SpreadsheetAnalyzerPlugin` extracts and summarizes tabular data from `.xlsx`, `.csv`, and `.ods`.
 
 ### 5. Rich Text & Metadata Extraction
-- **Broad File Support**: Extract metadata and content from PDFs (`pdfplumber`), Word Docs (`python-docx`), HTML web pages (`BeautifulSoup4`), and standard text/code files.
-- **Optical Character Recognition (OCR) & Vision Analysis**: Automatically detects images and extracts text using Tesseract OCR (`pytesseract`). The `OCRConfidenceScorerPlugin` scores the quality of the extraction. Separately, `VisionAnalyzerPlugin` unconditionally runs on all images to utilize a multimodal Vision LLM to describe the visual content, maintaining a clear separation of concerns.
+- **Broad File Support**: Extract metadata and content from PDFs (`pdfplumber`), Word Docs (`python-docx`), HTML web pages (`BeautifulSoup4`), and standard text/code files. The `MetadataExtractorPlugin` is used for explicit file system metadata extraction.
+- **Optical Character Recognition (OCR) & Vision Analysis**: Automatically detects images and extracts text using Tesseract OCR (`pytesseract`) or optionally uses `DocumentAIExtractorPlugin` as an alternative cloud-based extraction method via Google Cloud Document AI. The `OCRConfidenceScorerPlugin` scores the quality of the extraction. Separately, `VisionAnalyzerPlugin` unconditionally runs on all images to utilize a multimodal Vision LLM to describe the visual content, maintaining a clear separation of concerns.
 - **Vision Memory Safeguards**: Implements proactive image resizing (configurable via `VISION_MAX_PIXELS`) to prevent out-of-memory (OOM) crashes during local inference of high-resolution scans.
 
 ### 6. Interactive Visualization & Monitoring
