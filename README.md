@@ -58,6 +58,7 @@ Configuration is centrally managed via `pydantic-settings`.
 - `OPENAI_BASE_URL`: Base URL of the OpenAI-compatible endpoint when using the `openai` provider (default: `http://127.0.0.1:8000/v1`). Point this at your local vLLM, Ollama, or LM Studio server.
 - `OPENAI_API_KEY`: API key sent with each request to the OpenAI-compatible endpoint (default: `sk-no-key-required`). Most local servers accept any non-empty value.
 - `USE_DOCUMENT_AI`: Set to `True` to enable Google Cloud Document AI for text extraction in PDFs and Images.
+- `GOOGLE_CLOUD_PROJECT`: The Google Cloud Project ID (required for Document AI and Gemini cloud fallback).
 - `DOC_AI_PROCESSOR_ID`: The processor ID for Google Cloud Document AI (must be set as an environment variable).
 - `DOCUMENT_AI_LOCATION`: The location of the Google Cloud Document AI processor (default: `us`).
 - `LLM_MODEL_PATH` / `VISION_MODEL_PATH`: When using the `openai` provider these values are passed as the model name in the API request (e.g. `qwen3`, `llava`). For `llama_cpp` they are treated as file-system paths to GGUF weights; for `mlx` they are HuggingFace model identifiers.
