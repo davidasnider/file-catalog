@@ -47,7 +47,7 @@ Rebuild the application from the ground up to address robustness, extensibility,
 - **Problem:** "Multiple touchpoints" required to add a new analyzer.
 - **Solution:** Implement a dynamic plugin loader.
   - Create an `AnalyzerBase` class.
-  - Developers simply create a new file in `src/plugins/` and decorate their class with `@register_analyzer(name=ESTATE_ANALYZER_NAME, depends_on=[TEXT_EXTRACTOR_NAME])`.
+  - Developers simply create a new file in `src/plugins/` and decorate their class with `@register_analyzer(name=ESTATE_ANALYZER_NAME, depends_on=[TEXT_EXTRACTOR_NAME])`. (e.g. `DocumentAIExtractor` conditionally replaces local extraction if `config.use_document_ai` is set).
   - Analyzer names are centralized as exported constants (e.g., `ESTATE_ANALYZER_NAME` in `src/core/analyzer_names.py`) to maintain consistency across the codebase.
   - The registry supports diverse tools including `MetadataExtractorPlugin` for basic metadata and `DocumentAIExtractorPlugin` for optional Google Cloud Document AI extraction.
   - The core engine and the UI automatically discover, run, and render these plugins without any core code changes.
@@ -84,5 +84,5 @@ Rebuild the application from the ground up to address robustness, extensibility,
 - **Implementation:** A suite of scripts in `src/scripts/` handles:
   1. **Archive/Mailbox Extraction:** Converting `.zip` and `.mbox` files into ingestible formats.
   2. **Deduplication:** A standalone `Duplicate Remover` to clean the filesystem before or after ingestion.
-  3. **Index Management:** Tools for manually syncing the FTS5 index and purging noise records (e.g., XML).
-  4. **Diagnostic Tools:** Performance benchmarking and evaluation of AI-generated summaries.
+  3. **Index Management:** Tools for manually syncing the FTS5 index and purging noise records (e.g., XML) (`sync_fts.py`, `remove_xml_records.py`).
+  4. **Diagnostic Tools:** Performance benchmarking, evaluation of AI-generated summaries, pipeline failure reporting, text extraction failure scanning, and file inspection (`perf_test_llms.py`, `evaluate_summaries.py`, `report_failures.py`, `scan_text_failures.py`, `inspect_file.py`).

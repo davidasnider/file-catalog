@@ -128,10 +128,14 @@ async def sync_document_to_fts(session: AsyncSession, document_id: int):
                 content_parts.append(description)
 
         elif task_name == EMAIL_PARSER_NAME or normalized_task_name == "email_parser":
-            if subject := data.get("subject"):
-                content_parts.append(f"Subject: {subject}")
-            if text_content := data.get("text_body"):
-                content_parts.append(text_content)
+            for e in data.get("emails", []):
+                email_parts = []
+                if subject := e.get("subject"):
+                    email_parts.append(f"Subject: {subject}")
+                if body_text := e.get("body_text"):
+                    email_parts.append(body_text)
+                if email_parts:
+                    content_parts.append("\n".join(email_parts))
 
         elif (
             task_name == SPREADSHEET_ANALYZER_NAME

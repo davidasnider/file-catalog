@@ -360,3 +360,52 @@ class TestProcessDirectory:
 
         # File should be untouched
         assert txt_file.exists()
+
+
+def test_main_with_yes(tmp_path, mocker):
+    from src.scripts.extract_and_cleanup_mbox import main
+
+    # Create a mailbox file
+    mbox_path = tmp_path / "test.mbox"
+    mbox = mailbox.mbox(str(mbox_path))
+    msg = mailbox.mboxMessage()
+    msg["Subject"] = "Test"
+    msg["From"] = "test@example.com"
+    msg.set_payload("Body")
+    mbox.add(msg)
+    mbox.close()
+
+    # Mock sys.argv
+    mocker.patch("sys.argv", ["extract_and_cleanup_mbox.py", str(tmp_path), "--yes"])
+
+    # Mock input to raise an error if it's called
+    mocker.patch("builtins.input", side_effect=AssertionError("input() was called!"))
+
+    main()
+
+    # Original should be deleted since keep defaults to False
+    assert not mbox_path.exists()
+    # Extracted directory should exist
+    extracted = tmp_path / "test_extracted"
+    assert extracted.exists()
+
+
+def test_main_no_yes_cancel(tmp_path, mocker):
+    from src.scripts.extract_and_cleanup_mbox import main
+
+    mbox_path = tmp_path / "test.mbox"
+    mbox = mailbox.mbox(str(mbox_path))
+    msg = mailbox.mboxMessage()
+    msg["Subject"] = "Test"
+    msg["From"] = "test@example.com"
+    msg.set_payload("Body")
+    mbox.add(msg)
+    mbox.close()
+
+    mocker.patch("sys.argv", ["extract_and_cleanup_mbox.py", str(tmp_path)])
+    mocker.patch("builtins.input", return_value="n")
+
+    main()
+
+    # Since they cancelled, the mailbox file should still exist
+    assert mbox_path.exists()
