@@ -11,7 +11,7 @@ A robust, local-first AI document analysis pipeline that ingests heterogeneous a
   - `mlx-lm` / `mlx-vlm` (Apple Silicon optimized)
   - `google-genai` (Cloud fallback)
 - **Processing:** `asyncio` Task Engine with bounded concurrency.
-- **Extraction:** `pdfplumber`, `python-docx`, `Tesseract OCR`, `BeautifulSoup4`, `Faster-Whisper`.
+- **Extraction:** `pdfplumber`, `python-docx`, `Tesseract OCR`, `BeautifulSoup4`, `Faster-Whisper`, `Google Cloud Document AI`.
 
 ## 📂 Project Structure
 - `src/scanner.py`: Main CLI entry point for directory ingestion and analysis.
@@ -20,7 +20,7 @@ A robust, local-first AI document analysis pipeline that ingests heterogeneous a
   - `task_engine.py`: Orchestrates document processing and plugin execution.
   - `plugin_registry.py`: Dynamically loads analysis plugins from `src/plugins/`.
   - `config.py`: Global settings using `pydantic-settings`.
-- `src/plugins/`: Modular analysis units (e.g., `TextExtractor`, `Summarizer`, `EstateAnalyzer`, `PIIHarvester`).
+- `src/plugins/`: Modular analysis units (e.g., `TextExtractor`, `DocumentAIExtractor`, `Summarizer`, `EstateAnalyzer`, `PIIHarvester`).
 - `src/db/`: Database models (`models.py`), engine setup (`engine.py`), and FTS5 search (`fts.py`).
 - `src/llm/`: Provider abstractions (`provider.py`, `llama_cpp.py`, `mlx_provider.py`, `gemini.py`).
 - `src/scripts/`: Utility scripts for archive extraction, mailbox processing, and FTS synchronization.
@@ -71,6 +71,18 @@ python -m src.scripts.evaluate_summaries --samples 10
 
 # Run standalone LLM-as-a-Judge mode on completed tasks
 python src/scanner.py --judge
+
+# Inspect a file's metadata and analysis results
+python -m src.scripts.inspect_file "/path/to/document.pdf"
+
+# Remove XML-related documents and tasks
+python -m src.scripts.remove_xml_records
+
+# Report pipeline failures
+python -m src.scripts.report_failures
+
+# Scan a directory for text extraction failures
+python -m src.scripts.scan_text_failures "/path/to/directory"
 ```
 
 ## 📝 Development Conventions
@@ -85,6 +97,8 @@ python src/scanner.py --judge
 ## ⚙️ Configuration
 Settings are managed in `.env` or via CLI arguments in `scanner.py`.
 - `LLM_PROVIDER`: `mlx` (default), `llama_cpp`, or `gemini`.
+- `USE_DOCUMENT_AI`: Set to `True` to use Google Cloud Document AI for advanced text extraction.
+- `DOC_AI_PROCESSOR_ID`: The processor ID for Google Cloud Document AI.
 - `MAX_CONCURRENT`: Number of files to process in parallel.
 - `VISION_MAX_PIXELS`: Limit image resolution to prevent OOM on local GPU/NPU.
 - `USE_CLOUD_FALLBACK`: Set to `True` to allow Gemini fallback for complex reasoning tasks.
