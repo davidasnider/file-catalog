@@ -71,6 +71,18 @@ python -m src.scripts.evaluate_summaries --samples 10
 
 # Run standalone LLM-as-a-Judge mode on completed tasks
 python src/scanner.py --judge
+
+# Inspect a file's metadata and analysis results
+python -m src.scripts.inspect_file "/path/to/document.pdf"
+
+# Remove XML-related documents and tasks
+python -m src.scripts.remove_xml_records
+
+# Report pipeline failures
+python -m src.scripts.report_failures
+
+# Scan a directory for text extraction failures
+python -m src.scripts.scan_text_failures "/path/to/directory"
 ```
 
 ## 📝 Development Conventions
