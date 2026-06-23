@@ -62,14 +62,21 @@ class TextExtractorPlugin(AnalyzerBase):
 
         try:
             if mime_type == "text/plain":
-                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                    extracted_text = f.read()
+
+                def _read_text():
+                    with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                        return f.read()
+
+                extracted_text = await asyncio.to_thread(_read_text)
             elif mime_type == "text/html":
                 from bs4 import BeautifulSoup
 
-                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                    soup = BeautifulSoup(f, "html.parser")
-                    extracted_text = soup.get_text(separator="\n", strip=True)
+                def _read_html():
+                    with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                        soup = BeautifulSoup(f, "html.parser")
+                        return soup.get_text(separator="\n", strip=True)
+
+                extracted_text = await asyncio.to_thread(_read_html)
             elif mime_type == "application/pdf":
                 with pdfplumber.open(file_path) as pdf:
                     pages_text = []
@@ -102,8 +109,11 @@ class TextExtractorPlugin(AnalyzerBase):
             elif mime_type == "text/rtf":
                 from striprtf.striprtf import rtf_to_text
 
-                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                    extracted_text = rtf_to_text(f.read())
+                def _read_rtf():
+                    with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                        return rtf_to_text(f.read())
+
+                extracted_text = await asyncio.to_thread(_read_rtf)
             elif mime_type == "application/mbox":
                 import contextlib
                 from src.core.mbox_utils import RobustMbox
@@ -144,8 +154,11 @@ class TextExtractorPlugin(AnalyzerBase):
             elif mime_type == "chemical/x-cdx":
                 import re
 
-                with open(file_path, "rb") as f:
-                    content = f.read()
+                def _read_cdx():
+                    with open(file_path, "rb") as f:
+                        return f.read()
+
+                content = await asyncio.to_thread(_read_cdx)
                 # Extract printable strings as a fallback for binary CDX files (ASCII range)
                 strings = re.findall(b"[\x20-\x7e]{4,}", content)
                 extracted_text = "\n".join(
@@ -254,23 +267,29 @@ class TextExtractorPlugin(AnalyzerBase):
                 from email import policy
 
                 try:
-                    with open(file_path, "rb") as f:
-                        msg = email.message_from_binary_file(f, policy=policy.default)
-                        subject = msg.get("subject", "")
-                        from_addr = msg.get("from", "")
-                        to_addr = msg.get("to", "")
-                        date = msg.get("date", "")
 
-                        body = ""
-                        if msg.is_multipart():
-                            for part in msg.walk():
-                                if part.get_content_type() == "text/plain":
-                                    body = part.get_content()
-                                    break
-                        else:
-                            body = msg.get_content()
+                    def _read_rfc822():
+                        with open(file_path, "rb") as f:
+                            return email.message_from_binary_file(
+                                f, policy=policy.default
+                            )
 
-                        extracted_text = f"Subject: {subject}\nFrom: {from_addr}\nTo: {to_addr}\nDate: {date}\n\n{body}"
+                    msg = await asyncio.to_thread(_read_rfc822)
+                    subject = msg.get("subject", "")
+                    from_addr = msg.get("from", "")
+                    to_addr = msg.get("to", "")
+                    date = msg.get("date", "")
+
+                    body = ""
+                    if msg.is_multipart():
+                        for part in msg.walk():
+                            if part.get_content_type() == "text/plain":
+                                body = part.get_content()
+                                break
+                    else:
+                        body = msg.get_content()
+
+                    extracted_text = f"Subject: {subject}\nFrom: {from_addr}\nTo: {to_addr}\nDate: {date}\n\n{body}"
                 except Exception as e:
                     logger.error(f"Email parsing failed for {file_path}: {e}")
                     extracted_text = ""
@@ -280,8 +299,11 @@ class TextExtractorPlugin(AnalyzerBase):
                 try:
                     # Legacy WordPerfect files are complex; without wpd2text,
                     # we perform a robust string extraction as a fallback.
-                    with open(file_path, "rb") as f:
-                        content = f.read()
+                    def _read_wp():
+                        with open(file_path, "rb") as f:
+                            return f.read()
+
+                    content = await asyncio.to_thread(_read_wp)
                     # Extract printable sequences of 4+ characters
                     strings = re.findall(b"[\x20-\x7e]{4,}", content)
                     extracted_text = "\n".join(
