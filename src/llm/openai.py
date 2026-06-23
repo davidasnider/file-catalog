@@ -15,6 +15,7 @@ class OpenAIProvider(LLMProvider):
     """
     LLM Provider using OpenAI compatible endpoint.
     """
+
     _cache: dict[str, "OpenAIProvider"] = {}
 
     @classmethod

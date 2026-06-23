@@ -20,6 +20,7 @@ class GeminiProvider(LLMProvider):
     """
     LLM Provider using Google Cloud Vertex AI (Gemini Models).
     """
+
     _cache: dict[bool, "GeminiProvider"] = {}
 
     @classmethod
