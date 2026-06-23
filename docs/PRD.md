@@ -56,7 +56,7 @@ Rebuild the application from the ground up to address robustness, extensibility,
 ### 2.5 LLM Abstraction Layer
 - **Problem:** Hardcoded Ollama dependencies limit performance tuning and cloud fallback capabilities.
 - **Solution:** Defined an `LLMProvider` interface.
-  - Implemented multiple adapters: `MLXProvider`, `LlamaCppProvider`, Cloud Providers (`GeminiProvider`), and `OpenAIProvider` for OpenAI-compatible endpoints.
+  - Implemented multiple adapters: `MLXProvider`, `LlamaCppProvider`, Cloud Providers (`GeminiProvider`), and `OpenAIProvider` for OpenAI-compatible endpoints. API-based LLM providers (e.g., `OpenAIProvider`, `GeminiProvider`) implement connection caching via a class-level `_cache` dict and a `get_provider()` class method, ensuring underlying HTTP clients are reused across file processing tasks.
   - This allows falling back to robust cloud models for heavy reasoning while keeping local options for privacy. We also support enabling advanced reasoning models (like OpenAI o1/o3 or local equivalents) via the `enable_thinking` flag for high-complexity analytical plugins.
 
 ---
