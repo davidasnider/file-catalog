@@ -30,7 +30,7 @@ def get_llm_provider(is_vision: bool = False, **kwargs) -> LLMProvider | str:
             # We lazy import to avoid unnecessary dependencies if not used
             from src.llm.gemini import GeminiProvider
 
-            return GeminiProvider.get_provider(is_vision=is_vision)
+            return GeminiProvider(is_vision=is_vision)
         except ImportError as e:
             logger.error(f"Failed to import GeminiProvider for fallback: {e}")
             return "MISSING_LIBRARY"
@@ -52,7 +52,7 @@ def _instantiate_provider(
         try:
             from src.llm.gemini import GeminiProvider
 
-            return GeminiProvider.get_provider(**kwargs)
+            return GeminiProvider(**kwargs)
         except ImportError:
             return "MISSING_LIBRARY"
         except Exception as e:
@@ -72,7 +72,7 @@ def _instantiate_provider(
         try:
             from src.llm.openai import OpenAIProvider
 
-            return OpenAIProvider.get_provider(model_name=model_path, **kwargs)
+            return OpenAIProvider(model_name=model_path, **kwargs)
         except ImportError:
             return "MISSING_LIBRARY"
         except Exception as e:

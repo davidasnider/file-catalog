@@ -28,11 +28,7 @@ Rebuild the application from the ground up to address robustness, extensibility,
 - **Problem:** The current JSON manifest easily gets corrupted or out-of-sync during multithreaded operations.
 - **Solution:** Use **SQLite** via `SQLModel` (or `SQLAlchemy`).
 - **Schema Design:**
-  - `Document`: Tracks path, robustly detected MIME type, file hash (to detect content changes), and overall status (`PENDING`, `EXTRACTING`, `ANALYZING`, `COMPLETED`, `FAILED`, `NOT_PRESENT`). The `NOT_PRESENT` status is a core state used to synchronize the database with the filesystem.
-    It is used to mark files that were previously cataloged but are now deleted or missing from their original location on disk.
-    When the system runs an incremental scan and detects that a file is missing, its `status` is set to `NOT_PRESENT` (bypassing the standard processing pipeline).
-    Crucially, when a document transitions to this state, it is automatically purged from the Full-Text Search (FTS) index,
-    ensuring that search results remain accurate and do not surface stale data for files that no longer exist.
+  - `Document`: Tracks path, robustly detected MIME type, file hash (to detect content changes), and overall status (`PENDING`, `EXTRACTING`, `ANALYZING`, `COMPLETED`, `FAILED`, `NOT_PRESENT`). The `NOT_PRESENT` status is used to mark files that have been deleted or moved from their original location; when a document enters this state, it is automatically removed from the Full-Text Search (FTS) index to ensure search results remain accurate and synchronized with the current filesystem state.
   - `AnalysisTask`: Each document has multiple linked tasks (e.g., OCR, Text Splitting, Summarization, Estate Analysis). Each task has its own status (`PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `RETRIES`). It also includes a `judged_at` timestamp which is used to prioritize unjudged and older tasks during background evaluation by the `TaskJudge`.
 
 ### 2.2 Advanced File Type Detection

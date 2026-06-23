@@ -16,22 +16,6 @@ class OpenAIProvider(LLMProvider):
     LLM Provider using OpenAI compatible endpoint.
     """
 
-    _cache = {}
-
-    @classmethod
-    def get_provider(cls, model_name: str, **kwargs) -> "OpenAIProvider":
-        if model_name in cls._cache:
-            return cls._cache[model_name]
-
-        provider = cls(model_name=model_name, **kwargs)
-        cls._cache[model_name] = provider
-        return provider
-
-    @classmethod
-    def clear_cache(cls):
-        """Clear the process-global model cache."""
-        cls._cache.clear()
-
     def __init__(self, model_name: str, **kwargs):
         self.model_name = model_name
         self.client = AsyncOpenAI(
