@@ -15,6 +15,13 @@ class OpenAIProvider(LLMProvider):
     """
     LLM Provider using OpenAI compatible endpoint.
     """
+    _cache: dict[str, "OpenAIProvider"] = {}
+
+    @classmethod
+    def get_provider(cls, model_name: str, **kwargs) -> "OpenAIProvider":
+        if model_name not in cls._cache:
+            cls._cache[model_name] = cls(model_name, **kwargs)
+        return cls._cache[model_name]
 
     def __init__(self, model_name: str, **kwargs):
         self.model_name = model_name
