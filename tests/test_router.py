@@ -79,6 +79,7 @@ async def test_router_llm_fallback_malformed(monkeypatch):
     assert res["category"] == "GenericText"
     assert res["method"] == "error_fallback"
 
+
 def test_apply_heuristics_edge_cases():
     router = RouterPlugin()
 
@@ -88,15 +89,20 @@ def test_apply_heuristics_edge_cases():
 
     # Test empty mime_type or None (unexpected inputs)
     assert router._apply_heuristics("", "/some/file.txt") is None
-    assert router._apply_heuristics(None, "/some/file.txt") is None
+    assert router._apply_heuristics(None, "/some/file.txt") is None  # type: ignore
     assert router._apply_heuristics("", "/some/file.py") == "Code"
-    assert router._apply_heuristics(None, "/some/file.py") == "Code"
+    assert router._apply_heuristics(None, "/some/file.py") == "Code"  # type: ignore
 
     # Test unknown mime type with known extension
-    assert router._apply_heuristics("application/octet-stream", "/some/file.py") == "Code"
+    assert (
+        router._apply_heuristics("application/octet-stream", "/some/file.py") == "Code"
+    )
 
     # Test unknown mime type with unknown extension
-    assert router._apply_heuristics("application/octet-stream", "/some/file.unknown") is None
+    assert (
+        router._apply_heuristics("application/octet-stream", "/some/file.unknown")
+        is None
+    )
 
     # Test code mime types and prefix
     assert router._apply_heuristics("text/x-c", "/some/file.c") == "Code"
