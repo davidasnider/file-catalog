@@ -28,7 +28,7 @@ Rebuild the application from the ground up to address robustness, extensibility,
 - **Problem:** The current JSON manifest easily gets corrupted or out-of-sync during multithreaded operations.
 - **Solution:** Use **SQLite** via `SQLModel` (or `SQLAlchemy`).
 - **Schema Design:**
-  - `Document`: Tracks path, robustly detected MIME type, file hash (to detect content changes), and overall status (`PENDING`, `EXTRACTING`, `ANALYZING`, `COMPLETED`, `FAILED`, `NOT_PRESENT`). The `NOT_PRESENT` status is used to mark files that have been deleted or moved from their original location; when a document enters this state, it is automatically removed from the Full-Text Search (FTS) index to ensure search results remain accurate and synchronized with the current filesystem state.
+  - `Document`: Tracks path, robustly detected MIME type, file hash (to detect content changes), and overall status (`PENDING`, `EXTRACTING`, `ANALYZING`, `COMPLETED`, `FAILED`, `NOT_PRESENT`). The `NOT_PRESENT` status is used to mark files that have been deleted or moved from their original location; when a document enters this state, it is automatically removed from the Full-Text Search (FTS) index to ensure search results remain accurate and synchronized with the current filesystem state. The FTS search implementation safely escapes input to prevent SQL injection vulnerabilities.
   - `AnalysisTask`: Each document has multiple linked tasks (e.g., OCR, Text Splitting, Summarization, Estate Analysis). Each task has its own status (`PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `RETRIES`). It also includes a `judged_at` timestamp which is used to prioritize unjudged and older tasks during background evaluation by the `TaskJudge`.
 
 ### 2.2 Advanced File Type Detection
