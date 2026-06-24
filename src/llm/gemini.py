@@ -21,13 +21,23 @@ class GeminiProvider(LLMProvider):
     LLM Provider using Google Cloud Vertex AI (Gemini Models).
     """
 
-    _cache: dict[bool, "GeminiProvider"] = {}
+    _cache: dict[tuple[bool, str], "GeminiProvider"] = {}
+
+    @classmethod
+    def _get_kwargs_hash(cls, kwargs: dict) -> str:
+        import hashlib
+        import json
+
+        if not kwargs:
+            return "default"
+        return hashlib.sha256(json.dumps(kwargs, sort_keys=True).encode()).hexdigest()
 
     @classmethod
     def get_provider(cls, is_vision: bool = False, **kwargs) -> "GeminiProvider":
-        if is_vision not in cls._cache:
-            cls._cache[is_vision] = cls(is_vision, **kwargs)
-        return cls._cache[is_vision]
+        key = (is_vision, cls._get_kwargs_hash(kwargs))
+        if key not in cls._cache:
+            cls._cache[key] = cls(is_vision, **kwargs)
+        return cls._cache[key]
 
     @classmethod
     def clear_cache(cls) -> None:

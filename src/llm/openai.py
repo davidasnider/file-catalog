@@ -16,13 +16,23 @@ class OpenAIProvider(LLMProvider):
     LLM Provider using OpenAI compatible endpoint.
     """
 
-    _cache: dict[str, "OpenAIProvider"] = {}
+    _cache: dict[tuple[str, str], "OpenAIProvider"] = {}
+
+    @classmethod
+    def _get_kwargs_hash(cls, kwargs: dict) -> str:
+        import hashlib
+        import json
+
+        if not kwargs:
+            return "default"
+        return hashlib.sha256(json.dumps(kwargs, sort_keys=True).encode()).hexdigest()
 
     @classmethod
     def get_provider(cls, model_name: str, **kwargs) -> "OpenAIProvider":
-        if model_name not in cls._cache:
-            cls._cache[model_name] = cls(model_name, **kwargs)
-        return cls._cache[model_name]
+        key = (model_name, cls._get_kwargs_hash(kwargs))
+        if key not in cls._cache:
+            cls._cache[key] = cls(model_name, **kwargs)
+        return cls._cache[key]
 
     @classmethod
     def clear_cache(cls) -> None:
