@@ -1,10 +1,10 @@
 import re
 import asyncio
-from typing import Dict, Any
 
 # Mock the variables
 file_path = "dummy.cdx"
 logger = type("Logger", (object,), {"info": lambda self, x: print(x)})()
+
 
 # The proposed fix from the finding:
 async def extract_cdx():
@@ -13,12 +13,11 @@ async def extract_cdx():
             content = f.read()
         # Extract printable strings as a fallback for binary CDX files (ASCII range)
         strings = re.findall(b"[\x20-\x7e]{4,}", content)
-        return "\n".join(
-            [s.decode("ascii", errors="ignore") for s in strings]
-        )
+        return "\n".join([s.decode("ascii", errors="ignore") for s in strings])
 
     extracted_text = await asyncio.to_thread(_read_cdx)
     return extracted_text
+
 
 # The proposed fix from the finding:
 async def extract_wp():
@@ -35,5 +34,6 @@ async def extract_wp():
     extracted_text, num_strings = await asyncio.to_thread(_read_wp)
     print(f"Extracted {num_strings} strings from WordPerfect file")
     return extracted_text
+
 
 print("Code is valid.")

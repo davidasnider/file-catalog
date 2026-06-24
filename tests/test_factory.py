@@ -18,11 +18,18 @@ def mock_config():
 
 
 @pytest.fixture(autouse=True)
-def clear_mlx_cache():
-    """Clear MLX cache before each test to ensure predictable behavior."""
+def clear_provider_caches():
+    """Clear all provider caches before and after each test to ensure test isolation."""
+    from src.llm.openai import OpenAIProvider
+    from src.llm.gemini import GeminiProvider
+
     MLXModelManager.clear_cache()
+    OpenAIProvider.clear_cache()
+    GeminiProvider.clear_cache()
     yield
     MLXModelManager.clear_cache()
+    OpenAIProvider.clear_cache()
+    GeminiProvider.clear_cache()
 
 
 def test_get_llm_provider_mlx(mock_config):
@@ -34,14 +41,14 @@ def test_get_llm_provider_mlx(mock_config):
 
 def test_get_llm_provider_gemini(mock_config):
     config.llm_provider = "gemini"
-    with patch("src.llm.gemini.GeminiProvider") as mock_gemini:
+    with patch("src.llm.gemini.GeminiProvider.get_provider") as mock_gemini:
         get_llm_provider(is_vision=False)
         mock_gemini.assert_called_once()
 
 
 def test_get_llm_provider_openai(mock_config):
     config.llm_provider = "openai"
-    with patch("src.llm.openai.OpenAIProvider") as mock_openai:
+    with patch("src.llm.openai.OpenAIProvider.get_provider") as mock_openai:
         get_llm_provider(is_vision=False)
         mock_openai.assert_called_once()
 
@@ -55,7 +62,7 @@ def test_get_llm_provider_fallback(mock_config):
         "src.llm.mlx_provider.MLXModelManager.get_provider",
         side_effect=Exception("MLX fail"),
     ):
-        with patch("src.llm.gemini.GeminiProvider") as mock_gemini:
+        with patch("src.llm.gemini.GeminiProvider.get_provider") as mock_gemini:
             get_llm_provider(is_vision=False)
             # Should fall back to Gemini
             mock_gemini.assert_called_once()
@@ -70,7 +77,7 @@ def test_get_llm_provider_no_fallback(mock_config):
         "src.llm.mlx_provider.MLXModelManager.get_provider",
         side_effect=Exception("MLX fail"),
     ):
-        with patch("src.llm.gemini.GeminiProvider") as mock_gemini:
+        with patch("src.llm.gemini.GeminiProvider.get_provider") as mock_gemini:
             result = get_llm_provider(is_vision=False)
             # Should NOT fall back to Gemini
             mock_gemini.assert_not_called()

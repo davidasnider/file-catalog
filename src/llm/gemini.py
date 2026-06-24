@@ -21,7 +21,30 @@ class GeminiProvider(LLMProvider):
     LLM Provider using Google Cloud Vertex AI (Gemini Models).
     """
 
-    def __init__(self, is_vision: bool = False):
+    _cache: dict[tuple[bool, str], "GeminiProvider"] = {}
+
+    @classmethod
+    def _get_kwargs_hash(cls, kwargs: dict) -> str:
+        import hashlib
+        import json
+
+        if not kwargs:
+            return "default"
+        return hashlib.sha256(json.dumps(kwargs, sort_keys=True).encode()).hexdigest()
+
+    @classmethod
+    def get_provider(cls, is_vision: bool = False, **kwargs) -> "GeminiProvider":
+        key = (is_vision, cls._get_kwargs_hash(kwargs))
+        if key not in cls._cache:
+            cls._cache[key] = cls(is_vision, **kwargs)
+        return cls._cache[key]
+
+    @classmethod
+    def clear_cache(cls) -> None:
+        """Clear the cached provider instances."""
+        cls._cache.clear()
+
+    def __init__(self, is_vision: bool = False, **kwargs):
         if not HAS_VERTEX:
             raise ImportError(
                 "google-genai is not installed. "
