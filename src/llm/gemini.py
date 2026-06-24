@@ -29,6 +29,11 @@ class GeminiProvider(LLMProvider):
             cls._cache[is_vision] = cls(is_vision, **kwargs)
         return cls._cache[is_vision]
 
+    @classmethod
+    def clear_cache(cls) -> None:
+        """Clear the cached provider instances."""
+        cls._cache.clear()
+
     def __init__(self, is_vision: bool = False, **kwargs):
         if not HAS_VERTEX:
             raise ImportError(

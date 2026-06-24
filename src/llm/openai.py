@@ -24,6 +24,11 @@ class OpenAIProvider(LLMProvider):
             cls._cache[model_name] = cls(model_name, **kwargs)
         return cls._cache[model_name]
 
+    @classmethod
+    def clear_cache(cls) -> None:
+        """Clear the cached provider instances."""
+        cls._cache.clear()
+
     def __init__(self, model_name: str, **kwargs):
         self.model_name = model_name
         self.client = AsyncOpenAI(

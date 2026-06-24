@@ -18,11 +18,18 @@ def mock_config():
 
 
 @pytest.fixture(autouse=True)
-def clear_mlx_cache():
-    """Clear MLX cache before each test to ensure predictable behavior."""
+def clear_provider_caches():
+    """Clear all provider caches before and after each test to ensure test isolation."""
+    from src.llm.openai import OpenAIProvider
+    from src.llm.gemini import GeminiProvider
+
     MLXModelManager.clear_cache()
+    OpenAIProvider.clear_cache()
+    GeminiProvider.clear_cache()
     yield
     MLXModelManager.clear_cache()
+    OpenAIProvider.clear_cache()
+    GeminiProvider.clear_cache()
 
 
 def test_get_llm_provider_mlx(mock_config):
