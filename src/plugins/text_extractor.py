@@ -138,7 +138,9 @@ class TextExtractorPlugin(AnalyzerBase):
                                     if part.get_content_type() == "text/plain":
                                         payload = part.get_payload(decode=True)
                                         if payload:
-                                            charset = part.get_content_charset() or "utf-8"
+                                            charset = (
+                                                part.get_content_charset() or "utf-8"
+                                            )
                                             try:
                                                 text = payload.decode(
                                                     charset, errors="replace"
@@ -277,7 +279,9 @@ class TextExtractorPlugin(AnalyzerBase):
                                             except TypeError:
                                                 return str(plaintext)
                                     else:
-                                        logger.warning(f"No metadata found for {file_path}")
+                                        logger.warning(
+                                            f"No metadata found for {file_path}"
+                                        )
                                         return ""
                             else:
                                 logger.warning(f"Hachoir could not parse {file_path}")
