@@ -17,5 +17,3 @@ scratch_response.json
 threads_debug.json
 *.json
 .hermes/
-large_text.txt
-*.log

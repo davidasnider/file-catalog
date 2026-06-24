@@ -71,7 +71,12 @@ def fetch_documents(selected_statuses: list[str], search_query: str):
                 return []
             stmt = stmt.where(Document.status.in_(selected_statuses))
             if search_query:
-                stmt = stmt.where(Document.path.contains(search_query, autoescape=True))
+                escaped_query = (
+                    search_query.replace("\\", "\\\\")
+                    .replace("%", "\\%")
+                    .replace("_", "\\_")
+                )
+                stmt = stmt.where(Document.path.like(f"%{escaped_query}%", escape="\\"))
 
             stmt = stmt.order_by(Document.id.desc())
             res = await session.execute(stmt)

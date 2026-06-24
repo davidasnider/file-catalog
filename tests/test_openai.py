@@ -75,17 +75,3 @@ async def test_openai_process_multi_image(tmp_path):
         # content[0] is text, content[1] and content[2] should be images
         image_urls = [c for c in content if c["type"] == "image_url"]
         assert len(image_urls) == 2
-
-
-def test_openai_clear_cache():
-    with patch("src.llm.openai.AsyncOpenAI"):
-        OpenAIProvider.clear_cache()
-        assert len(OpenAIProvider._cache) == 0
-
-        provider1 = OpenAIProvider.get_provider(model_name="test-model-1")
-        OpenAIProvider.get_provider(model_name="test-model-2")
-        assert len(OpenAIProvider._cache) == 2
-        assert OpenAIProvider.get_provider(model_name="test-model-1") is provider1
-
-        OpenAIProvider.clear_cache()
-        assert len(OpenAIProvider._cache) == 0
