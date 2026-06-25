@@ -42,6 +42,7 @@ Rebuild the application from the ground up to address robustness, extensibility,
   2. Immediate exception bubbling and capture.
   3. Clean shutdown behavior via cancellation.
   4. Robust resuming of interrupted scans through priority-based queue hydration (prioritizing unprocessed files first, then failed files, then partially processed/retrying files).
+  5. Optimal performance by offloading blocking file I/O operations to separate threads via `asyncio.to_thread`.
 
 ### 2.4 Dynamic Plugin Registry
 - **Problem:** "Multiple touchpoints" required to add a new analyzer.
