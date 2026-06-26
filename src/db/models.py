@@ -11,7 +11,15 @@ class DocumentStatus(str, Enum):
     ANALYZING = "ANALYZING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
-    NOT_PRESENT = "NOT_PRESENT"  # Core status used for filesystem synchronization
+    NOT_PRESENT = "NOT_PRESENT"
+    # Core status used for filesystem synchronization. It is used to mark files
+    # that were previously cataloged but are now deleted or missing from their
+    # original location on disk. When the system runs an incremental scan and
+    # detects that a file is missing, its status is set to NOT_PRESENT (bypassing
+    # the standard processing pipeline). Crucially, when a document transitions
+    # to this state, it is automatically purged from the Full-Text Search (FTS)
+    # index, ensuring that search results remain accurate and do not surface stale
+    # data for files that no longer exist.
 
 
 class TaskStatus(str, Enum):
