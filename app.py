@@ -115,10 +115,10 @@ def fetch_all_tasks_for_documents(doc_ids: list[int]):
             res = await session.execute(stmt)
             tasks = res.scalars().all()
 
-        task_dict = {doc_id: [] for doc_id in doc_ids}
-        for t in tasks:
-            task_dict[t.document_id].append(t)
-        return task_dict
+            task_dict = {doc_id: [] for doc_id in doc_ids}
+            for t in tasks:
+                task_dict[t.document_id].append(t)
+            return task_dict
 
     if not doc_ids:
         return {}
