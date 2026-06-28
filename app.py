@@ -99,9 +99,19 @@ def fetch_all_tasks_for_documents(doc_ids: list[int]):
 
     async def _fetch():
         from sqlalchemy import text
+        import json
+
         async with async_session_maker() as session:
-            doc_ids_str = ",".join(map(str, doc_ids))
-            stmt = select(AnalysisTask).where(text(f"document_id IN ({doc_ids_str})"))
+            doc_ids_json = json.dumps(doc_ids)
+            stmt = (
+                select(AnalysisTask)
+                .where(
+                    AnalysisTask.document_id.in_(
+                        select(text("value")).select_from(text("json_each(:doc_ids)"))
+                    )
+                )
+                .params(doc_ids=doc_ids_json)
+            )
             res = await session.execute(stmt)
             tasks = res.scalars().all()
 
