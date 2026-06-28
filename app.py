@@ -101,10 +101,14 @@ def fetch_all_tasks_for_documents(doc_ids: list[int]):
         async with async_session_maker() as session:
             tasks = []
             chunk_size = 900
+            coroutines = []
             for i in range(0, len(doc_ids), chunk_size):
                 chunk = doc_ids[i : i + chunk_size]
                 stmt = select(AnalysisTask).where(AnalysisTask.document_id.in_(chunk))
-                res = await session.execute(stmt)
+                coroutines.append(session.execute(stmt))
+
+            results = await asyncio.gather(*coroutines)
+            for res in results:
                 tasks.extend(res.scalars().all())
 
             task_dict = {doc_id: [] for doc_id in doc_ids}
