@@ -98,23 +98,17 @@ def fetch_all_tasks_for_documents(doc_ids: list[int]):
     """Fetch all tasks for a list of documents in a single query, chunked to prevent SQLite parameter limits."""
 
     async def _fetch():
+        from sqlalchemy import text
         async with async_session_maker() as session:
-            tasks = []
-            chunk_size = 900
-            coroutines = []
-            for i in range(0, len(doc_ids), chunk_size):
-                chunk = doc_ids[i : i + chunk_size]
-                stmt = select(AnalysisTask).where(AnalysisTask.document_id.in_(chunk))
-                coroutines.append(session.execute(stmt))
+            doc_ids_str = ",".join(map(str, doc_ids))
+            stmt = select(AnalysisTask).where(text(f"document_id IN ({doc_ids_str})"))
+            res = await session.execute(stmt)
+            tasks = res.scalars().all()
 
-            results = await asyncio.gather(*coroutines)
-            for res in results:
-                tasks.extend(res.scalars().all())
-
-            task_dict = {doc_id: [] for doc_id in doc_ids}
-            for t in tasks:
-                task_dict[t.document_id].append(t)
-            return task_dict
+        task_dict = {doc_id: [] for doc_id in doc_ids}
+        for t in tasks:
+            task_dict[t.document_id].append(t)
+        return task_dict
 
     if not doc_ids:
         return {}
