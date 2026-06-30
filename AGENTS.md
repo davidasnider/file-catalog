@@ -87,6 +87,8 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 
 ## 📝 Development Conventions
 
+- **Filesystem Synchronization:** The system utilizes a core `DocumentStatus.NOT_PRESENT` state to handle deleted or moved files. It marks files that were previously cataloged but are now missing from their original location on disk. During an incremental scan, missing files are set to `NOT_PRESENT` (bypassing the standard pipeline) and are automatically purged from the Full-Text Search (FTS) index to prevent surfacing stale data.
+
 - **Async First:** The core pipeline is fully asynchronous. Always use `await` for I/O and DB operations.
 - **Plugin Architecture:** To add a new analyzer, create a new file in `src/plugins/` inheriting from `AnalyzerBase`. The `TaskEngine` will automatically discover and run it based on its `should_run()` condition.
 - **LLM Abstraction:** Do not call LLM libraries directly in plugins. Use the `LLMProvider` interface to ensure model portability.
