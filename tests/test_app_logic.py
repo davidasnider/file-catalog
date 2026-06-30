@@ -216,9 +216,7 @@ class TestFetchAllTasksForDocuments:
         async def mock_sm():
             async with real_sm() as session:
                 # Mock the dialect to simulate a non-SQLite backend
-                with patch.object(
-                    session.bind.dialect, "name", "postgresql"
-                ):
+                with patch.object(session.bind.dialect, "name", "postgresql"):
                     yield session
 
         mock_session_maker.side_effect = mock_sm
