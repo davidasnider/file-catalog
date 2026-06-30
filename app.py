@@ -132,7 +132,9 @@ def fetch_all_tasks_for_documents(doc_ids: list[int]):
                     select(AnalysisTask)
                     .where(
                         AnalysisTask.document_id.in_(
-                            select(text("value")).select_from(text("json_each(:doc_ids)"))
+                            select(text("value")).select_from(
+                                text("json_each(:doc_ids)")
+                            )
                         )
                     )
                     .params(doc_ids=doc_ids_json)

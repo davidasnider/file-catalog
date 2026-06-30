@@ -105,7 +105,9 @@ class TestFetchAllTasksForDocuments:
     def test_fetch_all_tasks_returns_correct_grouping(self, mock_session_maker):
         """Verify tasks are correctly grouped by document_id via real SQL."""
         engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-        async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        async_session = sessionmaker(
+            engine, class_=AsyncSession, expire_on_commit=False
+        )
         mock_session_maker.return_value = async_session()
 
         # Set up the database in a separate event loop (asyncio.run is used by the function)
@@ -138,7 +140,9 @@ class TestFetchAllTasksForDocuments:
     def test_fetch_all_tasks_missing_doc_ids_get_empty_lists(self, mock_session_maker):
         """Document IDs with no matching tasks should get empty lists."""
         engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-        async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        async_session = sessionmaker(
+            engine, class_=AsyncSession, expire_on_commit=False
+        )
         mock_session_maker.return_value = async_session()
 
         async def _setup():
@@ -162,7 +166,9 @@ class TestFetchAllTasksForDocuments:
     def test_fetch_all_tasks_single_document(self, mock_session_maker):
         """Single document ID should work correctly."""
         engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-        async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        async_session = sessionmaker(
+            engine, class_=AsyncSession, expire_on_commit=False
+        )
         mock_session_maker.return_value = async_session()
 
         async def _setup():
