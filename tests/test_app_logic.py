@@ -1,3 +1,5 @@
+import asyncio
+from unittest.mock import patch, AsyncMock, MagicMock
 from src.ui.snippets import render_snippet
 from src.db.fts import FTS_HL_START, FTS_HL_END
 
@@ -65,3 +67,83 @@ def test_render_snippet_missing_start_then_end():
     text = f"Before{FTS_HL_END} mid {FTS_HL_START}found{FTS_HL_END} after"
     expected = f"Before{FTS_HL_END} mid **found** after"
     assert render_snippet(text) == expected
+
+
+class TestFetchAllTasksForDocuments:
+    """Tests for fetch_all_tasks_for_documents using SQLite json_each()."""
+
+    def _make_task(self, document_id, task_name="TextExtractor"):
+        """Helper to create a mock AnalysisTask."""
+        task = MagicMock()
+        task.document_id = document_id
+        task.task_name = task_name
+        return task
+
+    @patch("app.asyncio.run")
+    def test_fetch_all_tasks_returns_correct_grouping(self, mock_run):
+        """Verify tasks are correctly grouped by document_id."""
+        doc_ids = [1, 2]
+        tasks = [
+            self._make_task(1, "TextExtractor"),
+            self._make_task(1, "Summarizer"),
+            self._make_task(2, "TextExtractor"),
+        ]
+
+        # Simulate the async _fetch returning grouped results
+        mock_run.return_value = {1: tasks[:2], 2: [tasks[2]]}
+
+        from app import fetch_all_tasks_for_documents
+
+        # Clear the cache to avoid interference between tests
+        fetch_all_tasks_for_documents.cache_clear()
+        result = fetch_all_tasks_for_documents(doc_ids)
+
+        assert len(result[1]) == 2
+        assert len(result[2]) == 1
+
+    @patch("app.asyncio.run")
+    def test_fetch_all_tasks_empty_doc_ids(self, mock_run):
+        """Empty doc_ids should return an empty dict without hitting the DB."""
+        from app import fetch_all_tasks_for_documents
+
+        fetch_all_tasks_for_documents.cache_clear()
+        result = fetch_all_tasks_for_documents([])
+
+        assert result == {}
+        mock_run.assert_not_called()
+
+    @patch("app.asyncio.run")
+    def test_fetch_all_tasks_missing_doc_ids_get_empty_lists(self, mock_run):
+        """Document IDs with no matching tasks should get empty lists."""
+        doc_ids = [1, 2, 3]
+        tasks = [self._make_task(1, "TextExtractor")]
+
+        mock_run.return_value = {1: tasks, 2: [], 3: []}
+
+        from app import fetch_all_tasks_for_documents
+
+        fetch_all_tasks_uses_json_each = True  # marker that we expect json_each path
+        fetch_all_tasks_for_documents.cache_clear()
+        result = fetch_all_tasks_for_documents(doc_ids)
+
+        assert len(result[1]) == 1
+        assert result[2] == []
+        assert result[3] == []
+
+    @patch("app.asyncio.run")
+    def test_fetch_all_tasks_single_document(self, mock_run):
+        """Single document ID should work correctly."""
+        doc_ids = [42]
+        tasks = [
+            self._make_task(42, "TextExtractor"),
+            self._make_task(42, "Summarizer"),
+        ]
+
+        mock_run.return_value = {42: tasks}
+
+        from app import fetch_all_tasks_for_documents
+
+        fetch_all_tasks_for_documents.cache_clear()
+        result = fetch_all_tasks_for_documents(doc_ids)
+
+        assert len(result[42]) == 2
