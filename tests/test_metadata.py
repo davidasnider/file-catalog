@@ -21,5 +21,5 @@ async def test_metadata_extractor_success(tmp_path):
 async def test_metadata_extractor_file_not_found():
     plugin = MetadataExtractorPlugin()
 
-    with pytest.raises(Exception, match="Metadata extraction failed:"):
+    with pytest.raises(Exception, match="Metadata extraction failed"):
         await plugin.analyze("non_existent_file.txt", "text/plain", {})
