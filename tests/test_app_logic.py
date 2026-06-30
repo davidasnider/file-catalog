@@ -96,7 +96,15 @@ def _build_test_db(task_configs):
 
     import asyncio
 
-    asyncio.run(init())
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        # No running loop - safe to use asyncio.run()
+        asyncio.run(init())
+    else:
+        # Already in an event loop (e.g., pytest-asyncio)
+        loop.run_until_complete(init())
+
     return engine
 
 
@@ -192,3 +200,36 @@ class TestFetchAllTasksForDocuments:
         result = fetch_all_tasks_for_documents(doc_ids)
 
         assert len(result[42]) == 2
+
+    @patch("app.async_session_maker")
+    def test_fetch_all_tasks_non_sqlite_fallback(self, mock_session_maker):
+        """Non-SQLite dialect should fall back to chunked IN() queries."""
+        engine = _build_test_db(
+            [
+                (1, "TextExtractor"),
+                (2, "Summarizer"),
+            ]
+        )
+        real_sm = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+        @asynccontextmanager
+        async def mock_sm():
+            async with real_sm() as session:
+                # Mock the dialect to simulate a non-SQLite backend
+                with patch.object(
+                    session.bind.dialect, "name", "postgresql"
+                ):
+                    yield session
+
+        mock_session_maker.side_effect = mock_sm
+        doc_ids = [1, 2]
+
+        from app import fetch_all_tasks_for_documents
+
+        fetch_all_tasks_for_documents.clear()
+        result = fetch_all_tasks_for_documents(doc_ids)
+
+        assert len(result[1]) == 1
+        assert result[1][0].task_name == "TextExtractor"
+        assert len(result[2]) == 1
+        assert result[2][0].task_name == "Summarizer"
