@@ -1,7 +1,4 @@
-import asyncio
-from unittest.mock import patch, MagicMock
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
+from unittest.mock import patch
 from src.ui.snippets import render_snippet
 from src.db.fts import FTS_HL_START, FTS_HL_END
 
@@ -72,116 +69,84 @@ def test_render_snippet_missing_start_then_end():
 
 
 class TestFetchAllTasksForDocuments:
-    """Tests for fetch_all_tasks_for_documents using a real in-memory SQLite database.
+    """Tests for fetch_all_tasks_for_documents using SQLite json_each()."""
 
-    Uses an actual SQLite backend so the json_each() query construction,
-    task grouping, and _is_sqlite_backend detection are all exercised.
-    """
-
-    @staticmethod
-    def _make_task(document_id, task_name="TextExtractor"):
+    def _make_task(self, document_id, task_name="TextExtractor"):
         """Helper to create a mock AnalysisTask."""
-        task = MagicMock()
-        task.document_id = document_id
-        task.task_name = task_name
+        from src.db.models import AnalysisTask
+
+        task = AnalysisTask(document_id=document_id, task_name=task_name)
         return task
 
-    @staticmethod
-    def _setup_db(session):
-        """Create tables and seed tasks in the test database."""
-        from app import AnalysisTask
-
-        session.execute(AnalysisTask.__table__.create(checkfirst=True))
-
-        tasks = [
-            AnalysisTask(document_id=1, task_name="TextExtractor"),
-            AnalysisTask(document_id=1, task_name="Summarizer"),
-            AnalysisTask(document_id=2, task_name="TextExtractor"),
-        ]
-        session.add_all(tasks)
-        session.commit()
-
     @patch("app.async_session_maker")
-    def test_fetch_all_tasks_returns_correct_grouping(self, mock_session_maker):
-        """Verify tasks are correctly grouped by document_id via real SQL."""
-        engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-        async_session = sessionmaker(
-            engine, class_=AsyncSession, expire_on_commit=False
-        )
-        mock_session_maker.return_value = async_session()
+    @patch("app.asyncio.run")
+    def test_fetch_all_tasks_returns_correct_grouping(
+        self, mock_run, mock_async_session_maker
+    ):
+        """Verify tasks are correctly grouped by document_id."""
+        doc_ids = [1, 2]
+        tasks = [
+            self._make_task(1, "TextExtractor"),
+            self._make_task(1, "Summarizer"),
+            self._make_task(2, "TextExtractor"),
+        ]
 
-        # Set up the database in a separate event loop (asyncio.run is used by the function)
-        async def _setup():
-            async with async_session() as s:
-                self._setup_db(s)
+        mock_run.return_value = {1: tasks[:2], 2: [tasks[2]]}
 
-        asyncio.run(_setup())
+        from app import fetch_all_tasks_for_documents
 
-        from app import fetch_all_tasks_for_documents, _is_sqlite_backend
-
-        _is_sqlite_backend.cache_clear()
-        fetch_all_tasks_for_documents.cache_clear()
-
-        result = fetch_all_tasks_for_documents([1, 2])
+        fetch_all_tasks_for_documents.clear()
+        result = fetch_all_tasks_for_documents(doc_ids)
 
         assert len(result[1]) == 2
         assert len(result[2]) == 1
 
-    def test_fetch_all_tasks_empty_doc_ids(self):
+    @patch("app.asyncio.run")
+    def test_fetch_all_tasks_empty_doc_ids(self, mock_run):
         """Empty doc_ids should return an empty dict without hitting the DB."""
         from app import fetch_all_tasks_for_documents
 
-        fetch_all_tasks_for_documents.cache_clear()
+        fetch_all_tasks_for_documents.clear()
         result = fetch_all_tasks_for_documents([])
 
         assert result == {}
+        mock_run.assert_not_called()
 
     @patch("app.async_session_maker")
-    def test_fetch_all_tasks_missing_doc_ids_get_empty_lists(self, mock_session_maker):
+    @patch("app.asyncio.run")
+    def test_fetch_all_tasks_missing_doc_ids_get_empty_lists(
+        self, mock_run, mock_async_session_maker
+    ):
         """Document IDs with no matching tasks should get empty lists."""
-        engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-        async_session = sessionmaker(
-            engine, class_=AsyncSession, expire_on_commit=False
-        )
-        mock_session_maker.return_value = async_session()
+        doc_ids = [1, 2, 3]
+        tasks = [self._make_task(1, "TextExtractor")]
 
-        async def _setup():
-            async with async_session() as s:
-                self._setup_db(s)
+        mock_run.return_value = {1: tasks, 2: [], 3: []}
 
-        asyncio.run(_setup())
+        from app import fetch_all_tasks_for_documents
 
-        from app import fetch_all_tasks_for_documents, _is_sqlite_backend
-
-        _is_sqlite_backend.cache_clear()
-        fetch_all_tasks_for_documents.cache_clear()
-
-        result = fetch_all_tasks_for_documents([1, 2, 3])
+        fetch_all_tasks_for_documents.clear()
+        result = fetch_all_tasks_for_documents(doc_ids)
 
         assert len(result[1]) == 1
         assert result[2] == []
         assert result[3] == []
 
     @patch("app.async_session_maker")
-    def test_fetch_all_tasks_single_document(self, mock_session_maker):
+    @patch("app.asyncio.run")
+    def test_fetch_all_tasks_single_document(self, mock_run, mock_async_session_maker):
         """Single document ID should work correctly."""
-        engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-        async_session = sessionmaker(
-            engine, class_=AsyncSession, expire_on_commit=False
-        )
-        mock_session_maker.return_value = async_session()
+        doc_ids = [42]
+        tasks = [
+            self._make_task(42, "TextExtractor"),
+            self._make_task(42, "Summarizer"),
+        ]
 
-        async def _setup():
-            async with async_session() as s:
-                self._setup_db(s)
+        mock_run.return_value = {42: tasks}
 
-        asyncio.run(_setup())
+        from app import fetch_all_tasks_for_documents
 
-        from app import fetch_all_tasks_for_documents, _is_sqlite_backend
+        fetch_all_tasks_for_documents.clear()
+        result = fetch_all_tasks_for_documents(doc_ids)
 
-        _is_sqlite_backend.cache_clear()
-        fetch_all_tasks_for_documents.cache_clear()
-
-        result = fetch_all_tasks_for_documents([1])
-
-        assert len(result[1]) == 2
+        assert len(result[42]) == 2

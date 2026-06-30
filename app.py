@@ -1,6 +1,5 @@
 import streamlit as st
 import asyncio
-import functools
 from sqlmodel import select
 import pandas as pd
 import json
@@ -95,18 +94,6 @@ def fetch_document_tasks(doc_id: int):
     return asyncio.run(_fetch())
 
 
-@functools.lru_cache(maxsize=1)
-async def _is_sqlite_backend():
-    """Detect whether the database backend is SQLite. Cached at module level."""
-    try:
-        async with async_session_maker() as session:
-            probe_stmt = select(text("SELECT 1 FROM sqlite_master LIMIT 1"))
-            await session.execute(probe_stmt)
-        return True
-    except Exception:
-        return False
-
-
 @st.cache_data(ttl=5)
 def fetch_all_tasks_for_documents(doc_ids: list[int]):
     """Fetch all tasks for a list of documents in a single query.
@@ -122,8 +109,18 @@ def fetch_all_tasks_for_documents(doc_ids: list[int]):
     async def _fetch():
         tasks = []
 
+        if not doc_ids:
+            return {}
+
         async with async_session_maker() as session:
-            is_sqlite = await _is_sqlite_backend()
+            # Check if the backend is SQLite; fall back to chunked IN() for other databases
+            is_sqlite = True
+            try:
+                probe_stmt = text("SELECT 1 FROM sqlite_master LIMIT 1")
+                await session.execute(probe_stmt)
+            except Exception:
+                await session.rollback()
+                is_sqlite = False
 
             if is_sqlite:
                 # SQLite path: use json_each() for efficient single-query expansion
@@ -152,10 +149,10 @@ def fetch_all_tasks_for_documents(doc_ids: list[int]):
                     res = await session.execute(stmt)
                     tasks.extend(res.scalars().all())
 
-        task_dict = {doc_id: [] for doc_id in doc_ids}
-        for t in tasks:
-            task_dict[t.document_id].append(t)
-        return task_dict
+            task_dict = {doc_id: [] for doc_id in doc_ids}
+            for t in tasks:
+                task_dict[t.document_id].append(t)
+            return task_dict
 
     if not doc_ids:
         return {}
