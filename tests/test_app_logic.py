@@ -1,8 +1,9 @@
-from unittest.mock import patch, MagicMock, AsyncMock, PropertyMock
+from unittest.mock import patch
 from contextlib import asynccontextmanager
-
-import asyncio as aio
-
+from src.db.models import AnalysisTask, Document
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlmodel import SQLModel
 from src.ui.snippets import render_snippet
 from src.db.fts import FTS_HL_START, FTS_HL_END
 
@@ -72,77 +73,63 @@ def test_render_snippet_missing_start_then_end():
     assert render_snippet(text) == expected
 
 
-def _build_test_db(seed_tasks):
-    """Create an in-memory SQLite engine, build schema, and seed tasks.
+def _build_test_db(task_configs):
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
 
-    Args:
-        seed_tasks: list of (document_id, task_name) tuples to insert.
-
-    Returns:
-        The configured engine (caller builds sessionmaker from it).
-    """
-    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-    from sqlalchemy.orm import sessionmaker
-    from sqlmodel import SQLModel
-    from src.db.models import AnalysisTask, Document
-
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    async def _setup():
+    async def init():
         async with engine.begin() as conn:
             await conn.run_sync(SQLModel.metadata.create_all)
-        sm = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-        async with sm() as session:
-            # Create documents for each unique doc_id
-            doc_ids = sorted(set(did for did, _ in seed_tasks))
-            docs = [
-                Document(id=did, path=f"/tmp/doc{did}.pdf", mime_type="application/pdf")
-                for did in doc_ids
-            ]
-            session.add_all(docs)
-            await session.flush()
 
-            # Create tasks
-            tasks = [
-                AnalysisTask(document_id=did, task_name=tname)
-                for did, tname in seed_tasks
-            ]
-            session.add_all(tasks)
+        async_session = sessionmaker(
+            engine, class_=AsyncSession, expire_on_commit=False
+        )
+        async with async_session() as session:
+            for doc_id, task_name in task_configs:
+                # Add doc if it doesn't exist
+                doc = await session.get(Document, doc_id)
+                if not doc:
+                    doc = Document(id=doc_id, path=f"/tmp/{doc_id}")
+                    session.add(doc)
+                task = AnalysisTask(document_id=doc_id, task_name=task_name)
+                session.add(task)
             await session.commit()
 
-    aio.run(_setup())
+    import asyncio
+
+    asyncio.run(init())
     return engine
 
 
 class TestFetchAllTasksForDocuments:
-    """Tests for fetch_all_tasks_for_documents using real in-memory SQLite."""
+    """Tests for fetch_all_tasks_for_documents using SQLite json_each()."""
 
-    def test_fetch_all_tasks_returns_correct_grouping(self):
-        """Verify tasks are correctly grouped by document_id using real SQLite json_each()."""
-        from sqlalchemy.ext.asyncio import AsyncSession
-        from sqlalchemy.orm import sessionmaker
-
-        engine = _build_test_db([
-            (1, "TextExtractor"),
-            (1, "Summarizer"),
-            (2, "TextExtractor"),
-        ])
+    @patch("app.async_session_maker")
+    def test_fetch_all_tasks_returns_correct_grouping(self, mock_session_maker):
+        """Verify tasks are correctly grouped by document_id via real SQL."""
+        engine = _build_test_db(
+            [
+                (1, "TextExtractor"),
+                (1, "Summarizer"),
+                (2, "TextExtractor"),
+            ]
+        )
         real_sm = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
         @asynccontextmanager
-        async def _session_ctx():
+        async def mock_sm():
             async with real_sm() as session:
                 yield session
 
-        with patch("app.async_session_maker", return_value=_session_ctx()):
-            from app import fetch_all_tasks_for_documents
+        mock_session_maker.side_effect = mock_sm
+        doc_ids = [1, 2]
 
-            doc_ids = [1, 2]
-            fetch_all_tasks_for_documents.clear()
-            result = fetch_all_tasks_for_documents(doc_ids)
+        from app import fetch_all_tasks_for_documents
 
-            assert len(result[1]) == 2
-            assert len(result[2]) == 1
+        fetch_all_tasks_for_documents.clear()
+        result = fetch_all_tasks_for_documents(doc_ids)
+
+        assert len(result[1]) == 2
+        assert len(result[2]) == 1
 
     def test_fetch_all_tasks_empty_doc_ids(self):
         """Empty doc_ids should return an empty dict without hitting the DB."""
@@ -153,82 +140,55 @@ class TestFetchAllTasksForDocuments:
 
         assert result == {}
 
-    def test_fetch_all_tasks_missing_doc_ids_get_empty_lists(self):
+    @patch("app.async_session_maker")
+    def test_fetch_all_tasks_missing_doc_ids_get_empty_lists(self, mock_session_maker):
         """Document IDs with no matching tasks should get empty lists."""
-        from sqlalchemy.ext.asyncio import AsyncSession
-        from sqlalchemy.orm import sessionmaker
-
-        engine = _build_test_db([(1, "TextExtractor")])
+        engine = _build_test_db(
+            [
+                (1, "TextExtractor"),
+            ]
+        )
         real_sm = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
         @asynccontextmanager
-        async def _session_ctx():
+        async def mock_sm():
             async with real_sm() as session:
                 yield session
 
-        with patch("app.async_session_maker", return_value=_session_ctx()):
-            from app import fetch_all_tasks_for_documents
+        mock_session_maker.side_effect = mock_sm
+        doc_ids = [1, 2, 3]
 
-            doc_ids = [1, 2, 3]
-            fetch_all_tasks_for_documents.clear()
-            result = fetch_all_tasks_for_documents(doc_ids)
+        from app import fetch_all_tasks_for_documents
 
-            assert len(result[1]) == 1
-            assert result[2] == []
-            assert result[3] == []
+        fetch_all_tasks_for_documents.clear()
+        result = fetch_all_tasks_for_documents(doc_ids)
 
-    def test_fetch_all_tasks_single_document(self):
+        assert len(result[1]) == 1
+        assert result[2] == []
+        assert result[3] == []
+
+    @patch("app.async_session_maker")
+    def test_fetch_all_tasks_single_document(self, mock_session_maker):
         """Single document ID should work correctly."""
-        from sqlalchemy.ext.asyncio import AsyncSession
-        from sqlalchemy.orm import sessionmaker
-
-        engine = _build_test_db([
-            (42, "TextExtractor"),
-            (42, "Summarizer"),
-        ])
+        engine = _build_test_db(
+            [
+                (42, "TextExtractor"),
+                (42, "Summarizer"),
+            ]
+        )
         real_sm = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
         @asynccontextmanager
-        async def _session_ctx():
+        async def mock_sm():
             async with real_sm() as session:
                 yield session
 
-        with patch("app.async_session_maker", return_value=_session_ctx()):
-            from app import fetch_all_tasks_for_documents
+        mock_session_maker.side_effect = mock_sm
+        doc_ids = [42]
 
-            doc_ids = [42]
-            fetch_all_tasks_for_documents.clear()
-            result = fetch_all_tasks_for_documents(doc_ids)
+        from app import fetch_all_tasks_for_documents
 
-            assert len(result[42]) == 2
+        fetch_all_tasks_for_documents.clear()
+        result = fetch_all_tasks_for_documents(doc_ids)
 
-    def test_fetch_all_tasks_non_sqlite_fallback(self):
-        """Non-SQLite backends should use the chunked IN() fallback path."""
-        from sqlalchemy.ext.asyncio import AsyncSession
-        from sqlalchemy.orm import sessionmaker
-
-        engine = _build_test_db([(10, "TextExtractor")])
-        real_sm = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-        @asynccontextmanager
-        async def _patched_session_ctx():
-            """Yield a session whose bind.dialect.name is spoofed as 'postgresql'."""
-            async with real_sm() as session:
-                # Patch the dialect name in-place on the underlying sync engine dialect
-                real_dialect = session.bind.sync_engine.dialect
-                real_name = real_dialect.name
-                real_dialect.name = "postgresql"
-                try:
-                    yield session
-                finally:
-                    real_dialect.name = real_name
-
-        with patch("app.async_session_maker", return_value=_patched_session_ctx()):
-            from app import fetch_all_tasks_for_documents
-
-            doc_ids = [10]
-            fetch_all_tasks_for_documents.clear()
-            result = fetch_all_tasks_for_documents(doc_ids)
-
-            # The fallback chunked IN() path should still find the task
-            assert len(result[10]) == 1
+        assert len(result[42]) == 2

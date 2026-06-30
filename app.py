@@ -114,11 +114,13 @@ def fetch_all_tasks_for_documents(doc_ids: list[int]):
 
         async with async_session_maker() as session:
             # Check if the backend is SQLite; fall back to chunked IN() for other databases
-            is_sqlite = (
-                session.bind.dialect.name == "sqlite"
-                if hasattr(session, "bind")
-                else True
-            )
+            is_sqlite = True
+            try:
+                probe_stmt = text("SELECT 1 FROM sqlite_master LIMIT 1")
+                await session.execute(probe_stmt)
+            except Exception:
+                await session.rollback()
+                is_sqlite = False
 
             if is_sqlite:
                 # SQLite path: use json_each() for efficient single-query expansion
@@ -152,6 +154,8 @@ def fetch_all_tasks_for_documents(doc_ids: list[int]):
                 task_dict[t.document_id].append(t)
             return task_dict
 
+    if not doc_ids:
+        return {}
     return asyncio.run(_fetch())
 
 
