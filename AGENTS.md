@@ -85,6 +85,12 @@ python -m src.scripts.report_failures
 python -m src.scripts.scan_text_failures "/path/to/directory"
 ```
 
+## 🏛 Architecture & Domain Concepts
+
+- **Filesystem Synchronization:** `DocumentStatus.NOT_PRESENT` marks files that were previously cataloged but are now deleted or missing from disk. Key behaviors:
+  - Set during incremental scans when a file is no longer found (bypasses the standard processing pipeline).
+  - Automatically purges the document from the Full-Text Search (FTS) index, preventing stale search results.
+
 ## 📝 Development Conventions
 
 - **Async First:** The core pipeline is fully asynchronous. Always use `await` for I/O and DB operations.
@@ -93,7 +99,6 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 - **Type Safety:** Use type hints throughout the codebase. `SQLModel` provides dual-purpose classes for both DB schema and Pydantic validation.
 - **Error Handling:** Plugins should catch their own exceptions and return descriptive error messages in the `AnalysisTask` record rather than crashing the engine.
 - **Linting:** The project uses `ruff` for linting and formatting. Ensure pre-commit hooks are enabled.
-- **Filesystem Synchronization:** `DocumentStatus.NOT_PRESENT` is a core status used for filesystem synchronization. It is used to mark files that were previously cataloged but are now deleted or missing from their original location on disk. When the system runs an incremental scan and detects that a file is missing, its status is set to `NOT_PRESENT` (bypassing the standard processing pipeline). Crucially, when a document transitions to this state, it is automatically purged from the Full-Text Search (FTS) index, ensuring that search results remain accurate and do not surface stale data for files that no longer exist.
 
 ## ⚙️ Configuration
 Settings are managed in `.env` or via CLI arguments in `scanner.py`.
