@@ -3,6 +3,7 @@ import asyncio
 from sqlmodel import select
 import pandas as pd
 import json
+from sqlalchemy import text
 from src.ui.snippets import render_snippet
 
 from src.db.engine import async_session_maker
@@ -95,17 +96,52 @@ def fetch_document_tasks(doc_id: int):
 
 @st.cache_data(ttl=5)
 def fetch_all_tasks_for_documents(doc_ids: list[int]):
-    """Fetch all tasks for a list of documents in a single query, chunked to prevent SQLite parameter limits."""
+    """Fetch all tasks for a list of documents in a single query.
+
+    Uses SQLite's json_each() table-valued function to expand a JSON array of document IDs
+    into rows, avoiding the need for chunked IN() clauses and parameter limit concerns.
+
+    Note: This implementation is SQLite-specific due to json_each(). If migrating away from
+    SQLite in the future, replace with a chunked IN() approach or use a backend-agnostic
+    JSON expansion function.
+    """
 
     async def _fetch():
+        tasks = []
+
+        if not doc_ids:
+            return {}
+
         async with async_session_maker() as session:
-            tasks = []
-            chunk_size = 900
-            for i in range(0, len(doc_ids), chunk_size):
-                chunk = doc_ids[i : i + chunk_size]
-                stmt = select(AnalysisTask).where(AnalysisTask.document_id.in_(chunk))
+            # Check if the backend is SQLite; fall back to chunked IN() for other databases
+            is_sqlite = session.bind.dialect.name == "sqlite"
+
+            if is_sqlite:
+                # SQLite path: use json_each() for efficient single-query expansion
+                doc_ids_json = json.dumps(doc_ids)
+                stmt = (
+                    select(AnalysisTask)
+                    .where(
+                        AnalysisTask.document_id.in_(
+                            select(text("value")).select_from(
+                                text("json_each(:doc_ids)")
+                            )
+                        )
+                    )
+                    .params(doc_ids=doc_ids_json)
+                )
                 res = await session.execute(stmt)
-                tasks.extend(res.scalars().all())
+                tasks = res.scalars().all()
+            else:
+                # Fallback: chunked IN() clause for non-SQLite backends
+                chunk_size = 900
+                for i in range(0, len(doc_ids), chunk_size):
+                    chunk = doc_ids[i : i + chunk_size]
+                    stmt = select(AnalysisTask).where(
+                        AnalysisTask.document_id.in_(chunk)
+                    )
+                    res = await session.execute(stmt)
+                    tasks.extend(res.scalars().all())
 
             task_dict = {doc_id: [] for doc_id in doc_ids}
             for t in tasks:
