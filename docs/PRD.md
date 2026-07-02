@@ -35,6 +35,7 @@ Rebuild the application from the ground up to address robustness, extensibility,
     ensuring that search results remain accurate and do not surface stale data for files that no longer exist.
     The FTS search implementation safely escapes input to prevent SQL injection vulnerabilities.
   - `AnalysisTask`: Each document has multiple linked tasks (e.g., OCR, Text Splitting, Summarization, Estate Analysis). Each task has its own status (`PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `RETRIES`). It also includes a `judged_at` timestamp which is used to prioritize unjudged and older tasks during background evaluation by the `TaskJudge`.
+  - **Query Optimization:** Batched queries utilize SQLite's `json_each()` to efficiently expand JSON arrays into rows without hitting parameter limits, gracefully falling back to chunked `IN()` clauses for other database dialects.
 
 ### 2.2 Advanced File Type Detection
 - **Problem:** Current detection depends largely on file extensions, failing on extensionless files or spoofed files.
