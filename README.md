@@ -73,6 +73,9 @@ Configuration is centrally managed via `pydantic-settings`.
 - `LOG_FORMAT`: Set to `json` for structured logging or `standard` for human-readable logs.
 
 ### Performance: Incremental Scanning
+
+- **Optimized Batch Loading:** The pipeline leverages SQLite's `json_each()` function to expand JSON arrays into rows. This allows batching database queries efficiently, avoiding parameter limits (usually 999) without chunking, while maintaining a chunked `.in_()` clause fallback for non-SQLite backends.
+
 The system implements a **Quick Skip** mechanism. It tracks the `file_size` and `mtime` of every ingested file. On subsequent runs, if a file's metadata hasn't changed and its status is `COMPLETED`, the scanner skips the entire analysis pipeline for that file, significantly reducing processing time for large, stable archives. The system also handles deleted or moved files by utilizing the core `DocumentStatus.NOT_PRESENT` state. It is used to mark files that were previously cataloged but are now deleted or missing from their original location on disk. When the system runs an incremental scan and detects that a file is missing, its `status` is set to `NOT_PRESENT` (bypassing the standard processing pipeline). Crucially, when a document transitions to this state, it is automatically purged from the Full-Text Search (FTS) index, ensuring that search results remain accurate and do not surface stale data for files that no longer exist.
 Additionally, when resuming scans, a **Priority-Based Hydration** logic is used to aggressively push incomplete tasks forward: unprocessed files are prioritized first, followed by failed files, and finally partially processed/retrying files. For evaluation, use `python src/scanner.py --judge` to run a standalone LLM-as-a-Judge on unjudged/older tasks to track analysis quality.
 

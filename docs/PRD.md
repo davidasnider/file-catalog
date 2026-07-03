@@ -49,6 +49,7 @@ Rebuild the application from the ground up to address robustness, extensibility,
   3. Clean shutdown behavior via cancellation.
   4. Robust resuming of interrupted scans through priority-based queue hydration (prioritizing unprocessed files first, then failed files, then partially processed/retrying files).
   5. Optimal performance by offloading blocking file I/O operations to separate threads via `asyncio.to_thread`.
+  6. Optimized database querying by leveraging SQLite's `json_each()` function to expand JSON arrays into rows. This allows batching queries efficiently, avoiding parameter limits (usually 999) without chunking, while maintaining a chunked `.in_()` clause fallback for non-SQLite backends.
 
 ### 2.4 Dynamic Plugin Registry
 - **Problem:** "Multiple touchpoints" required to add a new analyzer.

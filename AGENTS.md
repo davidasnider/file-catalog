@@ -87,6 +87,7 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 
 ## 🏛 Architecture & Domain Concepts
 
+- **Optimized Batch Loading:** `fetch_all_tasks_for_documents` leverages SQLite's `json_each()` function to expand JSON arrays into rows. This allows batching queries efficiently, avoiding parameter limits (usually 999) without chunking, while maintaining a chunked `.in_()` clause fallback for non-SQLite backends.
 - **Filesystem Synchronization:** `DocumentStatus.NOT_PRESENT` marks files that were previously cataloged but are now deleted or missing from disk. Key behaviors:
   - Set during incremental scans when a file is no longer found (bypasses the standard processing pipeline).
   - Automatically purges the document from the Full-Text Search (FTS) index, preventing stale search results.
