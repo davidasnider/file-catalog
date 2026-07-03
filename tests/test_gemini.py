@@ -3,7 +3,10 @@ from src.llm.gemini import GeminiProvider
 
 
 def test_gemini_clear_cache():
-    with patch("src.llm.gemini.HAS_VERTEX", True), patch("src.llm.gemini.genai"):
+    with (
+        patch("src.llm.gemini.HAS_VERTEX", True),
+        patch("src.llm.gemini.genai", create=True),
+    ):
         GeminiProvider.clear_cache()
         assert len(GeminiProvider._cache) == 0
 

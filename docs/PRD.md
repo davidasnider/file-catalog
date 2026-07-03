@@ -35,7 +35,7 @@ Rebuild the application from the ground up to address robustness, extensibility,
     ensuring that search results remain accurate and do not surface stale data for files that no longer exist.
     The FTS search implementation safely escapes input to prevent SQL injection vulnerabilities.
   - `AnalysisTask`: Each document has multiple linked tasks (e.g., OCR, Text Splitting, Summarization, Estate Analysis). Each task has its own status (`PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `RETRIES`). It also includes a `judged_at` timestamp which is used to prioritize unjudged and older tasks during background evaluation by the `TaskJudge`.
-  - **Query Optimization:** Batched queries utilize SQLite's `json_each()` to efficiently expand JSON arrays into rows without hitting parameter limits, gracefully falling back to chunked `IN()` clauses for other database dialects.
+  - **Query Optimization (UI):** Helper functions in the Streamlit UI (specifically in `app.py` for fetching task lists) utilize SQLite's `json_each()` to efficiently expand JSON arrays of document IDs into rows without hitting parameter limits, gracefully falling back to chunked `IN()` clauses for other database dialects.
 
 ### 2.2 Advanced File Type Detection
 - **Problem:** Current detection depends largely on file extensions, failing on extensionless files or spoofed files.
@@ -49,8 +49,6 @@ Rebuild the application from the ground up to address robustness, extensibility,
   3. Clean shutdown behavior via cancellation.
   4. Robust resuming of interrupted scans through priority-based queue hydration (prioritizing unprocessed files first, then failed files, then partially processed/retrying files).
   5. Optimal performance by offloading blocking file I/O operations to separate threads via `asyncio.to_thread`.
-  6. Optimized database querying by leveraging SQLite's `json_each()` function to expand JSON arrays into rows. This allows batching queries efficiently, avoiding parameter limits (usually 999) without chunking, while maintaining a chunked `.in_()` clause fallback for non-SQLite backends.
-
 ### 2.4 Dynamic Plugin Registry
 - **Problem:** "Multiple touchpoints" required to add a new analyzer.
 - **Solution:** Implement a dynamic plugin loader.
