@@ -99,7 +99,10 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 - **Type Safety:** Use type hints throughout the codebase. `SQLModel` provides dual-purpose classes for both DB schema and Pydantic validation.
 - **Error Handling:** Plugins should catch their own exceptions and return descriptive error messages in the `AnalysisTask` record rather than crashing the engine.
 - **Linting:** The project uses `ruff` for linting and formatting. Ensure pre-commit hooks are enabled.
-- **Database Querying:** For batched database queries with SQLite, use `json_each()`. For non-SQLite dialects, chunk input lists (e.g., maximum sizes of 900) to adhere to parameter limits.
+- **Filesystem Synchronization:** `DocumentStatus.NOT_PRESENT` marks files that were previously cataloged but are now deleted or missing from disk. Key behaviors:
+  - Set during incremental scans when a file is no longer found (bypasses the standard processing pipeline).
+  - Automatically purges the document from the Full-Text Search (FTS) index, preventing stale search results.
+- **Database Querying:** For batched database queries with SQLite (such as using `.in_()` clauses), ensure the input lists are chunked (e.g., maximum sizes of 900) to avoid the default SQLite parameter limits. When fetching data for many documents, utilize SQLite's `json_each()` function to expand a JSON array of IDs into rows, bypassing parameter limits with a fallback to chunked `IN()` clauses for non-SQLite dialects.
 
 ## ⚙️ Configuration
 Settings are managed in `.env` or via CLI arguments in `scanner.py`.
