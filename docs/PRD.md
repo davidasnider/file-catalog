@@ -60,7 +60,10 @@ Rebuild the application from the ground up to address robustness, extensibility,
   - The core engine and the UI automatically discover, run, and render these plugins without any core code changes.
   - Plugins use the `get_all_extracted_text` utility function from `src.core.text_utils` as the standard way to aggregate text results from all upstream analyzers stored in the execution context.
 
-### 2.5 LLM Abstraction Layer
+#### 2.5 Configuration Management
+Application configuration is centrally managed via `pydantic-settings` in `src/core/config.py`, which loads settings from `.env` files. The `update_config_from_cli` utility function is designed to patch the global `config` object with CLI arguments, applying only non-`None` values that correspond to existing attributes in the `Settings` class.
+
+## 2.6 LLM Abstraction Layer
 - **Problem:** Hardcoded Ollama dependencies limit performance tuning and cloud fallback capabilities.
 - **Solution:** Defined an `LLMProvider` interface.
   - Implemented multiple adapters: `MLXProvider`, `LlamaCppProvider`, Cloud Providers (`GeminiProvider`), and `OpenAIProvider` for OpenAI-compatible endpoints. API-based LLM providers (e.g., `OpenAIProvider`, `GeminiProvider`) implement connection caching via a class-level `_cache` dict and a `get_provider()` class method, ensuring underlying HTTP clients are reused across file processing tasks.
