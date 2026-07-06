@@ -1,7 +1,9 @@
-import pytest
 import os
+
+import pytest
 from pydantic_settings import SettingsConfigDict
-from src.core.config import Settings, update_config_from_cli, config
+
+from src.core.config import Settings, config, update_config_from_cli
 
 
 @pytest.fixture
