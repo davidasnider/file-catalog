@@ -1,6 +1,7 @@
 import pytest
 import os
-from src.core.config import Settings, update_config_from_cli, config, SettingsConfigDict
+from pydantic_settings import SettingsConfigDict
+from src.core.config import Settings, update_config_from_cli, config
 
 
 @pytest.fixture
@@ -46,7 +47,7 @@ def test_settings_properties():
 
 
 def test_update_config_from_cli():
-    # Instead of global modification, mock the attributes on config
+    # Mutate the global config directly, saving the original state to restore in the finally block
     original_provider = config.llm_provider
     original_max_concurrent = config.max_concurrent
 
