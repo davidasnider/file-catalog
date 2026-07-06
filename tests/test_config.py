@@ -1,6 +1,6 @@
 import pytest
 import os
-from src.core.config import Settings, update_config_from_cli, config
+from src.core.config import Settings, update_config_from_cli, config, SettingsConfigDict
 
 
 @pytest.fixture
@@ -25,9 +25,11 @@ def clean_env(monkeypatch):
 
 
 def test_settings_defaults(clean_env):
-    # To avoid relying on env_file logic mutating monkeypatch dict
-    # we just pass _env_file=None
-    settings = Settings(_env_file=None)
+    # Bypass all environment variables during testing
+    class TestSettings(Settings):
+        model_config = SettingsConfigDict(env_file=None, env_prefix="TEST_")
+
+    settings = TestSettings(_env_file=None)
     assert settings.llm_provider == "openai"
     assert settings.vision_provider == "openai"
     assert settings.vision_max_pixels == 1048576
