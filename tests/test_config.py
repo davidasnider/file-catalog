@@ -7,18 +7,24 @@ from src.core.config import Settings, update_config_from_cli, config
 @pytest.fixture
 def clean_env(monkeypatch):
     """Ensure environment variables don't interfere with defaults."""
-    # We clear known keys to ensure we get defaults
+    # We clear known keys (and their TEST_ prefixed variants) to ensure we get defaults
     keys_to_clear = [
         k
         for k in os.environ.keys()
         if k.upper()
         in [
             "LLM_PROVIDER",
+            "TEST_LLM_PROVIDER",
             "VISION_PROVIDER",
+            "TEST_VISION_PROVIDER",
             "VISION_MAX_PIXELS",
+            "TEST_VISION_MAX_PIXELS",
             "MAX_CONCURRENT",
+            "TEST_MAX_CONCURRENT",
             "LLM_MODEL_PATH",
+            "TEST_LLM_MODEL_PATH",
             "VISION_MODEL_PATH",
+            "TEST_VISION_MODEL_PATH",
         ]
     ]
     for key in keys_to_clear:
