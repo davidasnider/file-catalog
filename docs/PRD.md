@@ -49,6 +49,10 @@ Rebuild the application from the ground up to address robustness, extensibility,
   4. Robust resuming of interrupted scans through priority-based queue hydration (prioritizing unprocessed files first, then failed files, then partially processed/retrying files).
   5. Optimal performance by offloading blocking file I/O operations to separate threads via `asyncio.to_thread`.
   6. Optimized database querying at the Streamlit dashboard/query layer by leveraging SQLite's `json_each()` function to expand JSON arrays into rows. This allows batching queries efficiently, avoiding parameter limits (usually 999) without chunking, while maintaining a chunked `.in_()` clause fallback for non-SQLite backends.
+  7. The utility function `repair_and_load_json` in `src/core/text_utils.py` is the standard way to handle malformed LLM JSON outputs; it utilizes `json_repair.loads` for robust repairing and parsing in one step, and maintains a manual fallback heuristic for severely truncated strings.
+  8. Database sessions are configured with `expire_on_commit=False` by default (see `src/db/engine.py`), which allows model instances to remain valid and accessible after a session commit without requiring explicit re-fetching or refreshing.
+  9. Archive extraction (Tar, Zip, 7z) must be hardened against path traversal. Use `tarfile.data_filter` for Tar files on Python 3.12+.
+  10. The `src/core/config.py` file includes an `update_config_from_cli` utility function designed to patch the global `config` object with CLI arguments, applying only non-`None` values that correspond to existing attributes in the `Settings` class.
 
 ### 2.4 Dynamic Plugin Registry
 - **Problem:** "Multiple touchpoints" required to add a new analyzer.
