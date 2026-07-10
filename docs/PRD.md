@@ -66,6 +66,9 @@ Rebuild the application from the ground up to address robustness, extensibility,
   - Implemented multiple adapters: `MLXProvider`, `LlamaCppProvider`, Cloud Providers (`GeminiProvider`), and `OpenAIProvider` for OpenAI-compatible endpoints. API-based LLM providers (e.g., `OpenAIProvider`, `GeminiProvider`) implement connection caching via a class-level `_cache` dict and a `get_provider()` class method, ensuring underlying HTTP clients are reused across file processing tasks.
   - This allows falling back to robust cloud models for heavy reasoning while keeping local options for privacy. We also support enabling advanced reasoning models (like OpenAI o1/o3 or local equivalents) via the `enable_thinking` flag for high-complexity analytical plugins.
 
+### 2.6 Configuration Management
+Application configuration is centrally managed via `pydantic-settings` in `src/core/config.py`, which loads settings from `.env` files. The `src/core/config.py` file includes an `update_config_from_cli` utility function designed to patch the global `config` object with CLI arguments, applying only non-`None` values that correspond to existing attributes in the `Settings` class.
+
 ---
 
 ## 3. Verification Plan
