@@ -102,7 +102,7 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 - **Linting:** The project uses `ruff` for linting and formatting. Ensure pre-commit hooks are enabled.
 
 ## ⚙️ Configuration
-Settings are managed in `.env` or via CLI arguments in `scanner.py`.
+Settings are managed in `.env` or via CLI arguments in `scanner.py`. The `update_config_from_cli` utility function in `src/core/config.py` is designed to patch the global `config` object with CLI arguments, applying only non-`None` values that correspond to existing attributes in the `Settings` class.
 - `LLM_PROVIDER`: `mlx` (default), `llama_cpp`, or `gemini`.
 - `USE_DOCUMENT_AI`: Set to `True` to use Google Cloud Document AI for advanced text extraction.
 - `DOC_AI_PROCESSOR_ID`: The processor ID for Google Cloud Document AI.
