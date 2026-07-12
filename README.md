@@ -54,6 +54,8 @@ The scanner can be configured via environment variables (in a `.env` file) or CL
 
 ### Key Configuration Options:
 Configuration is centrally managed via `pydantic-settings`.
+The `src/core/config.py` file includes an `update_config_from_cli` utility function designed to patch the global `config` object with CLI arguments, applying only non-`None` values that correspond to existing attributes in the `Settings` class.
+
 - `LLM_PROVIDER` / `VISION_PROVIDER`: Choose `openai`, `mlx`, `llama_cpp`, or `gemini` (defaults to `openai`).
 - `USE_DOCUMENT_AI`: Enable Google Cloud Document AI extraction.
 - `DOC_AI_PROCESSOR_ID`: Processor ID for Google Cloud Document AI.

@@ -103,6 +103,8 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 
 ## ⚙️ Configuration
 Settings are managed in `.env` or via CLI arguments in `scanner.py`.
+The `src/core/config.py` file includes an `update_config_from_cli` utility function designed to patch the global `config` object with CLI arguments, applying only non-`None` values that correspond to existing attributes in the `Settings` class.
+
 - `LLM_PROVIDER`: `mlx` (default), `llama_cpp`, or `gemini`.
 - `USE_DOCUMENT_AI`: Set to `True` to use Google Cloud Document AI for advanced text extraction.
 - `DOC_AI_PROCESSOR_ID`: The processor ID for Google Cloud Document AI.
