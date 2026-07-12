@@ -53,5 +53,5 @@ config = Settings()
 def update_config_from_cli(**kwargs):
     """Update settings based on CLI arguments"""
     for key, value in kwargs.items():
-        if value is not None and hasattr(config, key):
+        if value is not None and key in type(config).model_fields:
             setattr(config, key, value)

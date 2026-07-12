@@ -51,3 +51,8 @@ def test_update_config_from_cli(clean_env, monkeypatch):
     # Test invalid attribute is ignored by the utility function
     update_config_from_cli(non_existent_key="some_value")
     assert not hasattr(test_config, "non_existent_key")
+
+    # Test read-only property name is silently ignored and does not raise an exception
+    update_config_from_cli(llm_display_name="some_display_name")
+    # Ensure it wasn't modified (since it's a read-only property) and didn't crash
+    assert test_config.llm_display_name != "some_display_name"
