@@ -24,7 +24,7 @@ def test_settings_defaults(clean_env):
     assert settings.vision_max_pixels == 1048576
 
 
-def test_settings_properties():
+def test_settings_properties(clean_env):
     settings = Settings(
         llm_model_path="some/path/to/llm-model",
         vision_model_path="another/path/to/vision-model",
@@ -34,7 +34,7 @@ def test_settings_properties():
     assert settings.vision_display_name == "vision-model"
 
 
-def test_update_config_from_cli(monkeypatch):
+def test_update_config_from_cli(clean_env, monkeypatch):
     # Use monkeypatch to isolate changes to a test config instance instead of mutating the global config
     test_config = Settings(_env_file=None)
     monkeypatch.setattr("src.core.config.config", test_config)
