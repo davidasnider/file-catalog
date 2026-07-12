@@ -1,5 +1,7 @@
-import pytest
 import os
+
+import pytest
+
 from src.core.config import Settings, update_config_from_cli
 
 
