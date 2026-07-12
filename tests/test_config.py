@@ -1,6 +1,6 @@
 import pytest
 import os
-from src.core.config import Settings, update_config_from_cli, config
+from src.core.config import Settings, update_config_from_cli
 
 
 @pytest.fixture
@@ -10,15 +10,7 @@ def clean_env(monkeypatch):
     keys_to_clear = [
         k
         for k in os.environ.keys()
-        if k.upper()
-        in [
-            "LLM_PROVIDER",
-            "VISION_PROVIDER",
-            "VISION_MAX_PIXELS",
-            "MAX_CONCURRENT",
-            "LLM_MODEL_PATH",
-            "VISION_MODEL_PATH",
-        ]
+        if k.upper() in {f.upper() for f in Settings.model_fields}
     ]
     for key in keys_to_clear:
         monkeypatch.delenv(key, raising=False)
@@ -42,26 +34,20 @@ def test_settings_properties():
     assert settings.vision_display_name == "vision-model"
 
 
-def test_update_config_from_cli():
-    # Save original values so we can restore the global config after mutating it
-    original_provider = config.llm_provider
-    original_max_concurrent = config.max_concurrent
+def test_update_config_from_cli(monkeypatch):
+    # Use monkeypatch to isolate changes to a test config instance instead of mutating the global config
+    test_config = Settings(_env_file=None)
+    monkeypatch.setattr("src.core.config.config", test_config)
 
-    try:
-        # Test valid update
-        update_config_from_cli(llm_provider="test_provider", max_concurrent=10)
-        assert config.llm_provider == "test_provider"
-        assert config.max_concurrent == 10
+    # Test valid update
+    update_config_from_cli(llm_provider="test_provider", max_concurrent=10)
+    assert test_config.llm_provider == "test_provider"
+    assert test_config.max_concurrent == 10
 
-        # Test None value is ignored
-        update_config_from_cli(llm_provider=None)
-        assert config.llm_provider == "test_provider"
+    # Test None value is ignored
+    update_config_from_cli(llm_provider=None)
+    assert test_config.llm_provider == "test_provider"
 
-        # Test invalid attribute is ignored by the utility function
-        update_config_from_cli(non_existent_key="some_value")
-        assert not hasattr(config, "non_existent_key")
-
-    finally:
-        # Restore manually since we need to mutate the actual global instance to test the logic
-        config.llm_provider = original_provider
-        config.max_concurrent = original_max_concurrent
+    # Test invalid attribute is ignored by the utility function
+    update_config_from_cli(non_existent_key="some_value")
+    assert not hasattr(test_config, "non_existent_key")
