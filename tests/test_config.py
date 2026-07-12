@@ -25,8 +25,7 @@ def clean_env(monkeypatch):
 
 
 def test_settings_defaults(clean_env):
-    # To avoid relying on env_file logic mutating monkeypatch dict
-    # we just pass _env_file=None
+    # Pass _env_file=None to skip loading any .env file and keep the test deterministic
     settings = Settings(_env_file=None)
     assert settings.llm_provider == "openai"
     assert settings.vision_provider == "openai"
@@ -44,7 +43,7 @@ def test_settings_properties():
 
 
 def test_update_config_from_cli():
-    # Instead of global modification, mock the attributes on config
+    # Save original values so we can restore the global config after mutating it
     original_provider = config.llm_provider
     original_max_concurrent = config.max_concurrent
 
