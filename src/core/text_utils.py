@@ -81,9 +81,8 @@ def repair_and_load_json(text: str) -> Dict[str, Any]:
     Attempts to extract, repair, and parse JSON from a string.
     Useful for handling non-compliant LLM outputs.
     """
-    import json
     import re
-    from json_repair import repair_json
+    import json_repair
 
     # 1. Basic cleanup
     cleaned = text.strip()
@@ -95,12 +94,9 @@ def repair_and_load_json(text: str) -> Dict[str, Any]:
     if match:
         cleaned = match.group(1)
 
-    # 3. Use json-repair to fix common issues
-    repaired = repair_json(cleaned)
-
-    # 4. Parse
+    # 3. Use json-repair to fix common issues and parse
     try:
-        data = json.loads(repaired)
+        data = json_repair.loads(cleaned)
         if isinstance(data, dict):
             return data
         return {}
