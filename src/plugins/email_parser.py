@@ -3,9 +3,11 @@ from __future__ import annotations
 import email
 import email.policy
 import logging
-from src.core.mbox_utils import RobustMbox
-from typing import Dict, Any
+from pathlib import Path
+from typing import Dict, Any, Optional
+from email.header import decode_header
 
+from src.core.mbox_utils import RobustMbox
 from src.core.plugin_registry import AnalyzerBase, register_analyzer
 from src.core.analyzer_names import EMAIL_PARSER_NAME
 
@@ -21,7 +23,7 @@ MAX_EMAILS_FROM_MBOX = 1000
 class EmailParserPlugin(AnalyzerBase):
     """
     Parses .eml and .mbox files to extract sender, recipients,
-    subject, body, and attachment metadata.
+    subject, body, and attachment metadata. Also extracts attachments to disk.
     """
 
     def should_run(
@@ -56,7 +58,7 @@ class EmailParserPlugin(AnalyzerBase):
         """Parse a single .eml file."""
         with open(file_path, "rb") as f:
             msg = email.message_from_binary_file(f, policy=email.policy.default)
-        return self._extract_email_data(msg)
+        return self._extract_email_data(msg, file_path)
 
     @staticmethod
     def _is_mbox(file_path: str, mime_type: str) -> bool:
@@ -76,16 +78,35 @@ class EmailParserPlugin(AnalyzerBase):
                         f"Reached max email limit ({MAX_EMAILS_FROM_MBOX}) for {file_path}"
                     )
                     break
-                emails.append(self._extract_email_data(msg))
+                emails.append(self._extract_email_data(msg, file_path, email_index=i))
         finally:
             mbox.close()
         return emails
 
-    def _extract_email_data(self, msg: email.message.Message) -> Dict[str, Any]:
+    def _extract_email_data(
+        self,
+        msg: email.message.Message,
+        file_path: str,
+        email_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
         """Extract structured data from an email.message.Message object."""
         # Extract body text
         body_text = ""
         attachments = []
+
+        # Determine attachments directory next to the email file: [file_path]_attachments/
+        attachments_dir = Path(file_path + "_attachments")
+
+        def _safe_decode(payload: Any, charset: str | None) -> str:
+            if not payload:
+                return ""
+            if isinstance(payload, str):
+                return payload
+            charset = charset or "utf-8"
+            try:
+                return payload.decode(charset, errors="replace")
+            except LookupError:
+                return payload.decode("utf-8", errors="replace")
 
         if msg.is_multipart():
             for part in msg.walk():
@@ -93,28 +114,63 @@ class EmailParserPlugin(AnalyzerBase):
                 disposition = str(part.get("Content-Disposition", ""))
 
                 if "attachment" in disposition:
+                    filename = part.get_filename()
+                    if filename:
+                        try:
+                            decoded = decode_header(filename)
+                            filename = "".join(
+                                [
+                                    (
+                                        t[0].decode(t[1] or "utf-8", errors="replace")
+                                        if isinstance(t[0], bytes)
+                                        else t[0]
+                                    )
+                                    for t in decoded
+                                ]
+                            )
+                        except (LookupError, UnicodeError):
+                            pass
+
+                    filename = filename or "unnamed"
+                    # Sanitize filename
+                    filename = Path(filename).name
+
+                    # Uniquify if in mbox
+                    prefix = f"{email_index}_" if email_index is not None else ""
+                    dest_filename = f"{prefix}{filename}"
+
+                    payload = part.get_payload(decode=True)
+                    size = len(payload) if payload else 0
+
                     attachments.append(
                         {
-                            "filename": part.get_filename() or "unnamed",
+                            "filename": dest_filename,
                             "content_type": content_type,
-                            "size": len(part.get_payload(decode=True) or b""),
+                            "size": size,
                         }
                     )
+
+                    if payload:
+                        try:
+                            attachments_dir.mkdir(parents=True, exist_ok=True)
+                            dest_path = attachments_dir / dest_filename
+                            if not dest_path.exists():
+                                dest_path.write_bytes(payload)
+                                logger.info(f"Extracted attachment to {dest_path}")
+                        except Exception as write_err:
+                            logger.error(
+                                f"Failed to write attachment {filename}: {write_err}"
+                            )
+
                 elif content_type == "text/plain" and not body_text:
                     payload = part.get_payload(decode=True)
-                    if payload:
-                        charset = part.get_content_charset() or "utf-8"
-                        body_text = payload.decode(charset, errors="replace")
+                    body_text = _safe_decode(payload, part.get_content_charset())
                 elif content_type == "text/html" and not body_text:
                     payload = part.get_payload(decode=True)
-                    if payload:
-                        charset = part.get_content_charset() or "utf-8"
-                        body_text = payload.decode(charset, errors="replace")
+                    body_text = _safe_decode(payload, part.get_content_charset())
         else:
             payload = msg.get_payload(decode=True)
-            if payload:
-                charset = msg.get_content_charset() or "utf-8"
-                body_text = payload.decode(charset, errors="replace")
+            body_text = _safe_decode(payload, msg.get_content_charset())
 
         return {
             "from": str(msg.get("From", "")),
