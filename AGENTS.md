@@ -29,8 +29,11 @@ A robust, local-first AI document analysis pipeline that ingests heterogeneous a
 
 ### Development Setup
 ```bash
+# Install system dependencies
+sudo apt-get install -y antiword
+
 # Sync dependencies
-uv sync
+uv sync --all-extras --dev
 ```
 
 ### Running the Pipeline

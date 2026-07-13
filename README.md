@@ -29,7 +29,7 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 - **Data Parsing & Spreadsheets**: An `EmailParserPlugin` accurately parses `.eml` and `.mbox` files (note: `.mbox` and `.xml` files are ignored by the scanner by default; `.mbox` must be extracted into `.eml` format first to be parsed), while the `SpreadsheetAnalyzerPlugin` extracts and summarizes tabular data from `.xlsx`, `.csv`, and `.ods`.
 
 ### 5. Rich Text & Metadata Extraction
-- **Broad File Support**: Extract metadata and content from PDFs (`pdfplumber`), Word Docs (`python-docx`), HTML web pages (`BeautifulSoup4`), and standard text/code files. Blocking file I/O operations are offloaded using `asyncio.to_thread` for optimal performance.
+- **Broad File Support**: Extract metadata and content from PDFs (`pdfplumber`), Word Docs (`python-docx`, plus `antiword` for legacy `.doc`), HTML web pages (`BeautifulSoup4`), and standard text/code files. Blocking file I/O operations are offloaded using `asyncio.to_thread` for optimal performance.
 - **Optical Character Recognition (OCR) & Vision Analysis**: Automatically detects images and extracts text using Tesseract OCR (`pytesseract`) or optionally through **Google Cloud Document AI** (`DocumentAIExtractorPlugin`) for highly accurate cloud-based extraction. The `OCRConfidenceScorerPlugin` scores the quality of local OCR extraction. Separately, `VisionAnalyzerPlugin` unconditionally runs on all images to utilize a multimodal Vision LLM to describe the visual content, maintaining a clear separation of concerns.
 - **Vision Memory Safeguards**: Implements proactive image resizing (configurable via `VISION_MAX_PIXELS`) to prevent out-of-memory (OOM) crashes during local inference of high-resolution scans.
 
