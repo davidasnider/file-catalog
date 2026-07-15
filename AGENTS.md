@@ -88,7 +88,9 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 ## 🏛 Architecture & Domain Concepts
 
 - **Optimized Batch Loading:** `fetch_all_tasks_for_documents` leverages SQLite's `json_each()` function to expand JSON arrays into rows. This allows batching queries efficiently, avoiding parameter limits (usually 999) without chunking, while maintaining a chunked `.in_()` clause fallback for non-SQLite backends.
-- **Filesystem Synchronization:** `DocumentStatus.NOT_PRESENT` is a core status used for filesystem synchronization. It is used to mark files that were previously cataloged but are now deleted or missing from their original location on disk. When the system runs an incremental scan and detects that a file is missing, its status is set to `NOT_PRESENT` (bypassing the standard processing pipeline). Crucially, when a document transitions to this state, it is automatically purged from the Full-Text Search (FTS) index, ensuring that search results remain accurate and do not surface stale data for files that no longer exist.
+- **Filesystem Synchronization:** `DocumentStatus.NOT_PRESENT` marks files that were previously cataloged but are now deleted or missing from disk. Key behaviors:
+  - Set during incremental scans when a file is no longer found (bypasses the standard processing pipeline).
+  - Automatically purges the document from the Full-Text Search (FTS) index, preventing stale search results.
 
 ## 📝 Development Conventions
 
@@ -100,7 +102,7 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 - **Linting:** The project uses `ruff` for linting and formatting. Ensure pre-commit hooks are enabled.
 
 ## ⚙️ Configuration
-Settings are managed in `.env` or via CLI arguments in `scanner.py`. The `src/core/config.py` file includes an `update_config_from_cli` utility function designed to patch the global `config` object with CLI arguments, applying only non-`None` values that correspond to existing attributes in the `Settings` class.
+Settings are managed in `.env` or via CLI arguments in `scanner.py`.
 - `LLM_PROVIDER`: `mlx` (default), `llama_cpp`, or `gemini`.
 - `USE_DOCUMENT_AI`: Set to `True` to use Google Cloud Document AI for advanced text extraction.
 - `DOC_AI_PROCESSOR_ID`: The processor ID for Google Cloud Document AI.

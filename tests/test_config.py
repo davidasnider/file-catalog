@@ -1,24 +1,32 @@
 import os
 
 import pytest
-from src.core.config import Settings, update_config_from_cli, config
+from pydantic_settings import SettingsConfigDict
+
+from src.core.config import Settings, config, update_config_from_cli
 
 
 @pytest.fixture
 def clean_env(monkeypatch):
     """Ensure environment variables don't interfere with defaults."""
-    # We clear known keys to ensure we get defaults
+    # We clear known keys (and their TEST_ prefixed variants) to ensure we get defaults
     keys_to_clear = [
         k
         for k in os.environ.keys()
         if k.upper()
         in [
             "LLM_PROVIDER",
+            "TEST_LLM_PROVIDER",
             "VISION_PROVIDER",
+            "TEST_VISION_PROVIDER",
             "VISION_MAX_PIXELS",
+            "TEST_VISION_MAX_PIXELS",
             "MAX_CONCURRENT",
+            "TEST_MAX_CONCURRENT",
             "LLM_MODEL_PATH",
+            "TEST_LLM_MODEL_PATH",
             "VISION_MODEL_PATH",
+            "TEST_VISION_MODEL_PATH",
         ]
     ]
     for key in keys_to_clear:
@@ -26,9 +34,11 @@ def clean_env(monkeypatch):
 
 
 def test_settings_defaults(clean_env):
-    # To avoid relying on env_file logic mutating monkeypatch dict
-    # we just pass _env_file=None
-    settings = Settings(_env_file=None)
+    # Bypass all environment variables during testing
+    class TestSettings(Settings):
+        model_config = SettingsConfigDict(env_file=None, env_prefix="TEST_")
+
+    settings = TestSettings(_env_file=None)
     assert settings.llm_provider == "openai"
     assert settings.vision_provider == "openai"
     assert settings.vision_max_pixels == 1048576
@@ -45,7 +55,7 @@ def test_settings_properties():
 
 
 def test_update_config_from_cli():
-    # Instead of global modification, mock the attributes on config
+    # Mutate the global config directly, saving the original state to restore in the finally block
     original_provider = config.llm_provider
     original_max_concurrent = config.max_concurrent
 
