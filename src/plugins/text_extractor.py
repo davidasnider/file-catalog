@@ -312,13 +312,43 @@ class TextExtractorPlugin(AnalyzerBase):
                     body = ""
                     if msg.is_multipart():
                         for part in msg.walk():
-                            if part.get_content_type() == "text/plain":
+                            ctype = part.get_content_type()
+                            if ctype == "text/plain":
                                 body = part.get_content()
                                 break
+                            elif ctype == "text/html" and not body:
+                                body = part.get_content()
                     else:
-                        body = msg.get_content()
+                        try:
+                            body = msg.get_content()
+                        except Exception:
+                            # Fallback for Eudora or other malformed emails
+                            payload = msg.get_payload(decode=True)
+                            if isinstance(payload, bytes):
+                                charset = msg.get_content_charset() or "utf-8"
+                                try:
+                                    body = payload.decode(charset, errors="replace")
+                                except LookupError:
+                                    body = payload.decode("utf-8", errors="replace")
+                            elif isinstance(payload, str):
+                                body = payload
+                            else:
+                                body = str(payload) if payload else ""
 
-                    extracted_text = f"Subject: {subject}\nFrom: {from_addr}\nTo: {to_addr}\nDate: {date}\n\n{body}"
+                    # Clean HTML from body if it is an HTML body
+                    body_str = str(body).strip()
+                    if body_str.lower().startswith(
+                        ("<html", "<!doctype html", "<x-html")
+                    ):
+                        try:
+                            from bs4 import BeautifulSoup
+
+                            soup = BeautifulSoup(body_str, "html.parser")
+                            body_str = soup.get_text(separator="\n", strip=True)
+                        except Exception:
+                            pass
+
+                    extracted_text = f"Subject: {subject}\nFrom: {from_addr}\nTo: {to_addr}\nDate: {date}\n\n{body_str}"
                 except Exception as e:
                     logger.error(f"Email parsing failed for {file_path}: {e}")
                     extracted_text = ""

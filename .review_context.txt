@@ -1,0 +1,54 @@
+PR #146 Review Context
+=============================
+
+Recent Commits:
+---------------
+b4a35ce feat: extract email attachments to disk, improve email parsing, add task invalidation script
+
+PR Discussion History:
+----------------------
+### PR #146: feat: extract email attachments, improve parsing, add task invalidation script
+**URL:** https://github.com/davidasnider/file-catalog/pull/146
+
+**PR Description:**
+> ## Summary
+>
+> Three improvements to the email processing pipeline and a new utility script for retrying failed tasks.
+>
+> ### Changes
+>
+> **EmailParserPlugin** (`src/plugins/email_parser.py`)
+> - Attachments are now extracted to disk in a `[file]_attachments/` directory next to the source email
+> - Proper filen...
+
+**Reviews:**
+- **davidasnider** (COMMENTED): Review feedback on email_parser.py
+- **davidasnider** (COMMENTED): Additional review feedback on text_extractor.py and invalidate_failed_tasks.py
+
+**Code Review Threads (Inline):**
+- **davidasnider** on `src/plugins/email_parser.py` line 100 (Resolved):
+> `_safe_decode` is defined as a nested function inside `_extract_email_data`, so it gets recreated on every call. Consider making it a `@staticmethod` on the class or a module-level function.
+>
+> Then update the call sites from `_safe_decode(...)` to `self._safe_decode(...)`.
+  - **davidasnider**: Acknowledged! Since this is a non-blocking suggestion/nitpick and the current implementation is functionally correct, we will keep it as-is to wrap up this PR. Thank you, @davidasnider!
+- **davidasnider** on `src/plugins/email_parser.py` line 131 (Unresolved):
+> Bare `except Exception` here swallows all errors during filename decoding. Since the only expected failure mode is a decoding error, use `except (LookupError, UnicodeError):` to be more targeted.
+- **davidasnider** on `src/plugins/text_extractor.py` line 341 (Resolved):
+> `"<x-html"` is not a standard HTML tag. If this is meant to catch XHTML documents, consider `"<xhtml"`. If it is intentional for a specific format, a comment explaining which format would help.
+  - **davidasnider**: Acknowledged! Since this is a non-blocking suggestion/nitpick and the current implementation is functionally correct, we will keep it as-is to wrap up this PR. Thank you, @davidasnider!
+- **davidasnider** on `src/scripts/invalidate_failed_tasks.py` line 47 (Unresolved):
+> User-supplied `error_filter` is interpolated directly into a SQL `LIKE` pattern. The `%` and `_` characters are SQL wildcards and could produce unexpected matches. Escape them before use:
+>
+> ```python
+> escaped = error_filter.replace("\\\\", "\\\\\\\\").replace("%", "\\%")
+> ```
+>
+> Same applies to `task_filter` — consider using `==` (exact match) instead of `like` there.
+- **davidasnider** on `src/scripts/invalidate_failed_tasks.py` line 84 (Unresolved):
+> Task objects are modified here (`.status` and `.error_message`), but `session.commit()` only happens inside the document batch loop below. If `doc_ids_to_reset` is empty (e.g., all parent documents are already in `PENDING` or `NOT_PRESENT` state), the task changes are never flushed to the database.
+>
+> Add a commit after the task modification loop:
+>
+> ```python
+> await session.commit()
+> ```
