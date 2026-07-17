@@ -23,7 +23,7 @@ A robust, local-first AI document analysis pipeline that ingests heterogeneous a
 - `src/plugins/`: Modular analysis units (e.g., `TextExtractor`, `DocumentAIExtractor`, `Summarizer`, `EstateAnalyzer`, `PIIHarvester`).
 - `src/db/`: Database models (`models.py`), engine setup (`engine.py`), and FTS5 search (`fts.py`).
 - `src/llm/`: Provider abstractions (`provider.py`, `llama_cpp.py`, `mlx_provider.py`, `gemini.py`).
-- `src/scripts/`: Utility scripts for archive extraction, mailbox processing, and FTS synchronization.
+- `src/scripts/`: Utility scripts for archive extraction, mailbox processing, FTS synchronization, and task invalidation.
 
 ## 🚀 Key Commands
 
@@ -83,6 +83,9 @@ python -m src.scripts.report_failures
 
 # Scan a directory for text extraction failures
 python -m src.scripts.scan_text_failures "/path/to/directory"
+
+# Invalidate and reset tasks for retry
+python -m src.scripts.invalidate_failed_tasks
 ```
 
 ## 🏛 Architecture & Domain Concepts
