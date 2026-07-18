@@ -26,10 +26,10 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 - **PII Harvesting**: A specialized `PIIHarvesterPlugin` leverages strict JSON-Schema enforcement to extract named entities (Names, Emails, Addresses) into the database.
 - **Credential Detection**: A high-precision `PasswordExtractorPlugin` specifically identifies authentication passwords, PINs, and secrets with advanced hallucination filtering.
 - **Estate & Legal Analysis**: `EstateAnalyzerPlugin` identifies critical documents for estate planning (Wills, Trusts, Financial Assets) using forensic-level reasoning.
-- **Data Parsing & Spreadsheets**: An `EmailParserPlugin` accurately parses `.eml` and `.mbox` files (note: `.mbox` and `.xml` files are ignored by the scanner by default; `.mbox` must be extracted into `.eml` format first to be parsed), while the `SpreadsheetAnalyzerPlugin` extracts and summarizes tabular data from `.xlsx`, `.csv`, and `.ods`.
+- **Data Parsing & Spreadsheets**: An `EmailParserPlugin` accurately parses `.eml` and `.mbox` files and extracts attachments to a dedicated `[file]_attachments/` directory alongside the source email (note: `.mbox` and `.xml` files are ignored by the scanner by default; `.mbox` must be extracted into `.eml` format first to be parsed), while the `SpreadsheetAnalyzerPlugin` extracts and summarizes tabular data from `.xlsx`, `.csv`, and `.ods`.
 
 ### 5. Rich Text & Metadata Extraction
-- **Broad File Support**: Extract metadata and content from PDFs (`pdfplumber`), Word Docs (`python-docx`), HTML web pages (`BeautifulSoup4`), and standard text/code files. Blocking file I/O operations are offloaded using `asyncio.to_thread` for optimal performance.
+- **Broad File Support**: Extract metadata and content from PDFs (`pdfplumber`), Word Docs (`python-docx`), HTML web pages (`BeautifulSoup4`), and standard text/code files. Includes fallback parsing for malformed emails and HTML body extraction with BeautifulSoup cleanup in the `TextExtractorPlugin`. Blocking file I/O operations are offloaded using `asyncio.to_thread` for optimal performance.
 - **Optical Character Recognition (OCR) & Vision Analysis**: Automatically detects images and extracts text using Tesseract OCR (`pytesseract`) or optionally through **Google Cloud Document AI** (`DocumentAIExtractorPlugin`) for highly accurate cloud-based extraction. The `OCRConfidenceScorerPlugin` scores the quality of local OCR extraction. Separately, `VisionAnalyzerPlugin` unconditionally runs on all images to utilize a multimodal Vision LLM to describe the visual content, maintaining a clear separation of concerns.
 - **Vision Memory Safeguards**: Implements proactive image resizing (configurable via `VISION_MAX_PIXELS`) to prevent out-of-memory (OOM) crashes during local inference of high-resolution scans.
 
@@ -80,7 +80,7 @@ The system implements a **Quick Skip** mechanism. It tracks the `file_size` and 
 Additionally, when resuming scans, a **Priority-Based Hydration** logic is used to aggressively push incomplete tasks forward: unprocessed files are prioritized first, followed by failed files, and finally partially processed/retrying files. For evaluation, use `python src/scanner.py --judge` to run a standalone LLM-as-a-Judge on unjudged/older tasks to track analysis quality.
 
 ## Utility Scripts
-For more details on utility scripts such as MBOX Exploder, Archive Extractor, FTS Index Synchronizer, Duplicate Remover, Inspect File with YAML output, Remove XML Records, Report Failures, Scan Text Extraction Failures, Performance Benchmarking, and Summary Evaluation, please refer to the [utility scripts README](src/scripts/README.md).
+For more details on utility scripts such as MBOX Exploder, Archive Extractor, FTS Index Synchronizer, Duplicate Remover, Inspect File with YAML output, Remove XML Records, Report Failures, Scan Text Extraction Failures, Task Invalidation, Performance Benchmarking, and Summary Evaluation, please refer to the [utility scripts README](src/scripts/README.md).
 
 ---
 *Built with Python, SQLite (SQLModel), Streamlit, and Llama.cpp.*
