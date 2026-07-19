@@ -74,6 +74,14 @@ async def test_email_parser_multipart_with_attachment(tmp_path):
     assert len(email_data["attachments"]) == 1
     assert email_data["attachments"][0]["filename"] == "report.pdf"
     assert email_data["attachments"][0]["content_type"] == "application/pdf"
+    assert email_data["attachments"][0]["size"] == len(b"Hello World")
+
+    # Verify attachment was written to disk
+    attachments_dir = tmp_path / "multipart.eml_attachments"
+    assert attachments_dir.exists()
+    attachment_file = attachments_dir / "report.pdf"
+    assert attachment_file.exists()
+    assert attachment_file.read_bytes() == b"Hello World"
 
 
 @pytest.mark.asyncio
