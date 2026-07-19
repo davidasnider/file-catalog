@@ -154,5 +154,24 @@ python -m src.scripts.delete_duplicates "/path/to/directory"
 
 The script prompts for confirmation before performing real deletions (unless `--yes` is provided).
 
+
+### 11. Task Invalidator (`invalidate_failed_tasks.py`)
+Finds tasks matching specific filters (like task name, error message, or MIME type) and status, resets them to PENDING, and resets their parent documents to PENDING so they are re-scanned.
+
+**Examples:**
+```bash
+# Preview what tasks would be reset without making changes
+python -m src.scripts.invalidate_failed_tasks --dry-run
+
+# Invalidate tasks by specific task name
+python -m src.scripts.invalidate_failed_tasks --task TextExtractor
+
+# Invalidate tasks containing a specific error message
+python -m src.scripts.invalidate_failed_tasks --error "Connection timed out"
+
+# Invalidate tasks with a specific status (COMPLETED instead of FAILED)
+python -m src.scripts.invalidate_failed_tasks --status COMPLETED
+```
+
 ## General Usage Note
 All scripts should be run from the root of the project using the `python -m src.scripts.<script_name>` syntax to ensure that internal imports and the `PYTHONPATH` are handled correctly.
