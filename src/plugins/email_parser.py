@@ -3,6 +3,7 @@ from __future__ import annotations
 import email
 import email.policy
 import logging
+from pathlib import Path
 from src.core.mbox_utils import RobustMbox
 from typing import Dict, Any
 
@@ -95,7 +96,7 @@ class EmailParserPlugin(AnalyzerBase):
                 if "attachment" in disposition:
                     attachments.append(
                         {
-                            "filename": part.get_filename() or "unnamed",
+                            "filename": Path(part.get_filename() or "unnamed").name,
                             "content_type": content_type,
                             "size": len(part.get_payload(decode=True) or b""),
                         }
