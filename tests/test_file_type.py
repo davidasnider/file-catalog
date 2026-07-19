@@ -71,3 +71,23 @@ def test_detect_file_type_magic_error():
 
         mime_type = detect_file_type("test.png")
         assert mime_type == "image/png"
+
+
+def test_detect_file_type_wma_override():
+    """
+    Test that a .wma file identified as video/x-ms-asf by libmagic
+    is correctly overridden to audio/x-ms-wma.
+    """
+    with patch("magic.from_file") as mock_magic, patch("os.path.exists") as mock_exists:
+        # Ensure file "exists" for detection logic
+        mock_exists.return_value = True
+        # Simulate libmagic misidentifying a .wma file as video/x-ms-asf
+        mock_magic.return_value = "video/x-ms-asf"
+
+        # Test with a .wma extension
+        mime_type = detect_file_type("test_file.wma")
+        assert mime_type == "audio/x-ms-wma"
+
+        # Test with a different extension
+        mime_type = detect_file_type("test_file.asf")
+        assert mime_type == "video/x-ms-asf"
