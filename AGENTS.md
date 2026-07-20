@@ -83,6 +83,9 @@ python -m src.scripts.report_failures
 
 # Scan a directory for text extraction failures
 python -m src.scripts.scan_text_failures "/path/to/directory"
+
+# Reset failed or completed tasks and their parent documents to PENDING for retry
+python -m src.scripts.invalidate_failed_tasks --status FAILED --dry-run
 ```
 
 ## 🏛 Architecture & Domain Concepts
@@ -93,6 +96,7 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 - **JSON Output Handling**: The utility function `repair_and_load_json` in `src/core/text_utils.py` is the standard way to handle malformed LLM JSON outputs; it utilizes `json_repair.loads` for robust repairing and parsing in one step, and maintains a manual fallback heuristic for severely truncated strings.
 - **Search Snippets Rendering**: To securely render SQLite FTS5 search snippets in the Streamlit UI, the project uses control character delimiters (`\x01` / `\x02`) in the FTS query; `src/ui/snippets.py` applies `html.escape()` and replaces these markers with Markdown bold (`**`) to avoid using `unsafe_allow_html=True`.
 - **Configuration Updates**: The `src/core/config.py` file includes an `update_config_from_cli` utility function designed to patch the global `config` object with CLI arguments, applying only non-`None` values that correspond to existing attributes in the `Settings` class.
+- **Email Parsing & Attachments**: `EmailParserPlugin` extracts attachments to a `[file]_attachments/` directory next to the source email. The `TextExtractorPlugin` includes fallback parsing for malformed emails and HTML body extraction with BeautifulSoup cleanup and graceful charset handling.
 - **Filesystem Synchronization:** `DocumentStatus.NOT_PRESENT` marks files that were previously cataloged but are now deleted or missing from disk. Key behaviors:
   - Set during incremental scans when a file is no longer found (bypasses the standard processing pipeline).
   - Automatically purges the document from the Full-Text Search (FTS) index, preventing stale search results.
