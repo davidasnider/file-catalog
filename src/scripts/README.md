@@ -154,9 +154,6 @@ python -m src.scripts.delete_duplicates "/path/to/directory"
 
 The script prompts for confirmation before performing real deletions (unless `--yes` is provided).
 
-## General Usage Note
-All scripts should be run from the root of the project using the `python -m src.scripts.<script_name>` syntax to ensure that internal imports and the `PYTHONPATH` are handled correctly.
-
 ---
 
 ### 11. Task Invalidation (`invalidate_failed_tasks.py`)
@@ -170,3 +167,8 @@ python -m src.scripts.invalidate_failed_tasks --status FAILED --dry-run
 # Invalidate tasks for real
 python -m src.scripts.invalidate_failed_tasks --status FAILED
 ```
+
+---
+
+## General Usage Note
+All scripts should be run from the root of the project using the `python -m src.scripts.<script_name>` syntax to ensure that internal imports and the `PYTHONPATH` are handled correctly.
