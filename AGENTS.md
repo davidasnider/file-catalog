@@ -30,7 +30,8 @@ A robust, local-first AI document analysis pipeline that ingests heterogeneous a
 ### Development Setup
 ```bash
 # Sync dependencies
-uv sync
+uv sync --all-extras --dev
+# Note: The system package "antiword" (e.g., `sudo apt-get install -y antiword`) is required for document extraction features and tests to run successfully.
 ```
 
 ### Running the Pipeline
@@ -90,7 +91,7 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 - **Optimized Batch Loading:** `fetch_all_tasks_for_documents` leverages SQLite's `json_each()` function to expand JSON arrays into rows. This allows batching queries efficiently, avoiding parameter limits (usually 999) without chunking, while maintaining a chunked `.in_()` clause fallback for non-SQLite backends.
 - **Database Sessions**: Database sessions are configured with `expire_on_commit=False` by default (see `src/db/engine.py`), which allows model instances to remain valid and accessible after a session commit without requiring explicit re-fetching or refreshing.
 - **Archive Extraction**: Archive extraction (Tar, Zip, 7z) must be hardened against path traversal. For Tar files on Python 3.12+, use `extractall(dest, filter="data")`. For 7z archives, explicitly validate that both member paths and link targets (symlinks) resolve within the target destination directory. For ZIP files, validate member paths to prevent traversal (note: symlink link targets are not checked per-member).
-- **JSON Output Handling**: The utility function `repair_and_load_json` in `src/core/text_utils.py` is the standard way to handle malformed LLM JSON outputs. It functions correctly by calling `repair_json` followed by `json.loads`. Do not refactor this to use `json_repair.loads` exclusively, as doing so may unintentionally remove necessary local imports (e.g., `import json`) and break existing localized error handling.
+- **JSON Output Handling**: The utility function `repair_and_load_json` in `src/core/text_utils.py` is the standard way to handle malformed LLM JSON outputs; it utilizes `json_repair.loads` for robust repairing and parsing in one step, and maintains a manual fallback heuristic for severely truncated strings.
 - **Search Snippets Rendering**: To securely render SQLite FTS5 search snippets in the Streamlit UI, the project uses control character delimiters (`\x01` for start and `\x02` for end) in the FTS query (defined as `FTS_HL_START` and `FTS_HL_END` in `src/db/fts.py`). The frontend (`app.py`) applies `html.escape()` and replaces these delimiters with Markdown bold (`**`) markers via the `render_snippet` function in `src/ui/snippets.py`, to avoid using `unsafe_allow_html=True`.
 - **Configuration Updates**: The `src/core/config.py` file includes an `update_config_from_cli` utility function designed to patch the global `config` object with CLI arguments, applying only non-`None` values that correspond to existing attributes in the `Settings` class.
 - **Filesystem Synchronization:** `DocumentStatus.NOT_PRESENT` marks files that were previously cataloged but are now deleted or missing from disk. Key behaviors:
@@ -100,6 +101,7 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 ## 📝 Development Conventions
 
 - **Async First:** The core pipeline is fully asynchronous. Always use `await` for I/O and DB operations.
+- **Expected Empty Outcomes:** In the plugin architecture, plugins must gracefully handle expected empty outcomes (e.g., an image with no text in OCR) by returning success with empty content (e.g. `{"text": "", "extracted": True}`). Raising exceptions for expected empty conditions triggers the `TaskEngine` retry loop and inappropriately marks tasks as failed.
 - **Plugin Architecture:** To add a new analyzer, create a new file in `src/plugins/` inheriting from `AnalyzerBase`. The `TaskEngine` will automatically discover and run it based on its `should_run()` condition.
 - **LLM Abstraction:** Do not call LLM libraries directly in plugins. Use the `LLMProvider` interface to ensure model portability.
 - **Type Safety:** Use type hints throughout the codebase. `SQLModel` provides dual-purpose classes for both DB schema and Pydantic validation.
