@@ -33,7 +33,7 @@ Rebuild the application from the ground up to address robustness, extensibility,
     When the system runs an incremental scan and detects that a file is missing, its `status` is set to `NOT_PRESENT` (bypassing the standard processing pipeline).
     Crucially, when a document transitions to this state, it is automatically purged from the Full-Text Search (FTS) index,
     ensuring that search results remain accurate and do not surface stale data for files that no longer exist.
-    The FTS search implementation safely escapes input to prevent SQL injection vulnerabilities.
+    The FTS search implementation safely escapes input by wrapping the user search string in double quotes to execute a phrase search and escaping internal double quotes by doubling them to prevent SQL injection vulnerabilities.
   - `AnalysisTask`: Each document has multiple linked tasks (e.g., OCR, Text Splitting, Summarization, Estate Analysis). Each task has its own status (`PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `RETRIES`). It also includes a `judged_at` timestamp which is used to prioritize unjudged and older tasks during background evaluation by the `TaskJudge`.
 
 ### 2.2 Advanced File Type Detection

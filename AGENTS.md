@@ -83,6 +83,9 @@ python -m src.scripts.report_failures
 
 # Scan a directory for text extraction failures
 python -m src.scripts.scan_text_failures "/path/to/directory"
+
+# Invalidate tasks in the database to retry them
+python -m src.scripts.invalidate_failed_tasks --task TextExtractor
 ```
 
 ## 🏛 Architecture & Domain Concepts
@@ -91,6 +94,7 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 - **Database Sessions**: Database sessions are configured with `expire_on_commit=False` by default (see `src/db/engine.py`), which allows model instances to remain valid and accessible after a session commit without requiring explicit re-fetching or refreshing.
 - **Archive Extraction**: Archive extraction (Tar, Zip, 7z) must be hardened against path traversal. For Tar files on Python 3.12+, use `extractall(dest, filter="data")`. For 7z archives, explicitly validate that both member paths and link targets (symlinks) resolve within the target destination directory. For ZIP files, validate member paths to prevent traversal (note: symlink link targets are not checked per-member).
 - **JSON Output Handling**: The utility function `repair_and_load_json` in `src/core/text_utils.py` is the standard way to handle malformed LLM JSON outputs. It functions correctly by calling `repair_json` followed by `json.loads`. Do not refactor this to use `json_repair.loads` exclusively, as doing so may unintentionally remove necessary local imports (e.g., `import json`) and break existing localized error handling.
+- **Search Sanitization:** When constructing SQLite FTS5 queries, wrap the user search string in double quotes to execute a phrase search and avoid syntax errors from punctuation. Additionally, escape internal double quotes by doubling them to properly sanitize the input and prevent SQL injection vulnerabilities.
 - **Search Snippets Rendering**: To securely render SQLite FTS5 search snippets in the Streamlit UI, the project uses control character delimiters (`\x01` for start and `\x02` for end) in the FTS query (defined as `FTS_HL_START` and `FTS_HL_END` in `src/db/fts.py`). The frontend (`app.py`) applies `html.escape()` and replaces these delimiters with Markdown bold (`**`) markers via the `render_snippet` function in `src/ui/snippets.py`, to avoid using `unsafe_allow_html=True`.
 - **Configuration Updates**: The `src/core/config.py` file includes an `update_config_from_cli` utility function designed to patch the global `config` object with CLI arguments, applying only non-`None` values that correspond to existing attributes in the `Settings` class.
 - **Filesystem Synchronization:** `DocumentStatus.NOT_PRESENT` marks files that were previously cataloged but are now deleted or missing from disk. Key behaviors:
@@ -103,7 +107,7 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 - **Plugin Architecture:** To add a new analyzer, create a new file in `src/plugins/` inheriting from `AnalyzerBase`. The `TaskEngine` will automatically discover and run it based on its `should_run()` condition.
 - **LLM Abstraction:** Do not call LLM libraries directly in plugins. Use the `LLMProvider` interface to ensure model portability.
 - **Type Safety:** Use type hints throughout the codebase. `SQLModel` provides dual-purpose classes for both DB schema and Pydantic validation.
-- **Error Handling:** Plugins should catch their own exceptions and return descriptive error messages in the `AnalysisTask` record rather than crashing the engine.
+- **Error Handling:** Plugins should catch their own exceptions and return descriptive error messages in the `AnalysisTask` record rather than crashing the engine. In retry loops involving database models (e.g., `TaskEngine.execute_plugin`), initialize the model variable (e.g., `task = None`) outside the `while` block and use explicit `is not None` guard in exception handlers to prevent `UnboundLocalError` if the initial fetch fails.
 - **Linting:** The project uses `ruff` for linting and formatting. Ensure pre-commit hooks are enabled.
 
 ## ⚙️ Configuration
