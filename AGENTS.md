@@ -75,6 +75,9 @@ python src/scanner.py --judge
 # Inspect a file's metadata and analysis results
 python -m src.scripts.inspect_file "/path/to/document.pdf"
 
+# Reset failed tasks and their parent documents to PENDING for retry
+python -m src.scripts.invalidate_failed_tasks --status FAILED --dry-run
+
 # Remove XML-related documents and tasks
 python -m src.scripts.remove_xml_records
 
