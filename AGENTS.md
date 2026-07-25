@@ -83,6 +83,9 @@ python -m src.scripts.report_failures
 
 # Scan a directory for text extraction failures
 python -m src.scripts.scan_text_failures "/path/to/directory"
+
+# Invalidate and reset failed tasks matching specific criteria
+python -m src.scripts.invalidate_failed_tasks --task TextExtractor --dry-run
 ```
 
 ## 🏛 Architecture & Domain Concepts
@@ -96,6 +99,8 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 - **Filesystem Synchronization:** `DocumentStatus.NOT_PRESENT` marks files that were previously cataloged but are now deleted or missing from disk. Key behaviors:
   - Set during incremental scans when a file is no longer found (bypasses the standard processing pipeline).
   - Automatically purges the document from the Full-Text Search (FTS) index, preventing stale search results.
+- **Email Processing:** The `EmailParserPlugin` extracts email attachments to a dedicated `[file]_attachments/` directory located alongside the source email file. The `TextExtractorPlugin` includes robust fallback parsing for malformed emails (e.g., Eudora) and HTML body extraction using BeautifulSoup cleanup and graceful charset handling.
+- **Task Management:** The `invalidate_failed_tasks.py` utility script finds tasks matching filters (task name, error message, MIME type) and status, resets them to `PENDING`, and resets their parent documents to `PENDING` so they are re-scanned, supporting dry-runs.
 
 ## 📝 Development Conventions
 
