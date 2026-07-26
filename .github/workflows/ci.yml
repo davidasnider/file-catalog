@@ -27,6 +27,9 @@ jobs:
       with:
         python-version-file: ".python-version"
 
+    - name: Install System Dependencies
+      run: sudo apt-get update && sudo apt-get install -y antiword tesseract-ocr ffmpeg
+
     - name: Install dependencies
       run: uv sync --all-extras --dev
 
