@@ -156,3 +156,20 @@ The script prompts for confirmation before performing real deletions (unless `--
 
 ## General Usage Note
 All scripts should be run from the root of the project using the `python -m src.scripts.<script_name>` syntax to ensure that internal imports and the `PYTHONPATH` are handled correctly.
+
+---
+
+### 11. Task Invalidation (`invalidate_failed_tasks.py`)
+Find tasks matching filters and status, reset them to PENDING, and reset their parent documents to PENDING so they are re-scanned. Supports dry-runs and various filters.
+
+**Examples:**
+```bash
+# Invalidate all FAILED tasks
+python -m src.scripts.invalidate_failed_tasks
+
+# Invalidate COMPLETED tasks for a specific task type
+python -m src.scripts.invalidate_failed_tasks --task TextExtractor --status COMPLETED
+
+# Preview tasks that would be invalidated
+python -m src.scripts.invalidate_failed_tasks --dry-run
+```

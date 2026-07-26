@@ -95,4 +95,4 @@ Application configuration is centrally managed via `pydantic-settings` in `src/c
   1. **Archive/Mailbox Extraction:** Converting `.zip` and `.mbox` files into ingestible formats.
   2. **Deduplication:** A standalone `Duplicate Remover` to clean the filesystem before or after ingestion.
   3. **Index Management:** Tools for manually syncing the FTS5 index and purging noise records (e.g., XML) (`sync_fts.py`, `remove_xml_records.py`).
-  4. **Diagnostic Tools:** Performance benchmarking, evaluation of AI-generated summaries, pipeline failure reporting, text extraction failure scanning, and file inspection (`perf_test_llms.py`, `evaluate_summaries.py`, `report_failures.py`, `scan_text_failures.py`, `inspect_file.py`).
+  4. **Diagnostic Tools:** Performance benchmarking, evaluation of AI-generated summaries, pipeline failure reporting, text extraction failure scanning, task invalidation, and file inspection (`perf_test_llms.py`, `evaluate_summaries.py`, `report_failures.py`, `scan_text_failures.py`, `invalidate_failed_tasks.py`, `inspect_file.py`).
