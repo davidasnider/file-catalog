@@ -154,5 +154,22 @@ python -m src.scripts.delete_duplicates "/path/to/directory"
 
 The script prompts for confirmation before performing real deletions (unless `--yes` is provided).
 
+
+### 11. Task Invalidation Script (`invalidate_failed_tasks.py`)
+Resets FAILED or COMPLETED tasks and their parent documents to PENDING for retry. This is useful for re-running specific failed tasks without rescanning the entire repository. Supports dry-runs and filtering by task name, error message, mime type, and current status.
+
+**Examples:**
+```bash
+# Preview which tasks would be reset (dry-run)
+python -m src.scripts.invalidate_failed_tasks --dry-run
+
+# Invalidate all FAILED tasks
+python -m src.scripts.invalidate_failed_tasks
+
+# Invalidate COMPLETED tasks for a specific plugin
+python -m src.scripts.invalidate_failed_tasks --status COMPLETED --task TextExtractor
+```
+---
+
 ## General Usage Note
 All scripts should be run from the root of the project using the `python -m src.scripts.<script_name>` syntax to ensure that internal imports and the `PYTHONPATH` are handled correctly.

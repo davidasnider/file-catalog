@@ -78,6 +78,9 @@ python -m src.scripts.inspect_file "/path/to/document.pdf"
 # Remove XML-related documents and tasks
 python -m src.scripts.remove_xml_records
 
+# Reset failed tasks to PENDING for retry
+python -m src.scripts.invalidate_failed_tasks
+
 # Report pipeline failures
 python -m src.scripts.report_failures
 
