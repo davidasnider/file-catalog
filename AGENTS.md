@@ -87,6 +87,9 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 
 ## 🏛 Architecture & Domain Concepts
 
+- **Task Invalidation:** The `invalidate_failed_tasks.py` utility script in `src/scripts/` finds tasks matching filters and status, resets them to PENDING, and resets their parent documents to PENDING so they are re-scanned, supporting dry-runs and various filters.
+- **Email Attachment Extraction:** The `EmailParserPlugin` extracts email attachments to a dedicated `[file]_attachments/` directory located alongside the source email file.
+- **Email Parsing:** The `TextExtractorPlugin` includes robust fallback parsing for malformed emails (e.g., Eudora) and HTML body extraction using BeautifulSoup cleanup and graceful charset handling.
 - **Optimized Batch Loading:** `fetch_all_tasks_for_documents` leverages SQLite's `json_each()` function to expand JSON arrays into rows. This allows batching queries efficiently, avoiding parameter limits (usually 999) without chunking, while maintaining a chunked `.in_()` clause fallback for non-SQLite backends.
 - **Database Sessions**: Database sessions are configured with `expire_on_commit=False` by default (see `src/db/engine.py`), which allows model instances to remain valid and accessible after a session commit without requiring explicit re-fetching or refreshing.
 - **Archive Extraction**: Archive extraction (Tar, Zip, 7z) must be hardened against path traversal. For Tar files on Python 3.12+, use `extractall(dest, filter="data")`. For 7z archives, explicitly validate that both member paths and link targets (symlinks) resolve within the target destination directory. For ZIP files, validate member paths to prevent traversal (note: symlink link targets are not checked per-member).
