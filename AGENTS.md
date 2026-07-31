@@ -83,6 +83,9 @@ python -m src.scripts.report_failures
 
 # Scan a directory for text extraction failures
 python -m src.scripts.scan_text_failures "/path/to/directory"
+
+# Invalidate failed tasks for re-processing
+python -m src.scripts.invalidate_failed_tasks
 ```
 
 ## 🏛 Architecture & Domain Concepts
@@ -93,6 +96,7 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 - **JSON Output Handling**: The utility function `repair_and_load_json` in `src/core/text_utils.py` is the standard way to handle malformed LLM JSON outputs. It functions correctly by calling `repair_json` followed by `json.loads`. Do not refactor this to use `json_repair.loads` exclusively, as doing so may unintentionally remove necessary local imports (e.g., `import json`) and break existing localized error handling.
 - **Search Snippets Rendering**: To securely render SQLite FTS5 search snippets in the Streamlit UI, the project uses control character delimiters (`\x01` for start and `\x02` for end) in the FTS query (defined as `FTS_HL_START` and `FTS_HL_END` in `src/db/fts.py`). The frontend (`app.py`) applies `html.escape()` and replaces these delimiters with Markdown bold (`**`) markers via the `render_snippet` function in `src/ui/snippets.py`, to avoid using `unsafe_allow_html=True`.
 - **Configuration Updates**: The `src/core/config.py` file includes an `update_config_from_cli` utility function designed to patch the global `config` object with CLI arguments, applying only non-`None` values that correspond to existing attributes in the `Settings` class.
+- **Email Parser**: The `EmailParserPlugin` extracts email attachments to a dedicated `[file]_attachments/` directory located alongside the source email file.
 - **Filesystem Synchronization:** `DocumentStatus.NOT_PRESENT` marks files that were previously cataloged but are now deleted or missing from disk. Key behaviors:
   - Set during incremental scans when a file is no longer found (bypasses the standard processing pipeline).
   - Automatically purges the document from the Full-Text Search (FTS) index, preventing stale search results.
