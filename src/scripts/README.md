@@ -134,7 +134,27 @@ python -m src.scripts.scan_text_failures "/path/to/directory" --limit 10
 
 ---
 
-### 10. Duplicate Remover (`delete_duplicates.py`)
+### 10. Task Invalidation Utility (`invalidate_failed_tasks.py`)
+Invalidate and reset tasks in the database to retry them. This finds tasks matching filters and status, resets them to `PENDING`, and resets their parent documents to `PENDING` so they are re-scanned.
+
+**Examples:**
+```bash
+# Preview tasks that would be reset (dry-run)
+python -m src.scripts.invalidate_failed_tasks --status FAILED --dry-run
+
+# Invalidate specific tasks by name
+python -m src.scripts.invalidate_failed_tasks --task EmailParser
+
+# Invalidate tasks by error message substring
+python -m src.scripts.invalidate_failed_tasks --error "JSONDecodeError"
+
+# Invalidate tasks by MIME type prefix
+python -m src.scripts.invalidate_failed_tasks --mime "message/rfc822"
+```
+
+---
+
+### 11. Duplicate Remover (`delete_duplicates.py`)
 Finds and deletes duplicate files based on SHA-256 hashes. In case of duplicates, it automatically preserves the version with the shortest file path (fewer characters) and deletes the rest.
 
 **Examples:**

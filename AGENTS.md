@@ -83,6 +83,9 @@ python -m src.scripts.report_failures
 
 # Scan a directory for text extraction failures
 python -m src.scripts.scan_text_failures "/path/to/directory"
+
+# Invalidate and retry failed tasks
+python -m src.scripts.invalidate_failed_tasks --status FAILED
 ```
 
 ## 🏛 Architecture & Domain Concepts
