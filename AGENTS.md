@@ -30,7 +30,8 @@ A robust, local-first AI document analysis pipeline that ingests heterogeneous a
 ### Development Setup
 ```bash
 # Sync dependencies
-uv sync
+uv sync --all-extras --dev
+# Note: The system package "antiword" (e.g., `sudo apt-get install -y antiword`) is required for document extraction features and tests to run successfully.
 ```
 
 ### Running the Pipeline
@@ -102,6 +103,7 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 ## 📝 Development Conventions
 
 - **Async First:** The core pipeline is fully asynchronous. Always use `await` for I/O and DB operations.
+- **Expected Empty Outcomes:** In the plugin architecture, plugins must gracefully handle expected empty outcomes (e.g., an image with no text in OCR) by returning success with empty content (e.g. `{"text": "", "extracted": True}`). Raising exceptions for expected empty conditions triggers the `TaskEngine` retry loop and inappropriately marks tasks as failed.
 - **Plugin Architecture:** To add a new analyzer, create a new file in `src/plugins/` inheriting from `AnalyzerBase`. The `TaskEngine` will automatically discover and run it based on its `should_run()` condition.
 - **LLM Abstraction:** Do not call LLM libraries directly in plugins. Use the `LLMProvider` interface to ensure model portability.
 - **Type Safety:** Use type hints throughout the codebase. `SQLModel` provides dual-purpose classes for both DB schema and Pydantic validation.
