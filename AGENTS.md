@@ -104,10 +104,19 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 - **Testing Global State**: When writing tests that modify global state, use `monkeypatch.setattr` or `unittest.mock.patch` to safely isolate state changes instead of simple `try...finally` blocks.
 - **Simulating Missing Dependencies**: When writing tests that simulate `ImportError` (or `ModuleNotFoundError`) for missing dependencies, use `patch.dict('sys.modules', {'module_name': None})` to safely mock the missing module.
 - **Image Analysis Separation**: The application separates image analysis concerns between plugins: `TextExtractorPlugin` uses local OCR strictly for text extraction, while `VisionAnalyzerPlugin` runs unconditionally on all images to generate multimodal visual descriptions. Text extractors should not fall back to Vision LLMs.
-- **LLM Connection Caching**: API-based LLM providers (e.g., `OpenAIProvider`, `GeminiProvider`) implement connection caching via a class-level `_cache` dict and a `get_provider()` class method. This ensures underlying HTTP clients are reused across file processing tasks, unlike local models (`llama_cpp`, `mlx`) which use dedicated `ModelManager` classes.
-- **Async I/O Offloading**: Blocking file I/O operations (like reading PDFs or HTML in `TextExtractorPlugin`) are offloaded to separate threads using `asyncio.to_thread` for optimal performance.
-- **Email & HTML Fallbacks**: The `TextExtractorPlugin` includes robust fallback parsing for malformed emails (e.g., Eudora) and HTML body extraction using BeautifulSoup cleanup and graceful charset handling. Note that `.mbox` files must be extracted into `.eml` format first before scanning.
-- **Test Suite Dependency**: The test suite uses `tests/conftest.py` which imports `sqlmodel`. If `sqlmodel` is missing from the environment, test collection will fail for the entire suite, even for unit tests that do not use database features.
+- **LLM Connection Caching**: API-based LLM providers (e.g., `OpenAIProvider`, `GeminiProvider`)
+  implement connection caching via a class-level `_cache` dict and a `get_provider()` class method.
+  This ensures underlying HTTP clients are reused across file processing tasks, unlike local models
+  (`llama_cpp`, `mlx`) which use dedicated `ModelManager` classes.
+- **Async I/O Offloading**: Blocking file I/O operations (like reading PDFs or HTML in
+  `TextExtractorPlugin`) are offloaded to separate threads using `asyncio.to_thread` for optimal
+  performance.
+- **Email & HTML Fallbacks**: The `TextExtractorPlugin` includes robust fallback parsing for
+  malformed emails (e.g., Eudora) and HTML body extraction using BeautifulSoup cleanup and graceful
+  charset handling. Note that `.mbox` files must be extracted into `.eml` format first before scanning.
+- **Test Suite Dependency**: The test suite uses `tests/conftest.py` which imports `sqlmodel`.
+  If `sqlmodel` is missing from the environment, test collection will fail for the entire suite,
+  even for unit tests that do not use database features.
 - **Filesystem Synchronization:** `DocumentStatus.NOT_PRESENT` marks files that were previously cataloged but are now deleted or missing from disk. Key behaviors:
   - Set during incremental scans when a file is no longer found (bypasses the standard processing pipeline).
   - Automatically purges the document from the Full-Text Search (FTS) index, preventing stale search results.
