@@ -18,9 +18,11 @@ async def cleanup():
         statement = select(Document.id).where(
             (func.lower(Document.path).like("%.xml"))
             | (
-                Document.mime_type.in_(
-                    ["text/xml", "application/xml", "application/xhtml+xml"]
-                )
+                Document.mime_type.in_([
+                    "text/xml",
+                    "application/xml",
+                    "application/xhtml+xml",
+                ])
             )
         )
         result = await session.execute(statement)
