@@ -117,6 +117,8 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 - **Type Safety:** Use type hints throughout the codebase. `SQLModel` provides dual-purpose classes for both DB schema and Pydantic validation.
 - **Error Handling:** Plugins should catch their own exceptions and return descriptive error messages in the `AnalysisTask` record rather than crashing the engine.
 - **Linting:** The project uses `ruff` for linting and formatting. Ensure pre-commit hooks are enabled.
+- **Ruff Formatting:** Code formatting and linting should be performed using `uv run ruff format <modified_files>` and `uv run ruff check <modified_files>`. Avoid running formatting on the entire codebase (e.g., `uv run ruff format .`) to prevent out-of-scope changes. When formatting Markdown files with ruff, it will fail unless preview mode is enabled; use `uv run ruff format --preview <modified_files>` when formatting Markdown.
+- **Testing SQLModel:** The test suite in `tests/` uses `tests/conftest.py` which imports `sqlmodel`. If `sqlmodel` is missing from the environment, test collection will fail for the entire suite, even for unit tests that do not use database features.
 
 ## ⚙️ Configuration
 Settings are managed in `.env` or via CLI arguments in `scanner.py`. The `src/core/config.py` file includes an `update_config_from_cli` utility function designed to patch the global `config` object with CLI arguments, applying only non-`None` values that correspond to existing attributes in the `Settings` class.
