@@ -1,54 +1,55 @@
-PR #146 Review Context
+PR #185 Review Context
 =============================
 
 Recent Commits:
 ---------------
-b4a35ce feat: extract email attachments to disk, improve email parsing, add task invalidation script
+1d1ae50 docs: update AGENTS.md with new memory guidelines
+d7d908b docs: update AGENTS.md with new memory guidelines
 
 PR Discussion History:
 ----------------------
-### PR #146: feat: extract email attachments, improve parsing, add task invalidation script
-**URL:** https://github.com/davidasnider/file-catalog/pull/146
+### PR #185: docs: update documentation to reflect code modifications
+**URL:** https://github.com/davidasnider/file-catalog/pull/185
 
 **PR Description:**
-> ## Summary
+> This PR updates AGENTS.md to include recently learned guidelines.
 >
-> Three improvements to the email processing pipeline and a new utility script for retrying failed tasks.
->
-> ### Changes
->
-> **EmailParserPlugin** (`src/plugins/email_parser.py`)
-> - Attachments are now extracted to disk in a `[file]_attachments/` directory next to the source email
-> - Proper filen...
+> ---
+> *PR created automatically by Jules for task [5102602370987208688](https://jules.google.com/task/5102602370987208688) started by @davidasnider*
 
 **Reviews:**
-- **davidasnider** (COMMENTED): Review feedback on email_parser.py
-- **davidasnider** (COMMENTED): Additional review feedback on text_extractor.py and invalidate_failed_tasks.py
+- **copilot-pull-request-reviewer** (COMMENTED): ## Pull request overview
+
+This PR updates `AGENTS.md` with additional contributor/agent guidelines to reflect the current constraints and workflow expectations in the repository’s execution/review environment.
+
+**Changes:**
+- Added guidance on handling truncated command output during test/review runs.
+- Documented git workflow caveats (shallow clones, avoiding direct push, update strategies).
+- Added guidance on CLI flag verification and ruff-based formatting/linting practices.
+
+
+
+
+<details>
+<summary>Suppressed comments (1)</summary>
+
+**AGENTS.md:118**
+* These entries also exceed typical Markdown line-length limits, and this section immediately introduces a line-length guideline. Wrapping them onto indented continuation lines will keep the guidance consistent and easier to review.
+```
+- **Code Formatting**: Code formatting and linting should be performed using `uv run ruff format <modified_files>` and `uv run ruff check <modified_files>`. Avoid running formatting on the entire codebase (e.g., `uv run ruff format .`) to prevent out-of-scope changes that can introduce Python compatibility issues or clutter Pull Requests. When formatting Markdown files with ruff, it will fail unless preview mode is enabled; use `uv run ruff format --preview <modified_files>` when formatting Markdown.
+- **Line Length**: When updating Markdown files, wrap text strings to adhere to standard line length limits (e.g., 80-120 characters) to pass project Markdown linting (like `ruff` or `markdownlint`) and prevent CI check failures.
+- **Missing Module Testing**: The test suite in `tests/` uses `tests/conftest.py` which imports `sqlmodel`. If `sqlmodel` is missing from the environment, test collection will fail for the entire suite, even for unit tests that do not use database features.
+```
+</details>
+
+
+
+---
+
+💡 <a href="/davidasnider/file-catalog/new/main?filename=.github/skills/code-review/SKILL.md" class="Link--inTextBlock" target="_blank" rel="noopener noreferrer">Add a `code-review` agent skill</a> or configure MCP servers for context-aware, tailored reviews. <a href="https://docs.github.com/en/copilot/how-tos/use-copilot-agents/request-a-code-review/use-code-review#mcp-servers-and-agent-skills" class="Link--inTextBlock" target="_blank" rel="noopener noreferrer">Learn more in the docs.</a>
 
 **Code Review Threads (Inline):**
-- **davidasnider** on `src/plugins/email_parser.py` line 100 (Resolved):
-> `_safe_decode` is defined as a nested function inside `_extract_email_data`, so it gets recreated on every call. Consider making it a `@staticmethod` on the class or a module-level function.
+- **copilot-pull-request-reviewer** on `AGENTS.md` (Unresolved):
+> These newly added bullet items are each a single very long line, which hurts readability and can violate typical Markdown line-length linting. Please wrap each bullet’s text onto multiple indented continuation lines (while keeping the `-` list structure).
 >
-> Then update the call sites from `_safe_decode(...)` to `self._safe_decode(...)`.
-  - **davidasnider**: Acknowledged! Since this is a non-blocking suggestion/nitpick and the current implementation is functionally correct, we will keep it as-is to wrap up this PR. Thank you, @davidasnider!
-- **davidasnider** on `src/plugins/email_parser.py` line 131 (Unresolved):
-> Bare `except Exception` here swallows all errors during filename decoding. Since the only expected failure mode is a decoding error, use `except (LookupError, UnicodeError):` to be more targeted.
-- **davidasnider** on `src/plugins/text_extractor.py` line 341 (Resolved):
-> `"<x-html"` is not a standard HTML tag. If this is meant to catch XHTML documents, consider `"<xhtml"`. If it is intentional for a specific format, a comment explaining which format would help.
-  - **davidasnider**: Acknowledged! Since this is a non-blocking suggestion/nitpick and the current implementation is functionally correct, we will keep it as-is to wrap up this PR. Thank you, @davidasnider!
-- **davidasnider** on `src/scripts/invalidate_failed_tasks.py` line 47 (Unresolved):
-> User-supplied `error_filter` is interpolated directly into a SQL `LIKE` pattern. The `%` and `_` characters are SQL wildcards and could produce unexpected matches. Escape them before use:
->
-> ```python
-> escaped = error_filter.replace("\\\\", "\\\\\\\\").replace("%", "\\%")
-> ```
->
-> Same applies to `task_filter` — consider using `==` (exact match) instead of `like` there.
-- **davidasnider** on `src/scripts/invalidate_failed_tasks.py` line 84 (Unresolved):
-> Task objects are modified here (`.status` and `.error_message`), but `session.commit()` only happens inside the document batch loop below. If `doc_ids_to_reset` is empty (e.g., all parent documents are already in `PENDING` or `NOT_PRESENT` state), the task changes are never flushed to the database.
->
-> Add a commit after the task modification loop:
->
-> ```python
-> await session.commit()
-> ```
+> This issue also appears on line 116 of the same file.
