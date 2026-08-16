@@ -132,10 +132,6 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 - **Linting:** The project uses `ruff` for linting and formatting. Ensure pre-commit hooks are enabled.
   - Run formatting with `uv run ruff format <modified_files>` and linting with `uv run ruff check <modified_files>`.
   - Do not run formatting on the entire codebase (e.g., `uv run ruff format .`) to prevent out-of-scope changes.
-  - When formatting Markdown files, you must use `--preview` mode (e.g.,
-    `uv run ruff format --preview <modified_files>`).
-  - When updating Markdown files, wrap text strings to adhere to standard line length limits (e.g.,
-    80-120 characters) to pass project Markdown linting.
   - When documenting or executing internal Python CLI scripts, verify the actual exposed flags by
     inspecting the script's `argparse` configuration.
 
