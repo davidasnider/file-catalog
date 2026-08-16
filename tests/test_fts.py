@@ -39,9 +39,9 @@ async def test_sync_document_to_fts(fts_setup):
             document_id=doc.id,
             task_name=TEXT_EXTRACTOR_NAME,
             status=TaskStatus.COMPLETED,
-            result_data=json.dumps(
-                {"text": "The quick brown fox jumps over the lazy dog."}
-            ),
+            result_data=json.dumps({
+                "text": "The quick brown fox jumps over the lazy dog."
+            }),
         ),
         AnalysisTask(
             document_id=doc.id,
@@ -53,11 +53,9 @@ async def test_sync_document_to_fts(fts_setup):
             document_id=doc.id,
             task_name="Summarizer",
             status=TaskStatus.COMPLETED,
-            result_data=json.dumps(
-                {
-                    "summary": "This document is primarily about a quick fox and a lazy dog."
-                }
-            ),
+            result_data=json.dumps({
+                "summary": "This document is primarily about a quick fox and a lazy dog."
+            }),
         ),
     ]
     session.add_all(tasks)
@@ -98,26 +96,24 @@ async def test_sync_email_document_to_fts(fts_setup):
         document_id=doc.id,
         task_name=EMAIL_PARSER_NAME,
         status=TaskStatus.COMPLETED,
-        result_data=json.dumps(
-            {
-                "emails": [
-                    {
-                        "from": "alice@example.com",
-                        "to": "bob@example.com",
-                        "subject": "Greetings",
-                        "body_text": "Hello Bob, hope you are doing well.",
-                    },
-                    {
-                        "from": "bob@example.com",
-                        "to": "alice@example.com",
-                        "subject": "Re: Greetings",
-                        "body_text": "Thanks Alice! I am doing great.",
-                    },
-                ],
-                "total_emails": 2,
-                "source": "email_parser",
-            }
-        ),
+        result_data=json.dumps({
+            "emails": [
+                {
+                    "from": "alice@example.com",
+                    "to": "bob@example.com",
+                    "subject": "Greetings",
+                    "body_text": "Hello Bob, hope you are doing well.",
+                },
+                {
+                    "from": "bob@example.com",
+                    "to": "alice@example.com",
+                    "subject": "Re: Greetings",
+                    "body_text": "Thanks Alice! I am doing great.",
+                },
+            ],
+            "total_emails": 2,
+            "source": "email_parser",
+        }),
     )
     session.add(task)
     await session.commit()
@@ -155,11 +151,9 @@ async def test_search_fts(fts_setup):
         document_id=doc.id,
         task_name=TEXT_EXTRACTOR_NAME,
         status=TaskStatus.COMPLETED,
-        result_data=json.dumps(
-            {
-                "text": "Hello world! This is a highly specific unique_searchable_term to find."
-            }
-        ),
+        result_data=json.dumps({
+            "text": "Hello world! This is a highly specific unique_searchable_term to find."
+        }),
     )
     session.add(task)
     await session.commit()

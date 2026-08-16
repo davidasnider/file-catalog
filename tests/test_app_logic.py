@@ -114,13 +114,11 @@ class TestFetchAllTasksForDocuments:
     @patch("app.async_session_maker")
     def test_fetch_all_tasks_returns_correct_grouping(self, mock_session_maker):
         """Verify tasks are correctly grouped by document_id via real SQL."""
-        engine = _build_test_db(
-            [
-                (1, "TextExtractor"),
-                (1, "Summarizer"),
-                (2, "TextExtractor"),
-            ]
-        )
+        engine = _build_test_db([
+            (1, "TextExtractor"),
+            (1, "Summarizer"),
+            (2, "TextExtractor"),
+        ])
         real_sm = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
         @asynccontextmanager
@@ -151,11 +149,9 @@ class TestFetchAllTasksForDocuments:
     @patch("app.async_session_maker")
     def test_fetch_all_tasks_missing_doc_ids_get_empty_lists(self, mock_session_maker):
         """Document IDs with no matching tasks should get empty lists."""
-        engine = _build_test_db(
-            [
-                (1, "TextExtractor"),
-            ]
-        )
+        engine = _build_test_db([
+            (1, "TextExtractor"),
+        ])
         real_sm = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
         @asynccontextmanager
@@ -178,12 +174,10 @@ class TestFetchAllTasksForDocuments:
     @patch("app.async_session_maker")
     def test_fetch_all_tasks_single_document(self, mock_session_maker):
         """Single document ID should work correctly."""
-        engine = _build_test_db(
-            [
-                (42, "TextExtractor"),
-                (42, "Summarizer"),
-            ]
-        )
+        engine = _build_test_db([
+            (42, "TextExtractor"),
+            (42, "Summarizer"),
+        ])
         real_sm = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
         @asynccontextmanager
@@ -204,12 +198,10 @@ class TestFetchAllTasksForDocuments:
     @patch("app.async_session_maker")
     def test_fetch_all_tasks_non_sqlite_fallback(self, mock_session_maker):
         """Non-SQLite dialect should fall back to chunked IN() queries."""
-        engine = _build_test_db(
-            [
-                (1, "TextExtractor"),
-                (2, "Summarizer"),
-            ]
-        )
+        engine = _build_test_db([
+            (1, "TextExtractor"),
+            (2, "Summarizer"),
+        ])
         real_sm = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
         @asynccontextmanager
