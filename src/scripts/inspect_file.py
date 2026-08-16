@@ -503,11 +503,9 @@ def print_rich_analysis(info: Dict[str, Any]):
                         or data.get("error")
                         or "Condition not met by should_run"
                     )
-                    skipped_scanners.append((
-                        task_name,
-                        task_info.get("version", "1.0"),
-                        reason,
-                    ))
+                    skipped_scanners.append(
+                        (task_name, task_info.get("version", "1.0"), reason)
+                    )
                 else:
                     active_scanners.append((task_name, task_info, data))
             elif data:

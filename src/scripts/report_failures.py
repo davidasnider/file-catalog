@@ -53,14 +53,16 @@ async def report_failures(output_format="table", task_filter=None, ext_filter=No
         if ext_filter and not doc.path.lower().endswith(ext_filter.lower()):
             continue
 
-        failures.append({
-            "type": "task",
-            "document_id": doc.id,
-            "path": doc.path,
-            "mime_type": doc.mime_type,
-            "task_name": task.task_name,
-            "error_message": task.error_message or "Unknown error",
-        })
+        failures.append(
+            {
+                "type": "task",
+                "document_id": doc.id,
+                "path": doc.path,
+                "mime_type": doc.mime_type,
+                "task_name": task.task_name,
+                "error_message": task.error_message or "Unknown error",
+            }
+        )
 
     for doc in failed_docs:
         if doc.id in failed_doc_ids_with_tasks:
@@ -69,14 +71,16 @@ async def report_failures(output_format="table", task_filter=None, ext_filter=No
         if ext_filter and not doc.path.lower().endswith(ext_filter.lower()):
             continue
 
-        failures.append({
-            "type": "document",
-            "document_id": doc.id,
-            "path": doc.path,
-            "mime_type": doc.mime_type,
-            "task_name": "N/A",
-            "error_message": "Document marked as FAILED (could be timeout, pipeline crash, etc.)",
-        })
+        failures.append(
+            {
+                "type": "document",
+                "document_id": doc.id,
+                "path": doc.path,
+                "mime_type": doc.mime_type,
+                "task_name": "N/A",
+                "error_message": "Document marked as FAILED (could be timeout, pipeline crash, etc.)",
+            }
+        )
 
     if output_format == "json":
         print(json.dumps(failures, indent=2))
