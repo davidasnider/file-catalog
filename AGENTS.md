@@ -98,11 +98,10 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
   blocking file I/O operations (like reading PDFs or HTML) to separate threads. It also includes
   robust fallback parsing for malformed emails (e.g., Eudora) and HTML body extraction using
   BeautifulSoup cleanup and graceful charset handling.
-- **Email Parsing**: The `EmailParserPlugin` can parse the mbox *format* in addition to `.eml`
-  files, but `.mbox` container files are ignored by the scanner by default (as are `.xml` files),
-  so they usually need to be exploded into individual `.eml` files first. It extracts email
-  attachments to a dedicated `[file]_attachments/` directory located alongside the source email
-  file.
+- **Email Parsing**: The `EmailParserPlugin` handles `.eml` and `.mbox` files, but `.mbox` files
+  must be extracted into `.eml` format first, as `.mbox` and `.xml` are ignored by the scanner by
+  default. It extracts email attachments to a dedicated `[file]_attachments/` directory located
+  alongside the source email file.
 - **Task Invalidation**: The `invalidate_failed_tasks.py` utility script in `src/scripts/` finds tasks matching filters and status, resets them to PENDING, and resets their parent documents to PENDING so they are re-scanned, supporting dry-runs and various filters.
 - **JSON Output Handling**: The utility function `repair_and_load_json` in `src/core/text_utils.py` is the standard way to handle malformed LLM JSON outputs. It functions correctly by calling `repair_json` followed by `json.loads`. Do not refactor this to use `json_repair.loads` exclusively, as doing so may unintentionally remove necessary local imports (e.g., `import json`) and break existing localized error handling.
 - **Search Snippets Rendering**: To securely render SQLite FTS5 search snippets in the Streamlit UI, the project uses control character delimiters (`\x01` for start and `\x02` for end) in the FTS query (defined as `FTS_HL_START` and `FTS_HL_END` in `src/db/fts.py`). The frontend (`app.py`) applies `html.escape()` and replaces these delimiters with Markdown bold (`**`) markers via the `render_snippet` function in `src/ui/snippets.py`, to avoid using `unsafe_allow_html=True`.
@@ -210,3 +209,4 @@ Settings are managed in `.env` or via CLI arguments in `scanner.py`. The `src/co
 - `VISION_MAX_PIXELS`: Limit image resolution to prevent OOM on local GPU/NPU.
 - `USE_CLOUD_FALLBACK`: Set to `True` to allow Gemini fallback for complex reasoning tasks.
 <!-- -->
+# innocuous non-empty change to trigger submit
