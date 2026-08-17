@@ -55,6 +55,9 @@ streamlit run app.py
 ```bash
 pytest
 ```
+Note: The test suite in `tests/` uses `tests/conftest.py` which imports `sqlmodel`.
+If `sqlmodel` is missing from the environment, test collection will fail for the entire suite,
+even for unit tests that do not use database features.
 
 ### Utilities
 ```bash
@@ -91,7 +94,14 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 - **Optimized Batch Loading:** `fetch_all_tasks_for_documents` leverages SQLite's `json_each()` function to expand JSON arrays into rows. This allows batching queries efficiently, avoiding parameter limits (usually 999) without chunking, while maintaining a chunked `.in_()` clause fallback for non-SQLite backends.
 - **Database Sessions**: Database sessions are configured with `expire_on_commit=False` by default (see `src/db/engine.py`), which allows model instances to remain valid and accessible after a session commit without requiring explicit re-fetching or refreshing.
 - **Archive Extraction**: Archive extraction (Tar, Zip, 7z) must be hardened against path traversal. For Tar files on Python 3.12+, use `extractall(dest, filter="data")`. For 7z archives, explicitly validate that both member paths and link targets (symlinks) resolve within the target destination directory. For ZIP files, validate member paths to prevent traversal (note: symlink link targets are not checked per-member).
-- **Email Parsing**: The `EmailParserPlugin` extracts email attachments to a dedicated `[file]_attachments/` directory located alongside the source email file.
+- **Text Extraction Offloading**: The `TextExtractorPlugin` uses `asyncio.to_thread` to offload
+  blocking file I/O operations (like reading PDFs or HTML) to separate threads. It also includes
+  robust fallback parsing for malformed emails (e.g., Eudora) and HTML body extraction using
+  BeautifulSoup cleanup and graceful charset handling.
+- **Email Parsing**: The `EmailParserPlugin` handles `.eml` and `.mbox` files, but `.mbox` files
+  must be extracted into `.eml` format first, as `.mbox` and `.xml` are ignored by the scanner by
+  default. It extracts email attachments to a dedicated `[file]_attachments/` directory located
+  alongside the source email file.
 - **Task Invalidation**: The `invalidate_failed_tasks.py` utility script in `src/scripts/` finds tasks matching filters and status, resets them to PENDING, and resets their parent documents to PENDING so they are re-scanned, supporting dry-runs and various filters.
 - **JSON Output Handling**: The utility function `repair_and_load_json` in `src/core/text_utils.py` is the standard way to handle malformed LLM JSON outputs. It functions correctly by calling `repair_json` followed by `json.loads`. Do not refactor this to use `json_repair.loads` exclusively, as doing so may unintentionally remove necessary local imports (e.g., `import json`) and break existing localized error handling.
 - **Search Snippets Rendering**: To securely render SQLite FTS5 search snippets in the Streamlit UI, the project uses control character delimiters (`\x01` for start and `\x02` for end) in the FTS query (defined as `FTS_HL_START` and `FTS_HL_END` in `src/db/fts.py`). The frontend (`app.py`) applies `html.escape()` and replaces these delimiters with Markdown bold (`**`) markers via the `render_snippet` function in `src/ui/snippets.py`, to avoid using `unsafe_allow_html=True`.
@@ -184,8 +194,11 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 - **Linting:** The project uses `ruff` for linting and formatting. Ensure pre-commit hooks are enabled.
   - Run formatting with `uv run ruff format <modified_files>` and linting with `uv run ruff check <modified_files>`.
   - Do not run formatting on the entire codebase (e.g., `uv run ruff format .`) to prevent out-of-scope changes.
-  - When documenting or executing internal Python CLI scripts, verify the actual exposed flags by
-    inspecting the script's `argparse` configuration.
+  - When formatting Markdown files with ruff, it will fail unless preview mode is enabled;
+    use `uv run ruff format --preview <modified_files>`.
+- **Markdown Formatting:** When updating Markdown files, wrap text strings to adhere to standard
+  line length limits (e.g., 80-120 characters) to pass project Markdown linting (like `ruff`
+  or `markdownlint`) and prevent CI check failures.
 
 ## ⚙️ Configuration
 Settings are managed in `.env` or via CLI arguments in `scanner.py`. The `src/core/config.py` file includes an `update_config_from_cli` utility function designed to patch the global `config` object with CLI arguments, applying only non-`None` values that correspond to existing attributes in the `Settings` class.
@@ -196,3 +209,4 @@ Settings are managed in `.env` or via CLI arguments in `scanner.py`. The `src/co
 - `VISION_MAX_PIXELS`: Limit image resolution to prevent OOM on local GPU/NPU.
 - `USE_CLOUD_FALLBACK`: Set to `True` to allow Gemini fallback for complex reasoning tasks.
 <!-- -->
+# innocuous non-empty change to trigger submit
