@@ -104,53 +104,9 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 - **Testing Global State**: When writing tests that modify global state, use `monkeypatch.setattr` or `unittest.mock.patch` to safely isolate state changes instead of simple `try...finally` blocks.
 - **Simulating Missing Dependencies**: When writing tests that simulate `ImportError` (or `ModuleNotFoundError`) for missing dependencies, use `patch.dict('sys.modules', {'module_name': None})` to safely mock the missing module.
 - **Image Analysis Separation**: The application separates image analysis concerns between plugins: `TextExtractorPlugin` uses local OCR strictly for text extraction, while `VisionAnalyzerPlugin` runs unconditionally on all images to generate multimodal visual descriptions. Text extractors should not fall back to Vision LLMs.
-- **LLM Connection Caching**: API-based LLM providers (e.g., `OpenAIProvider`, `GeminiProvider`)
-  implement connection caching via a class-level `_cache` dict and a `get_provider()` class method.
-  This ensures underlying HTTP clients are reused across file processing tasks, unlike local models
-  (`llama_cpp`, `mlx`) which use dedicated `ModelManager` classes.
-- **Async I/O Offloading**: Blocking file I/O operations (like reading PDFs or HTML in
-  `TextExtractorPlugin`) are offloaded to separate threads using `asyncio.to_thread` for optimal
-  performance.
-- **Email & HTML Fallbacks**: The `TextExtractorPlugin` includes robust fallback parsing for
-  malformed emails (e.g., Eudora) and HTML body extraction using BeautifulSoup cleanup and graceful
-  charset handling. Note that `.mbox` files must be extracted into `.eml` format first before scanning.
-- **Test Suite Dependency**: The test suite uses `tests/conftest.py` which imports `sqlmodel`.
-  If `sqlmodel` is missing from the environment, test collection will fail for the entire suite,
-  even for unit tests that do not use database features.
 - **Filesystem Synchronization:** `DocumentStatus.NOT_PRESENT` marks files that were previously cataloged but are now deleted or missing from disk. Key behaviors:
   - Set during incremental scans when a file is no longer found (bypasses the standard processing pipeline).
   - Automatically purges the document from the Full-Text Search (FTS) index, preventing stale search results.
-
-- **Truncation Mitigation**: The test execution and review environment truncates the
-  standard output of terminal commands (like `cat`, `read_file`, or multi-file `grep`)
-  to 1000 characters, indicating truncation with a marker like `(1000 / 1588 characters shown)`.
-  To ensure compliance with the Groundedness Rule, use pagination (`tail`, `head`, `sed`)
-  for large files, and check files individually with `grep` rather than grouping multiple
-  files in a single command, which can hide results from later files.
-- **Git Fetch Warning**: If `git log` shows limited commit history (e.g., only 1 commit),
-  the repository environment may be a shallow clone. Run `git fetch --unshallow origin`
-  to retrieve the full commit history before comparing branches or generating diffs. If this
-  causes a fatal error on a complete repository, it is already fully cloned.
-- **Git Push Warning**: Do not use `git push` directly in `run_in_bash_session` as it will
-  block the session or cause execution issues. Always use the `submit` tool to push commits.
-- **Git Reset Warning**: When retrieving remote updates (like Copilot autofixes) via
-  `run_in_bash_session`, avoid using `git fetch origin <branch> && git reset --hard origin/<branch>`
-  instead of `git pull` as it can block the session or fail the tool execution.
-- **CLI Script Introspection**: When documenting or executing internal Python CLI scripts,
-  do not guess CLI arguments based on function signatures. Verify the actual exposed flags
-  by inspecting the script's `argparse` configuration (e.g., via `grep add_argument`).
-- **Code Formatting**: Code formatting and linting should be performed using
-  `uv run ruff format <modified_files>` and `uv run ruff check <modified_files>`.
-  Avoid running formatting on the entire codebase (e.g., `uv run ruff format .`) to prevent
-  out-of-scope changes that can introduce Python compatibility issues or clutter Pull Requests.
-  When formatting Markdown files with ruff, it will fail unless preview mode is enabled;
-  use `uv run ruff format --preview <modified_files>` when formatting Markdown.
-- **Line Length**: When updating Markdown files, wrap text strings to adhere to standard line
-  length limits (e.g., 80-120 characters) to pass project Markdown linting (like `ruff` or
-  `markdownlint`) and prevent CI check failures.
-- **Missing Module Testing**: The test suite in `tests/` uses `tests/conftest.py` which
-  imports `sqlmodel`. If `sqlmodel` is missing from the environment, test collection will
-  fail for the entire suite, even for unit tests that do not use database features.
 
 ## 📝 Development Conventions
 
@@ -161,10 +117,6 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 - **Type Safety:** Use type hints throughout the codebase. `SQLModel` provides dual-purpose classes for both DB schema and Pydantic validation.
 - **Error Handling:** Plugins should catch their own exceptions and return descriptive error messages in the `AnalysisTask` record rather than crashing the engine.
 - **Linting:** The project uses `ruff` for linting and formatting. Ensure pre-commit hooks are enabled.
-  - Run formatting with `uv run ruff format <modified_files>` and linting with `uv run ruff check <modified_files>`.
-  - Do not run formatting on the entire codebase (e.g., `uv run ruff format .`) to prevent out-of-scope changes.
-  - When documenting or executing internal Python CLI scripts, verify the actual exposed flags by
-    inspecting the script's `argparse` configuration.
 
 ## ⚙️ Configuration
 Settings are managed in `.env` or via CLI arguments in `scanner.py`. The `src/core/config.py` file includes an `update_config_from_cli` utility function designed to patch the global `config` object with CLI arguments, applying only non-`None` values that correspond to existing attributes in the `Settings` class.
@@ -174,4 +126,3 @@ Settings are managed in `.env` or via CLI arguments in `scanner.py`. The `src/co
 - `MAX_CONCURRENT`: Number of files to process in parallel.
 - `VISION_MAX_PIXELS`: Limit image resolution to prevent OOM on local GPU/NPU.
 - `USE_CLOUD_FALLBACK`: Set to `True` to allow Gemini fallback for complex reasoning tasks.
-<!-- -->
