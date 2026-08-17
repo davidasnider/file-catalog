@@ -405,13 +405,11 @@ def main():
         if filtered_docs:
             table_data = []
             for doc in filtered_docs:
-                table_data.append(
-                    {
-                        "Document Status": f"{get_status_color(doc.status.name)}",  # Simplified
-                        "File": doc.path.split("/")[-1],
-                        "ID": doc.id,
-                    }
-                )
+                table_data.append({
+                    "Document Status": f"{get_status_color(doc.status.name)}",  # Simplified
+                    "File": doc.path.split("/")[-1],
+                    "ID": doc.id,
+                })
 
             df = pd.DataFrame(table_data)
 

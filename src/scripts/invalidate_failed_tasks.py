@@ -45,7 +45,8 @@ async def invalidate_tasks(
 
         if error_filter:
             escaped = (
-                error_filter.replace("\\", "\\\\")
+                error_filter
+                .replace("\\", "\\\\")
                 .replace("%", "\\%")
                 .replace("_", "\\_")
             )

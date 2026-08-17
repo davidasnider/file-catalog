@@ -63,13 +63,11 @@ async def test_spreadsheet_analyzer_ods(tmp_path):
     ods_file.write_text("fake ods content")
 
     # Create a dummy DataFrame to return from mock
-    df = pd.DataFrame(
-        {
-            "Name": ["Alice", "Bob"],
-            "City": ["NYC", "LA"],
-            "Value": [100, 200],
-        }
-    )
+    df = pd.DataFrame({
+        "Name": ["Alice", "Bob"],
+        "City": ["NYC", "LA"],
+        "Value": [100, 200],
+    })
 
     with patch("pandas.read_excel", return_value={"Sheet1": df}) as mock_read_excel:
         result = await plugin.analyze(
