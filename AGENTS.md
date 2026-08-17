@@ -154,16 +154,31 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 
 ## 📝 Development Conventions
 
-- **Planning PR Review Cycles:** When planning PR review cycles, plan only one review cycle at a time; do not bundle multiple cycles upfront. Use two strictly ordered steps: '1. Use `request_code_review` to request a review.' followed by '2. Use `read_pr_comments` to check for feedback. If there is feedback, update the plan with specific, granular steps to address the exact issues before proceeding.' Dynamically update the plan to add subsequent review cycles only after completing the `read_pr_comments` step.
+- **Planning PR Review Cycles:** When planning PR review cycles, plan only one review cycle
+  at a time; do not bundle multiple cycles upfront. Use two strictly ordered steps: '1. Use
+  `request_code_review` to request a review.' followed by '2. Use `read_pr_comments` to check
+  for feedback. If there is feedback, update the plan with specific, granular steps to address
+  the exact issues before proceeding.' Dynamically update the plan to add subsequent review
+  cycles only after completing the `read_pr_comments` step.
 
-- **Planning Test Execution:** When creating execution plans for subsequent tasks, the plan must conclude with the mandatory test execution step (e.g., `uv run pytest`) and the pre-commit step, even if these were previously performed.
+- **Planning Test Execution:** When creating execution plans for subsequent tasks, the plan
+  must conclude with the mandatory test execution step (e.g., `uv run pytest`) and the pre-commit
+  step, even if these were previously performed.
 
-- **Trivial Changes for CI:** If a task requires submitting a Pull Request but the existing code is already correct, avoid using `git commit --allow-empty`. Instead, make a truly trivial, innocuous non-empty change, such as adding an empty comment (`#`) or a harmless blank line in a markdown file. Avoid adding trailing blank lines to Python files, as this violates PEP8.
+- **Trivial Changes for CI:** If a task requires submitting a Pull Request but the existing code
+  is already correct, avoid using `git commit --allow-empty`. Instead, make a truly trivial,
+  innocuous non-empty change, such as adding an empty comment (`#`) or a harmless blank line in a
+  markdown file. Avoid adding trailing blank lines to Python files, as this violates PEP8.
 
 - **Async First:** The core pipeline is fully asynchronous. Always use `await` for I/O and DB operations.
 - **Expected Empty Outcomes:** In the plugin architecture, plugins must gracefully handle expected empty outcomes (e.g., an image with no text in OCR) by returning success with empty content (e.g. `{"text": "", "extracted": True}`). Raising exceptions for expected empty conditions triggers the `TaskEngine` retry loop and inappropriately marks tasks as failed.
 - **Plugin Architecture:** To add a new analyzer, create a new file in `src/plugins/` inheriting from `AnalyzerBase`. The `TaskEngine` will automatically discover and run it based on its `should_run()` condition.
-- **LLM Abstraction:** Do not call LLM libraries directly in plugins. Use the `LLMProvider` interface to ensure model portability.
+- **LLM Abstraction:** Do not call LLM libraries directly in plugins. Use the `LLMProvider`
+  interface to ensure model portability. API-based LLM providers (e.g., `OpenAIProvider`,
+  `GeminiProvider`) implement connection caching via a class-level `_cache` dict and a
+  `get_provider()` class method, ensuring underlying HTTP clients are reused across file
+  processing tasks, unlike local models (`llama_cpp`, `mlx`) which use dedicated
+  `ModelManager` classes.
 - **Type Safety:** Use type hints throughout the codebase. `SQLModel` provides dual-purpose classes for both DB schema and Pydantic validation.
 - **Error Handling:** Plugins should catch their own exceptions and return descriptive error messages in the `AnalysisTask` record rather than crashing the engine.
 - **Linting:** The project uses `ruff` for linting and formatting. Ensure pre-commit hooks are enabled.
