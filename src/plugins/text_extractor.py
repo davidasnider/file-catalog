@@ -178,9 +178,9 @@ class TextExtractorPlugin(AnalyzerBase):
                         content = f.read()
                     # Extract printable strings as a fallback for binary CDX files (ASCII range)
                     strings = re.findall(b"[\x20-\x7e]{4,}", content)
-                    return "\n".join([
-                        s.decode("ascii", errors="ignore") for s in strings
-                    ])
+                    return "\n".join(
+                        [s.decode("ascii", errors="ignore") for s in strings]
+                    )
 
                 extracted_text = await asyncio.to_thread(_read_cdx)
             elif mime_type == "application/msword":
@@ -337,11 +337,9 @@ class TextExtractorPlugin(AnalyzerBase):
 
                     # Clean HTML from body if it is an HTML body
                     body_str = str(body).strip()
-                    if body_str.lower().startswith((
-                        "<html",
-                        "<!doctype html",
-                        "<x-html",
-                    )):
+                    if body_str.lower().startswith(
+                        ("<html", "<!doctype html", "<x-html")
+                    ):
                         try:
                             from bs4 import BeautifulSoup
 
@@ -365,9 +363,9 @@ class TextExtractorPlugin(AnalyzerBase):
                             content = f.read()
                         # Extract printable sequences of 4+ characters
                         strings = re.findall(b"[\x20-\x7e]{4,}", content)
-                        extracted_text = "\n".join([
-                            s.decode("ascii", errors="ignore") for s in strings
-                        ])
+                        extracted_text = "\n".join(
+                            [s.decode("ascii", errors="ignore") for s in strings]
+                        )
                         return extracted_text, len(strings)
 
                     extracted_text, num_strings = await asyncio.to_thread(_read_wp)

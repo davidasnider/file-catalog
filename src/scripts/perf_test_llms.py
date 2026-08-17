@@ -153,12 +153,14 @@ async def run_benchmark(root_dir: Path):
             else 0
         )
 
-        results.append({
-            "provider": provider_name,
-            "avg_tps": avg_tps,
-            "load_time": load_time,
-            "total_time": total_inference_time,
-        })
+        results.append(
+            {
+                "provider": provider_name,
+                "avg_tps": avg_tps,
+                "load_time": load_time,
+                "total_time": total_inference_time,
+            }
+        )
 
     print("\n\n=============================================")
     print("FINAL BENCHMARK RESULTS")
