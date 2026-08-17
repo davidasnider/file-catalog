@@ -176,9 +176,9 @@ class DeepSummarizerPlugin(AnalyzerBase):
         reduction_level = 1
 
         while True:
-            combined_summaries = "\n\n".join(
-                [f"Part {j + 1}: {s}" for j, s in enumerate(current_summaries)]
-            )
+            combined_summaries = "\n\n".join([
+                f"Part {j + 1}: {s}" for j, s in enumerate(current_summaries)
+            ])
 
             if len(combined_summaries) <= max_safe_chars or len(current_summaries) <= 1:
                 break
@@ -192,9 +192,9 @@ class DeepSummarizerPlugin(AnalyzerBase):
             next_level_summaries = []
             for i in range(0, len(current_summaries), group_size):
                 group = current_summaries[i : i + group_size]
-                group_text = "\n\n".join(
-                    [f"Sub-part {j + 1}: {s}" for j, s in enumerate(group)]
-                )
+                group_text = "\n\n".join([
+                    f"Sub-part {j + 1}: {s}" for j, s in enumerate(group)
+                ])
 
                 intermediate_prompt = f"""
                 You are an intermediate summarization assistant. Synthesize the following sequential document part summaries into a single, cohesive intermediate summary.
@@ -228,9 +228,9 @@ class DeepSummarizerPlugin(AnalyzerBase):
             current_summaries = next_level_summaries
             reduction_level += 1
 
-        combined_summaries = "\n\n".join(
-            [f"Part {j + 1}: {s}" for j, s in enumerate(current_summaries)]
-        )
+        combined_summaries = "\n\n".join([
+            f"Part {j + 1}: {s}" for j, s in enumerate(current_summaries)
+        ])
 
         final_prompt = f"""
         You are finalizing a deep summarization task. Below are the sequential summaries of different parts of a massive document.
