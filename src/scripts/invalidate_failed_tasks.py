@@ -49,11 +49,15 @@ async def invalidate_tasks(
                 .replace("%", "\\%")
                 .replace("_", "\\_")
             )
-            query = query.where(AnalysisTask.error_message.like(f"%{escaped}%"))
+            query = query.where(
+                AnalysisTask.error_message.contains(escaped, autoescape=True)
+            )
             logger.info(f"Filtering by error message containing: '{error_filter}'")
 
         if mime_filter:
-            query = query.where(Document.mime_type.like(f"%{mime_filter}%"))
+            query = query.where(
+                Document.mime_type.contains(mime_filter, autoescape=True)
+            )
             logger.info(f"Filtering by MIME type: {mime_filter}")
 
         result = await session.execute(query)

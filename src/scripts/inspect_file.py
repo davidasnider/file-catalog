@@ -564,7 +564,7 @@ async def get_matching_files(path: str) -> list[Dict[str, Any]]:
                 path.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             )
             stmt = select(Document).where(
-                Document.path.like(f"%{escaped_path}", escape="\\")
+                Document.path.contains(escaped_path, autoescape=True)
             )
             result = await session.execute(stmt)
             docs = result.scalars().all()
@@ -576,7 +576,7 @@ async def get_matching_files(path: str) -> list[Dict[str, Any]]:
                 basename.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             )
             stmt = select(Document).where(
-                Document.path.like(f"%{escaped_basename}", escape="\\")
+                Document.path.contains(escaped_basename, autoescape=True)
             )
             result = await session.execute(stmt)
             docs = result.scalars().all()

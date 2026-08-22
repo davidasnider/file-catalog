@@ -132,7 +132,9 @@ async def report_failures(output_format="table", task_filter=None, ext_filter=No
         )
 
         if ext_filter:
-            stats_query = stats_query.where(Document.path.like(f"%{ext_filter}"))
+            stats_query = stats_query.where(
+                Document.path.contains(ext_filter, autoescape=True)
+            )
 
         if task_filter:
             # If filtering by task, we need to join AnalysisTask to correctly count
