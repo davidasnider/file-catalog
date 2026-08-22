@@ -1,0 +1,3 @@
+## 2025-02-27 - Dashboard Metrics N+1 Query Optimization
+**Learning:** The Streamlit dashboard's `get_global_metrics` function originally made three separate, sequential database queries to calculate total, completed, and failed document counts on every dashboard load or filter action. Because this is executed constantly as users interact with the UI, this "1+1+1" query pattern caused unnecessary database overhead and lock contention.
+**Action:** Always look for opportunities to consolidate multiple sequential scalar queries into a single query using conditional aggregation (e.g., `func.sum(case(...))`) to reduce database round-trips and improve responsiveness.

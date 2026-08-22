@@ -155,17 +155,25 @@ def get_global_metrics():
     """Fetch aggregate metrics for the dashboard."""
 
     async def _fetch():
+        from sqlalchemy import case
         from sqlalchemy import func
 
+        # ⚡ Bolt Performance Optimization:
+        # Replaced 3 separate database queries with a single query using conditional aggregation.
+        # This resolves an N+1 query pattern on the dashboard load and reduces DB round-trips by 66%.
         async with async_session_maker() as session:
-            total = await session.scalar(select(func.count(Document.id)))
-            completed = await session.scalar(
-                select(func.count(Document.id)).where(Document.status == "COMPLETED")
+            stmt = select(
+                func.count(Document.id),
+                func.sum(case((Document.status == "COMPLETED", 1), else_=0)),
+                func.sum(case((Document.status == "FAILED", 1), else_=0)),
             )
-            failed = await session.scalar(
-                select(func.count(Document.id)).where(Document.status == "FAILED")
-            )
-            return {"total": total, "completed": completed, "failed": failed}
+            res = await session.execute(stmt)
+            row = res.fetchone()
+            return {
+                "total": row[0] or 0,
+                "completed": row[1] or 0,
+                "failed": row[2] or 0,
+            }
 
     return asyncio.run(_fetch())
 
@@ -405,11 +413,13 @@ def main():
         if filtered_docs:
             table_data = []
             for doc in filtered_docs:
-                table_data.append({
-                    "Document Status": f"{get_status_color(doc.status.name)}",  # Simplified
-                    "File": doc.path.split("/")[-1],
-                    "ID": doc.id,
-                })
+                table_data.append(
+                    {
+                        "Document Status": f"{get_status_color(doc.status.name)}",  # Simplified
+                        "File": doc.path.split("/")[-1],
+                        "ID": doc.id,
+                    }
+                )
 
             df = pd.DataFrame(table_data)
 
