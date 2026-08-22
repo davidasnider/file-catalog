@@ -244,7 +244,7 @@ def main():
         fts_query = st.text_input(
             "Full Text Content Search...",
             "",
-            placeholder="e.g., 'estate tax' or 'confidential'",
+            placeholder="e.g., estate tax or confidential",
             help="Search extracted text, summaries, and transcripts using SQLite FTS5",
         )
 
