@@ -148,12 +148,14 @@ async def get_summary_pairs(session: AsyncSession, limit: int) -> List[Dict[str,
                     break
 
         if source_text and summary:
-            pairs.append({
-                "path": doc.path,
-                "source_text": source_text,
-                "summary": summary,
-                "model_used": model_used,
-            })
+            pairs.append(
+                {
+                    "path": doc.path,
+                    "source_text": source_text,
+                    "summary": summary,
+                    "model_used": model_used,
+                }
+            )
         else:
             logger.debug(f"Skipping {doc.path}: Missing source text or summary data.")
 
