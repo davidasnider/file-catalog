@@ -118,14 +118,16 @@ class EmailParserPlugin(AnalyzerBase):
                     if filename:
                         try:
                             decoded = decode_header(filename)
-                            filename = "".join([
-                                (
-                                    t[0].decode(t[1] or "utf-8", errors="replace")
-                                    if isinstance(t[0], bytes)
-                                    else t[0]
-                                )
-                                for t in decoded
-                            ])
+                            filename = "".join(
+                                [
+                                    (
+                                        t[0].decode(t[1] or "utf-8", errors="replace")
+                                        if isinstance(t[0], bytes)
+                                        else t[0]
+                                    )
+                                    for t in decoded
+                                ]
+                            )
                         except (LookupError, UnicodeError):
                             pass
 
@@ -140,11 +142,13 @@ class EmailParserPlugin(AnalyzerBase):
                     payload = part.get_payload(decode=True)
                     size = len(payload) if payload else 0
 
-                    attachments.append({
-                        "filename": dest_filename,
-                        "content_type": content_type,
-                        "size": size,
-                    })
+                    attachments.append(
+                        {
+                            "filename": dest_filename,
+                            "content_type": content_type,
+                            "size": size,
+                        }
+                    )
 
                     if payload:
                         try:

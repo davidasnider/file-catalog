@@ -121,11 +121,13 @@ class OpenAIProvider(LLMProvider):
             response_format = {"type": "json_object"}
 
         # Prepare parameters (handling thinking/reasoning)
-        chat_kwargs = self._prepare_chat_kwargs({
-            "max_tokens": 1024,
-            "temperature": 0.7,
-            **kwargs,
-        })
+        chat_kwargs = self._prepare_chat_kwargs(
+            {
+                "max_tokens": 1024,
+                "temperature": 0.7,
+                **kwargs,
+            }
+        )
 
         response = await self.client.chat.completions.create(
             model=self.model_name,
@@ -141,11 +143,13 @@ class OpenAIProvider(LLMProvider):
         messages = [{"role": "user", "content": prompt}]
 
         # Stream defaults
-        chat_kwargs = self._prepare_chat_kwargs({
-            "max_tokens": 1024,
-            "temperature": 0.7,
-            **kwargs,
-        })
+        chat_kwargs = self._prepare_chat_kwargs(
+            {
+                "max_tokens": 1024,
+                "temperature": 0.7,
+                **kwargs,
+            }
+        )
 
         stream = await self.client.chat.completions.create(
             model=self.model_name,
@@ -196,10 +200,14 @@ class OpenAIProvider(LLMProvider):
                     image.save(buffer, format="JPEG")
                     base64_image = base64.b64encode(buffer.getvalue()).decode("utf-8")
 
-                    content.append({
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
-                    })
+                    content.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            },
+                        }
+                    )
             except Exception as e:
                 logger.error(f"Failed to process image {path} in OpenAIProvider: {e}")
                 continue
@@ -217,11 +225,13 @@ class OpenAIProvider(LLMProvider):
             response_format = rf
 
         # Prepare parameters (handling thinking/reasoning)
-        chat_kwargs = self._prepare_chat_kwargs({
-            "max_tokens": 512,
-            "temperature": 0.2,
-            **kwargs,
-        })
+        chat_kwargs = self._prepare_chat_kwargs(
+            {
+                "max_tokens": 512,
+                "temperature": 0.2,
+                **kwargs,
+            }
+        )
 
         response = await self.client.chat.completions.create(
             model=self.model_name,

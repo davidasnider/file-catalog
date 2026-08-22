@@ -243,9 +243,9 @@ class VideoAnalyzerPlugin(AnalyzerBase):
                     }
                 text_llm = llm
 
-            combined_segments = "\n\n".join([
-                f"Segment {i + 1}: {d}" for i, d in enumerate(partial_descriptions)
-            ])
+            combined_segments = "\n\n".join(
+                [f"Segment {i + 1}: {d}" for i, d in enumerate(partial_descriptions)]
+            )
 
             # Dynamically trim transcript and combined_segments to fit within the text LLM's context window.
             # Leave at least 512 tokens budget for the output.
