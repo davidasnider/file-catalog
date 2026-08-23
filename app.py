@@ -1,5 +1,6 @@
 import streamlit as st
 import asyncio
+import os
 from sqlmodel import select
 import pandas as pd
 import json
@@ -220,7 +221,9 @@ def main():
     with st.sidebar:
         st.header("Filters")
 
-        if st.button("🔄 Refresh Cache"):
+        if st.button(
+            "🔄 Refresh Cache", help="Clear cached data and reload from the database"
+        ):
             st.cache_data.clear()
             st.rerun()
 
@@ -241,10 +244,16 @@ def main():
             default=unique_doc_statuses,
         )
 
-        search_query = st.text_input("Search path...", "")
+        search_query = st.text_input(
+            "Search path...",
+            "",
+            placeholder="e.g., report.pdf or /docs/",
+            help="Filter documents by their file path or name",
+        )
         fts_query = st.text_input(
             "Full Text Content Search...",
             "",
+            placeholder="e.g., estate tax or confidential",
             help="Search extracted text, summaries, and transcripts using SQLite FTS5",
         )
 
@@ -416,7 +425,7 @@ def main():
                 table_data.append(
                     {
                         "Document Status": f"{get_status_color(doc.status.name)}",  # Simplified
-                        "File": doc.path.split("/")[-1],
+                        "File": os.path.basename(doc.path),
                         "ID": doc.id,
                     }
                 )
@@ -541,8 +550,6 @@ def main():
                 st.divider()
 
             # 2. Image Viewer Section (Middle)
-            import os
-
             if selected_doc.mime_type and selected_doc.mime_type.startswith("image/"):
                 st.subheader("Image Viewer")
                 if os.path.exists(selected_doc.path):
