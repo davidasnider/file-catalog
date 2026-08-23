@@ -8,7 +8,7 @@ from sqlalchemy import text
 from src.ui.snippets import render_snippet
 
 from src.db.engine import async_session_maker
-from src.db.models import Document, AnalysisTask
+from src.db.models import Document, AnalysisTask, DocumentStatus
 from src.db.fts import search_fts
 from src.core.analyzer_names import (
     TEXT_EXTRACTOR_NAME,
@@ -165,8 +165,10 @@ def get_global_metrics():
         async with async_session_maker() as session:
             stmt = select(
                 func.count(Document.id),
-                func.sum(case((Document.status == "COMPLETED", 1), else_=0)),
-                func.sum(case((Document.status == "FAILED", 1), else_=0)),
+                func.sum(
+                    case((Document.status == DocumentStatus.COMPLETED, 1), else_=0)
+                ),
+                func.sum(case((Document.status == DocumentStatus.FAILED, 1), else_=0)),
             )
             res = await session.execute(stmt)
             row = res.fetchone()
