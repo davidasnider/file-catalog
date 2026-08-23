@@ -1,5 +1,6 @@
 import streamlit as st
 import asyncio
+import os
 from sqlmodel import select
 import pandas as pd
 import json
@@ -416,7 +417,7 @@ def main():
                 table_data.append(
                     {
                         "Document Status": f"{get_status_color(doc.status.name)}",  # Simplified
-                        "File": doc.path.split("/")[-1],
+                        "File": os.path.basename(doc.path),
                         "ID": doc.id,
                     }
                 )
@@ -541,8 +542,6 @@ def main():
                 st.divider()
 
             # 2. Image Viewer Section (Middle)
-            import os
-
             if selected_doc.mime_type and selected_doc.mime_type.startswith("image/"):
                 st.subheader("Image Viewer")
                 if os.path.exists(selected_doc.path):
