@@ -560,23 +560,15 @@ async def get_matching_files(path: str) -> list[Dict[str, Any]]:
 
         # 2. Try suffix/path fragment match if not found (e.g. 'rfb/Appointments.txt')
         if not docs:
-            escaped_path = (
-                path.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            )
-            stmt = select(Document).where(
-                Document.path.contains(escaped_path, autoescape=True)
-            )
+            stmt = select(Document).where(Document.path.endswith(path, autoescape=True))
             result = await session.execute(stmt)
             docs = result.scalars().all()
 
         # 3. Try filename basename match (e.g. 'Appointments.txt')
         if not docs:
             basename = os.path.basename(path)
-            escaped_basename = (
-                basename.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            )
             stmt = select(Document).where(
-                Document.path.contains(escaped_basename, autoescape=True)
+                Document.path.endswith(basename, autoescape=True)
             )
             result = await session.execute(stmt)
             docs = result.scalars().all()

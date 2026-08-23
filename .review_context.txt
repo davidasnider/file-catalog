@@ -1,55 +1,84 @@
-PR #185 Review Context
+PR #195 Review Context
 =============================
 
 Recent Commits:
 ---------------
-1d1ae50 docs: update AGENTS.md with new memory guidelines
-d7d908b docs: update AGENTS.md with new memory guidelines
+689518c 🛡️ Sentinel: [CRITICAL/HIGH] Fix SQL injection risks
 
 PR Discussion History:
 ----------------------
-### PR #185: docs: update documentation to reflect code modifications
-**URL:** https://github.com/davidasnider/file-catalog/pull/185
+### PR #195: 🛡️ Sentinel: [CRITICAL/HIGH] Fix SQL injection risks
+**URL:** https://github.com/davidasnider/file-catalog/pull/195
 
 **PR Description:**
-> This PR updates AGENTS.md to include recently learned guidelines.
->
-> ---
-> *PR created automatically by Jules for task [5102602370987208688](https://jules.google.com/task/5102602370987208688) started by @davidasnider*
+> 🚨 Severity: HIGH
+> 💡 Vulnerability: SQL injection risks due to f-strings with `.like()` in sql queries.
+> 🎯 Impact: Using `.like(f"%{user_input}%")` in SQLModel queries without escaping or parameterization is vulnerable to SQL injection.
+> 🔧 Fix: Replace `.like(f"%{user_input}%")` with `.contains(user_inp...
 
 **Reviews:**
-- **copilot-pull-request-reviewer** (COMMENTED): ## Pull request overview
+- **copilot-pull-request-reviewer** (COMMENTED): ### 🟡 Changes recommended
 
-This PR updates `AGENTS.md` with additional contributor/agent guidelines to reflect the current constraints and workflow expectations in the repository’s execution/review environment.
+Resolve the critical test failure and the predicate-matching and escaping issues before approval.
 
-**Changes:**
-- Added guidance on handling truncated command output during test/review runs.
-- Documented git workflow caveats (shallow clones, avoiding direct push, update strategies).
-- Added guidance on CLI flag verification and ruff-based formatting/linting practices.
-
-
-
+*Once you've addressed the issues Copilot identified, you can request another Copilot review.*
 
 <details>
-<summary>Suppressed comments (1)</summary>
+<summary>Pull request overview</summary>
 
-**AGENTS.md:118**
-* These entries also exceed typical Markdown line-length limits, and this section immediately introduces a line-length guideline. Wrapping them onto indented continuation lines will keep the guidance consistent and easier to review.
-```
-- **Code Formatting**: Code formatting and linting should be performed using `uv run ruff format <modified_files>` and `uv run ruff check <modified_files>`. Avoid running formatting on the entire codebase (e.g., `uv run ruff format .`) to prevent out-of-scope changes that can introduce Python compatibility issues or clutter Pull Requests. When formatting Markdown files with ruff, it will fail unless preview mode is enabled; use `uv run ruff format --preview <modified_files>` when formatting Markdown.
-- **Line Length**: When updating Markdown files, wrap text strings to adhere to standard line length limits (e.g., 80-120 characters) to pass project Markdown linting (like `ruff` or `markdownlint`) and prevent CI check failures.
-- **Missing Module Testing**: The test suite in `tests/` uses `tests/conftest.py` which imports `sqlmodel`. If `sqlmodel` is missing from the environment, test collection will fail for the entire suite, even for unit tests that do not use database features.
-```
+This PR replaces interpolated SQL `LIKE` filters with safer SQLModel predicates and documents the remediation.
+
+**Changes:**
+- Updates failure, invalidation, and path filtering queries.
+- Adds a SQLAlchemy probe file.
+- Documents the Sentinel SQL-filtering fix.
 </details>
 
+<details>
+<summary>File summaries</summary>
 
+| File | Review summary |
+|---|---|
+| `test_sqla.py` | Critical pytest collection failure from duplicate `Document` table registration. |
+| `src/scripts/report_failures.py` | Moderate suffix-matching regression. |
+| `src/scripts/invalidate_failed_tasks.py` | Moderate double-escaping issue. |
+| `src/scripts/inspect_file.py` | Moderate matching and double-escaping issues. |
+| `.jules/sentinel.md` | Documents the SQL-filtering remediation. |
+</details>
+
+<details>
+<summary>Review details</summary>
+
+### Suppressed comments (2)
+
+**src/scripts/inspect_file.py:579**
+* The basename fallback has the same regression: `contains` broadens the old suffix match and `escaped_basename` is then auto-escaped again, so filenames containing wildcard or backslash characters can fail to match. Pass the raw basename to `endswith(..., autoescape=True)` instead.
+```
+                Document.path.contains(escaped_basename, autoescape=True)
+```
+**test_sqla.py:21**
+* Because this new file matches pytest's default `test_*.py` pattern, `asyncio.run(main())` executes during collection, creating a database engine and printing SQL before any test runs. `main` contains no assertions, so this is a collection-time side effect rather than a regression test; convert it to a real pytest test with assertions, or rename it and guard the standalone entry point.
+```
+asyncio.run(main())
+```
+
+- **Files reviewed:** 5/5 changed files
+- **Comments generated:** 4
+- **Review effort level:** Lite
+</details>
 
 ---
 
 💡 <a href="/davidasnider/file-catalog/new/main?filename=.github/skills/code-review/SKILL.md" class="Link--inTextBlock" target="_blank" rel="noopener noreferrer">Add a `code-review` agent skill</a> or configure MCP servers for context-aware, tailored reviews. <a href="https://docs.github.com/en/copilot/how-tos/use-copilot-agents/request-a-code-review/use-code-review#mcp-servers-and-agent-skills" class="Link--inTextBlock" target="_blank" rel="noopener noreferrer">Learn more in the docs.</a>
 
 **Code Review Threads (Inline):**
-- **copilot-pull-request-reviewer** on `AGENTS.md` (Unresolved):
-> These newly added bullet items are each a single very long line, which hurts readability and can violate typical Markdown line-length linting. Please wrap each bullet’s text onto multiple indented continuation lines (while keeping the `-` list structure).
+- **copilot-pull-request-reviewer** on `src/scripts/inspect_file.py` line 567 (Unresolved):
+> The previous predicate was a suffix match (`LIKE '%{escaped_path}'`), but `contains` matches the fragment anywhere, so an input such as `Appointments.txt` can also return `/archive/Appointments.txt.bak` or an unrelated directory match. This also passes the manually escaped value into `autoescape=True`, causing literal `%`, `_`, and backslash characters to be escaped twice. Remove the manual escaping and use `endswith(path, autoescape=True)` to preserve the original behavior.
 >
-> This issue also appears on line 116 of the same file.
+> This issue also appears on line 579 of the same file.
+- **copilot-pull-request-reviewer** on `src/scripts/invalidate_failed_tasks.py` line 54 (Unresolved):
+> The filter is manually escaped before being passed to `contains(..., autoescape=True)`. `autoescape` escapes the raw value itself, so an `error_filter` containing `%`, `_`, or `\\` is double-escaped and no longer matches the actual error text. Pass `error_filter` directly and remove the `escaped` transformation.
+- **copilot-pull-request-reviewer** on `src/scripts/report_failures.py` line 137 (Unresolved):
+> `ext_filter` is documented and applied above as an extension/suffix filter (`doc.path.lower().endswith(...)`), and the previous SQL predicate was `LIKE '%<filter>'`. `contains` now includes paths that merely contain `.pdf` (for example, `/a.pdf.backup`), so the summary counts can disagree with the filtered failures. Use `endswith` with `autoescape=True` here to preserve the suffix semantics.
+- **copilot-pull-request-reviewer** on `test_sqla.py` line 9 (Unresolved):
+> Because this new root-level file matches pytest's default `test_*.py` discovery, importing it registers a second `Document` table in the global `SQLModel.metadata`. The real `src.db.models.Document` is then imported by the suite and raises SQLAlchemy's duplicate-table error during collection (regardless of import order). Remove this scratch probe or make it use the production model in a proper test module.

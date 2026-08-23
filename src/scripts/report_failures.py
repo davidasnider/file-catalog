@@ -133,7 +133,7 @@ async def report_failures(output_format="table", task_filter=None, ext_filter=No
 
         if ext_filter:
             stats_query = stats_query.where(
-                Document.path.contains(ext_filter, autoescape=True)
+                Document.path.endswith(ext_filter, autoescape=True)
             )
 
         if task_filter:
