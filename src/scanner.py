@@ -964,10 +964,12 @@ async def run_scanner(
 
             stalled_docs_res = await session.execute(
                 select(Document).where(
-                    Document.status.in_([
-                        DocumentStatus.EXTRACTING,
-                        DocumentStatus.ANALYZING,
-                    ])
+                    Document.status.in_(
+                        [
+                            DocumentStatus.EXTRACTING,
+                            DocumentStatus.ANALYZING,
+                        ]
+                    )
                 )
             )
             stalled_docs = stalled_docs_res.scalars().all()
