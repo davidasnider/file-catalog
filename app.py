@@ -156,12 +156,12 @@ def get_global_metrics():
     """Fetch aggregate metrics for the dashboard."""
 
     async def _fetch():
-        from sqlalchemy import case
-        from sqlalchemy import func
+        from sqlalchemy import case, func
 
         # ⚡ Bolt Performance Optimization:
-        # Replaced 3 separate database queries with a single query using conditional aggregation.
-        # This resolves an N+1 query pattern on the dashboard load and reduces DB round-trips by 66%.
+        # Replaced a fixed set of sequential database queries with a single query using
+        # conditional aggregation. This eliminates 3 separate dashboard queries and reduces
+        # DB round-trips by 66%.
         async with async_session_maker() as session:
             stmt = select(
                 func.count(Document.id),
