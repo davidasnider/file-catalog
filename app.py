@@ -8,7 +8,7 @@ from sqlalchemy import text
 from src.ui.snippets import render_snippet
 
 from src.db.engine import async_session_maker
-from src.db.models import Document, AnalysisTask
+from src.db.models import Document, AnalysisTask, DocumentStatus
 from src.db.fts import search_fts
 from src.core.analyzer_names import (
     TEXT_EXTRACTOR_NAME,
@@ -156,17 +156,27 @@ def get_global_metrics():
     """Fetch aggregate metrics for the dashboard."""
 
     async def _fetch():
-        from sqlalchemy import func
+        from sqlalchemy import case, func
 
+        # ⚡ Bolt Performance Optimization:
+        # Replaced a fixed set of sequential database queries with a single query using
+        # conditional aggregation. This eliminates 3 separate dashboard queries and reduces
+        # DB round-trips by 66%.
         async with async_session_maker() as session:
-            total = await session.scalar(select(func.count(Document.id)))
-            completed = await session.scalar(
-                select(func.count(Document.id)).where(Document.status == "COMPLETED")
+            stmt = select(
+                func.count(Document.id),
+                func.sum(
+                    case((Document.status == DocumentStatus.COMPLETED, 1), else_=0)
+                ),
+                func.sum(case((Document.status == DocumentStatus.FAILED, 1), else_=0)),
             )
-            failed = await session.scalar(
-                select(func.count(Document.id)).where(Document.status == "FAILED")
-            )
-            return {"total": total, "completed": completed, "failed": failed}
+            res = await session.execute(stmt)
+            row = res.fetchone()
+            return {
+                "total": row[0] or 0,
+                "completed": row[1] or 0,
+                "failed": row[2] or 0,
+            }
 
     return asyncio.run(_fetch())
 
