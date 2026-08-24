@@ -121,6 +121,10 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 - **Async I/O Offloading**: Blocking file I/O operations (like reading PDFs or HTML in
   `TextExtractorPlugin`) are offloaded to separate threads using `asyncio.to_thread` for optimal
   performance.
+- **Dashboard Metrics Optimization**: The Streamlit dashboard's global metrics query has been
+  optimized to reduce database round-trips. It consolidates multiple sequential scalar queries
+  into a single query using conditional aggregation (e.g., `func.sum(case(...))`), which reduces
+  query overhead and lock contention during high-concurrency ingestion.
 - **Email & HTML Fallbacks**: The `TextExtractorPlugin` includes robust fallback parsing for
   malformed emails (e.g., Eudora) and HTML body extraction using BeautifulSoup cleanup and graceful
   charset handling. Note that `.mbox` files must be extracted into `.eml` format first before scanning.
