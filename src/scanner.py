@@ -593,9 +593,7 @@ async def _batch_check_doc_errors(
                     select(AnalysisTask.result_data)
                     .where(AnalysisTask.document_id.in_(chunk))
                     .where(AnalysisTask.result_data.isnot(None))
-                    .where(
-                        AnalysisTask.result_data.contains('"error"', autoescape=True)
-                    )
+                    .where(AnalysisTask.result_data.like('%"error"%'))
                 )
                 for result_data in result.scalars().all():
                     if result_data:
@@ -757,15 +755,11 @@ async def run_scanner(
                     AnalysisTask.status,
                     case(
                         (
-                            AnalysisTask.result_data.contains(
-                                '"skipped": true', autoescape=True
-                            ),
+                            AnalysisTask.result_data.like('%"skipped": true%'),
                             True,
                         ),
                         (
-                            AnalysisTask.result_data.contains(
-                                '"skipped":true', autoescape=True
-                            ),
+                            AnalysisTask.result_data.like('%"skipped":true%'),
                             True,
                         ),
                         else_=False,
@@ -776,15 +770,11 @@ async def run_scanner(
                     AnalysisTask.status,
                     case(
                         (
-                            AnalysisTask.result_data.contains(
-                                '"skipped": true', autoescape=True
-                            ),
+                            AnalysisTask.result_data.like('%"skipped": true%'),
                             True,
                         ),
                         (
-                            AnalysisTask.result_data.contains(
-                                '"skipped":true', autoescape=True
-                            ),
+                            AnalysisTask.result_data.like('%"skipped":true%'),
                             True,
                         ),
                         else_=False,
