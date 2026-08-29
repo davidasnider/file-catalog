@@ -193,9 +193,8 @@ async def ingest_directory(
 
     base_path_resolved = base_path.resolve()
     # Filter documents in DB by path prefix to avoid loading the entire database
-    search_pattern = f"{base_path_resolved}%"
     result = await session.execute(
-        select(Document).where(Document.path.like(search_pattern))
+        select(Document).where(Document.path.startswith(str(base_path_resolved), autoescape=True))
     )
     existing_docs: Dict[str, Document] = {
         doc.path: doc for doc in result.scalars().all()
@@ -592,7 +591,7 @@ async def _batch_check_doc_errors(
                     select(AnalysisTask.result_data)
                     .where(AnalysisTask.document_id.in_(chunk))
                     .where(AnalysisTask.result_data.isnot(None))
-                    .where(AnalysisTask.result_data.like('%"error"%'))
+                    .where(AnalysisTask.result_data.contains('"error"', autoescape=True))
                 )
                 for result_data in result.scalars().all():
                     if result_data:
@@ -753,8 +752,8 @@ async def run_scanner(
                     AnalysisTask.task_name,
                     AnalysisTask.status,
                     case(
-                        (AnalysisTask.result_data.like('%"skipped": true%'), True),
-                        (AnalysisTask.result_data.like('%"skipped":true%'), True),
+                        (AnalysisTask.result_data.contains('"skipped": true', autoescape=True), True),
+                        (AnalysisTask.result_data.contains('"skipped":true', autoescape=True), True),
                         else_=False,
                     ).label("is_skipped"),
                     func.count(AnalysisTask.id).label("count"),
@@ -762,8 +761,8 @@ async def run_scanner(
                     AnalysisTask.task_name,
                     AnalysisTask.status,
                     case(
-                        (AnalysisTask.result_data.like('%"skipped": true%'), True),
-                        (AnalysisTask.result_data.like('%"skipped":true%'), True),
+                        (AnalysisTask.result_data.contains('"skipped": true', autoescape=True), True),
+                        (AnalysisTask.result_data.contains('"skipped":true', autoescape=True), True),
                         else_=False,
                     ),
                 )
