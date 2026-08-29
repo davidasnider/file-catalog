@@ -8,7 +8,7 @@ from sqlalchemy import text
 from src.ui.snippets import render_snippet
 
 from src.db.engine import async_session_maker
-from src.db.models import Document, AnalysisTask, DocumentStatus
+from src.db.models import Document, AnalysisTask, DocumentStatus, TaskStatus
 from src.db.fts import search_fts
 from src.core.analyzer_names import (
     TEXT_EXTRACTOR_NAME,
@@ -232,12 +232,7 @@ def main():
         # Get unique statuses for the multiselect (cached)
         @st.cache_data(ttl=3600)
         def get_all_statuses():
-            async def _fetch():
-                async with async_session_maker() as session:
-                    res = await session.execute(select(Document.status).distinct())
-                    return [s.name for s in res.scalars().all()]
-
-            return asyncio.run(_fetch())
+            return [s.name for s in DocumentStatus]
 
         unique_doc_statuses = get_all_statuses()
         selected_doc_statuses = st.multiselect(
@@ -264,12 +259,7 @@ def main():
 
         @st.cache_data(ttl=3600)
         def get_all_task_statuses():
-            async def _fetch():
-                async with async_session_maker() as session:
-                    res = await session.execute(select(AnalysisTask.status).distinct())
-                    return [s.name for s in res.scalars().all()]
-
-            return asyncio.run(_fetch())
+            return [s.name for s in TaskStatus]
 
         unique_task_statuses = get_all_task_statuses()
         selected_task_statuses = st.multiselect(
