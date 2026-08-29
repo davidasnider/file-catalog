@@ -5,3 +5,4 @@
 ## 2025-02-27 - Replace DB queries for distinct statuses with Enum iteration
 **Learning:** The `get_all_statuses` and `get_all_task_statuses` functions in the Streamlit app queried the database for distinct statuses using `SELECT DISTINCT`. These statuses are statically defined in `DocumentStatus` and `TaskStatus` enums. Querying a potentially large table for static enum values is unnecessary overhead.
 **Action:** Replace `SELECT DISTINCT` queries on enum columns with direct iteration over the Python Enum values to avoid database queries entirely.
+##
