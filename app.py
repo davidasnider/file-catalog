@@ -457,10 +457,26 @@ def main():
     # Metrics Row
     metrics = get_global_metrics()
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total Documents", metrics["total"])
-    col2.metric("Filtered", len(filtered_docs))
-    col3.metric("Completed", metrics["completed"])
-    col4.metric("Failed", metrics["failed"])
+    col1.metric(
+        "Total Documents",
+        metrics["total"],
+        help="Total number of documents in the catalog",
+    )
+    col2.metric(
+        "Filtered",
+        len(filtered_docs),
+        help="Number of documents matching current filters",
+    )
+    col3.metric(
+        "Completed",
+        metrics["completed"],
+        help="Number of documents successfully analyzed",
+    )
+    col4.metric(
+        "Failed",
+        metrics["failed"],
+        help="Number of documents that failed analysis",
+    )
 
     # Detail View Context
     if selected_row is not None:
