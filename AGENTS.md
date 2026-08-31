@@ -121,6 +121,8 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 - **Async I/O Offloading**: Blocking file I/O operations (like reading PDFs or HTML in
   `TextExtractorPlugin`) are offloaded to separate threads using `asyncio.to_thread` for optimal
   performance.
+- **Enum Iteration**: Replace `SELECT DISTINCT` queries on static Enum columns (like `DocumentStatus`) with direct Python Enum iteration to avoid unnecessary database queries.
+- **Streamlit UI Tooltips**: Utilize `help='...'` parameters on `st.metric` components to provide accessible tooltips. Do not use `border=True` on `st.metric` as it is unsupported by the project's Streamlit version and will cause component errors and CI failures.
 - **Dashboard Metrics Optimization**: The Streamlit dashboard's global metrics query has been
   optimized to reduce database round-trips. It consolidates multiple sequential scalar queries
   into a single query using conditional aggregation (e.g., `func.sum(case(...))`), which reduces
