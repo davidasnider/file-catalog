@@ -284,9 +284,16 @@ def main():
         documents = fetch_documents(selected_doc_statuses, search_query)
 
     if not documents:
-        st.info(
-            "No documents found matching your filters. Try adjusting your criteria in the sidebar."
-        )
+        if not selected_doc_statuses:
+            st.info(
+                "All documents are hidden because no Document Status is selected. "
+                "Select one or more statuses in the sidebar to show documents."
+            )
+        else:
+            st.info(
+                "No documents found matching your filters. Try adjusting your "
+                "criteria in the sidebar."
+            )
         return
 
     # Apply smart filters and search refinement in-memory on the SQL-filtered subset
