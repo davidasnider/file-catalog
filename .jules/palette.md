@@ -1,0 +1,3 @@
+## 2024-05-15 - Streamlit Accessibility and Empty States
+**Learning:** Adding `help` parameters to Streamlit UI components (like multiselects and columns) acts as accessible tooltips, significantly improving the experience for users unsure about filter functionality. Additionally, replacing generic "No documents found" messages with actionable empty states (e.g., "Try adjusting your criteria in the sidebar") reduces user frustration when filtering yields no results.
+**Action:** Always provide `help` tooltips on interactive filters and ensure empty states guide the user on how to resolve the empty condition.
