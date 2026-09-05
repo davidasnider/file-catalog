@@ -239,6 +239,7 @@ def main():
             "Filter by Document Status",
             unique_doc_statuses,
             default=unique_doc_statuses,
+            help="Filter documents by their processing status. Remove all to hide all.",
         )
 
         search_query = st.text_input(
@@ -266,6 +267,7 @@ def main():
             "Filter by Task Status",
             unique_task_statuses,
             default=unique_task_statuses,
+            help="Show documents that have tasks matching these statuses.",
         )
 
         st.divider()
@@ -274,6 +276,7 @@ def main():
             "Quick Filters",
             ["Estate Documents", "NSFW Content", "Contains Passwords"],
             default=[],
+            help="Filter based on AI analysis of document contents.",
         )
 
     # Fetch Filtered Documents
@@ -281,7 +284,9 @@ def main():
         documents = fetch_documents(selected_doc_statuses, search_query)
 
     if not documents:
-        st.info("No documents found matching your filters.")
+        st.info(
+            "No documents found matching your filters. Try adjusting your criteria in the sidebar."
+        )
         return
 
     # Apply smart filters and search refinement in-memory on the SQL-filtered subset
@@ -432,9 +437,11 @@ def main():
                 hide_index=True,
                 column_config={
                     "Document Status": st.column_config.TextColumn(
-                        "Status", width="small"
+                        "Status", width="small", help="Current processing status"
                     ),
-                    "File": st.column_config.TextColumn("File", width="large"),
+                    "File": st.column_config.TextColumn(
+                        "File", width="large", help="Document file name"
+                    ),
                 },
                 on_select="rerun",
                 selection_mode="single-row",
@@ -670,7 +677,12 @@ def main():
                             st.write("No result data available.")
 
     else:
-        st.info("Select a document from the table to view its analysis details.")
+        if filtered_docs:
+            st.info("Select a document from the table to view its analysis details.")
+        else:
+            st.info(
+                "No documents match the current filters. Adjust your search or smart filters in the sidebar."
+            )
 
 
 if __name__ == "__main__":
