@@ -22,10 +22,6 @@ class Settings(BaseSettings):
     def llm_display_name(self) -> str:
         return self.llm_model_path.split("/")[-1]
 
-    @property
-    def vision_display_name(self) -> str:
-        return self.vision_model_path.split("/")[-1]
-
     # API Keys & Cloud Config
     vertex_api_key: str | None = None
     google_cloud_project: str | None = None
