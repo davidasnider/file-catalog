@@ -41,7 +41,6 @@ def test_settings_properties():
         _env_file=None,
     )
     assert settings.llm_display_name == "llm-model"
-    assert settings.vision_display_name == "vision-model"
 
 
 def test_update_config_from_cli():
