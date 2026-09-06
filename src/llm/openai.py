@@ -7,7 +7,6 @@ from typing import AsyncGenerator
 from openai import AsyncOpenAI
 from src.llm.provider import LLMProvider
 from src.core.config import config
-from src.llm.vision_utils import resize_image_for_vision
 
 logger = logging.getLogger(__name__)
 
@@ -183,6 +182,7 @@ class OpenAIProvider(LLMProvider):
                 with Image.open(path) as img:
                     # Convert to RGB (standard for most VLMs)
                     image = img.convert("RGB")
+                    from src.llm.vision_utils import resize_image_for_vision
 
                     # Prevent memory explosion and request payload limits
 
