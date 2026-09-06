@@ -228,6 +228,7 @@ class MLXProvider(LLMProvider):
                 from PIL import Image
                 from mlx_vlm.models import cache as vlm_cache
                 from src.core.config import config
+                from src.llm.vision_utils import resize_image_for_vision
 
                 if not os.path.exists(image_path):
                     raise FileNotFoundError(f"Image not found at {image_path}")
@@ -240,17 +241,10 @@ class MLXProvider(LLMProvider):
                         # Prevent memory explosion by ensuring image isn't too large for the VLM sequence.
                         # Sequence length scales linearly with pixels (e.g., Qwen2-VL), but
                         # attention buffers and masks scale O(N^2), leading to OOM on high-res.
-                        max_pixels = config.vision_max_pixels
-                        w, h = image.size
-                        if w * h > max_pixels:
-                            # thumbnail preserves aspect ratio while staying within pixel budget
-                            scale = (max_pixels / (w * h)) ** 0.5
-                            new_size = (max(1, int(w * scale)), max(1, int(h * scale)))
-                            image.thumbnail(new_size, Image.Resampling.LANCZOS)
-                            logger.info(
-                                f"Resized image for vision processing: {w}x{h} -> {image.size} "
-                                f"(Max allowed: {max_pixels} pixels)"
-                            )
+
+                        image = resize_image_for_vision(
+                            image, config.vision_max_pixels, "vision processing"
+                        )
                 except Exception as e:
                     logger.error(f"Failed to open/process image {image_path}: {e}")
                     raise ValueError(f"Invalid or corrupt image: {e}") from e
