@@ -206,6 +206,7 @@ class LlamaCppProvider(LLMProvider):
             from PIL import Image
             import io
             from src.core.config import config
+            from src.llm.vision_utils import resize_image_for_vision
 
             if not os.path.exists(image_path):
                 raise FileNotFoundError(f"Image not found at {image_path}")
@@ -219,17 +220,10 @@ class LlamaCppProvider(LLMProvider):
                     # Prevent extreme memory usage or base64 overhead for high-res images.
                     # LlamaCpp often resizes internally, but resizing early saves memory
                     # during the encoding and transmission phase.
-                    max_pixels = config.vision_max_pixels
-                    w, h = img.size
-                    if w * h > max_pixels:
-                        # thumbnail preserves aspect ratio while staying within pixel budget
-                        scale = (max_pixels / (w * h)) ** 0.5
-                        new_size = (max(1, int(w * scale)), max(1, int(h * scale)))
-                        img.thumbnail(new_size, Image.Resampling.LANCZOS)
-                        logger.info(
-                            f"Resized image for LlamaCpp vision: {w}x{h} -> {img.size} "
-                            f"(Max allowed: {max_pixels} pixels)"
-                        )
+
+                    img = resize_image_for_vision(
+                        img, config.vision_max_pixels, "LlamaCpp vision"
+                    )
 
                     buffered = io.BytesIO()
                     img.save(buffered, format="JPEG")

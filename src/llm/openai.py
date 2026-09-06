@@ -7,6 +7,7 @@ from typing import AsyncGenerator
 from openai import AsyncOpenAI
 from src.llm.provider import LLMProvider
 from src.core.config import config
+from src.llm.vision_utils import resize_image_for_vision
 
 logger = logging.getLogger(__name__)
 
@@ -184,16 +185,10 @@ class OpenAIProvider(LLMProvider):
                     image = img.convert("RGB")
 
                     # Prevent memory explosion and request payload limits
-                    max_pixels = config.vision_max_pixels
-                    w, h = image.size
-                    if w * h > max_pixels:
-                        scale = (max_pixels / (w * h)) ** 0.5
-                        new_size = (max(1, int(w * scale)), max(1, int(h * scale)))
-                        image.thumbnail(new_size, Image.Resampling.LANCZOS)
-                        logger.info(
-                            f"Resized image for OpenAI vision processing: {w}x{h} -> {image.size} "
-                            f"(Max allowed: {max_pixels} pixels)"
-                        )
+
+                    image = resize_image_for_vision(
+                        image, config.vision_max_pixels, "OpenAI vision processing"
+                    )
 
                     # Encode to base64 from the potentially resized image
                     buffer = io.BytesIO()
