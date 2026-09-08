@@ -260,6 +260,7 @@ async def ingest_directory(
 
             # FIX: Re-detect MIME type for .wma files misidentified as video.
             # This MUST run even for COMPLETED files to ensure they are correctly re-classified.
+            #
             current_mime = doc.mime_type if doc else None
             if file_path.lower().endswith(".wma") and (
                 not current_mime or current_mime.startswith("video/")
