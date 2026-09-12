@@ -21,8 +21,9 @@ logger = logging.getLogger(__name__)
 async def get_failures_data(task_filter=None, ext_filter=None):
     """
     Fetch failure data from the database.
+
+    Note: The database must already be initialized (see `report_failures()`).
     """
-    await init_db()
     async with async_session_maker() as session:
         # Load all failed tasks and link them to their documents
         query = (
@@ -88,8 +89,12 @@ async def get_summary_stats(task_filter=None, ext_filter=None, failures=None):
     # Fetch summary stats for the summary table
     async with async_session_maker() as session:
         # Query: count(id), status, mime_type GROUP BY status, mime_type
+        # Count distinct document IDs so that fan-out joins (e.g. with
+        # AnalysisTask when a task filter is set) cannot double-count documents.
         stats_query = select(
-            Document.status, Document.mime_type, func.count(Document.id)
+            Document.status,
+            Document.mime_type,
+            func.count(func.distinct(Document.id)),
         )
 
         if ext_filter:
@@ -154,6 +159,8 @@ async def report_failures(output_format="table", task_filter=None, ext_filter=No
         task_filter (str, optional): Name of a specific task to filter by.
         ext_filter (str, optional): File extension to filter by (e.g., ".pdf").
     """
+    await init_db()
+
     failures = await get_failures_data(task_filter, ext_filter)
 
     if output_format == "json":
