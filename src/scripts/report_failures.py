@@ -2,9 +2,11 @@ import argparse
 import asyncio
 import json
 import logging
+from collections import defaultdict
 
 from rich.console import Console
 from rich.table import Table
+from sqlalchemy import func
 from sqlmodel import select
 
 from src.db.engine import async_session_maker, init_db
@@ -16,16 +18,12 @@ logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
-async def report_failures(output_format="table", task_filter=None, ext_filter=None):
+async def get_failures_data(task_filter=None, ext_filter=None):
     """
-    Generate a report of pipeline failures from the database.
+    Fetch failure data from the database.
 
-    Args:
-        output_format (str): Output format, either "table" (Rich) or "json".
-        task_filter (str, optional): Name of a specific task to filter by.
-        ext_filter (str, optional): File extension to filter by (e.g., ".pdf").
+    Note: The database must already be initialized (see `report_failures()`).
     """
-    await init_db()
     async with async_session_maker() as session:
         # Load all failed tasks and link them to their documents
         query = (
@@ -81,6 +79,102 @@ async def report_failures(output_format="table", task_filter=None, ext_filter=No
                 "error_message": "Document marked as FAILED (could be timeout, pipeline crash, etc.)",
             }
         )
+    return failures
+
+
+async def get_summary_stats(task_filter=None, ext_filter=None, failures=None):
+    """
+    Fetch summary statistics from the database.
+
+    Args:
+        task_filter (str, optional): Name of a specific task to filter by.
+        ext_filter (str, optional): File extension to filter by (e.g., ".pdf").
+        failures (list, optional): Failure entries from `get_failures_data()`.
+            When provided, it refines the FAILED counts (including task-level
+            failures whose document status has not flipped to FAILED yet).
+            When omitted, documents with status FAILED are still counted from
+            the raw status aggregation, so the helper is correct on its own.
+    """
+    # Fetch summary stats for the summary table
+    async with async_session_maker() as session:
+        # Query: count(id), status, mime_type GROUP BY status, mime_type
+        # Count distinct document IDs so that fan-out joins (e.g. with
+        # AnalysisTask when a task filter is set) cannot double-count documents.
+        stats_query = select(
+            Document.status,
+            Document.mime_type,
+            func.count(func.distinct(Document.id)),
+        )
+
+        if ext_filter:
+            stats_query = stats_query.where(
+                Document.path.endswith(ext_filter, autoescape=True)
+            )
+
+        if task_filter:
+            # If filtering by task, we need to join AnalysisTask to correctly count
+            # but note that simple COMPLETED/PENDING might not make sense if we only
+            # look at documents that have at least one of that specific task.
+            # For simplicity, we filter the doc set to those that have the task.
+            stats_query = stats_query.join(AnalysisTask).where(
+                AnalysisTask.task_name == task_filter
+            )
+
+        stats_query = stats_query.group_by(Document.status, Document.mime_type)
+
+        stats_result = await session.execute(stats_query)
+        raw_stats = stats_result.all()
+
+    # Aggregate stats: {mime: {"FAILED": X, "COMPLETED": Y, "PENDING": Z, "MISSING": W}}
+    summary_stats = defaultdict(
+        lambda: {"FAILED": 0, "COMPLETED": 0, "PENDING": 0, "MISSING": 0}
+    )
+
+    for status, mime, count in raw_stats:
+        m = mime or "unknown"
+        # Filter by extension logic moved to SQL stats_query
+        s = status.name if hasattr(status, "name") else str(status)
+        if s == "COMPLETED":
+            summary_stats[m]["COMPLETED"] = count
+        elif s == "NOT_PRESENT":
+            summary_stats[m]["MISSING"] = count
+        elif s == "FAILED":
+            summary_stats[m]["FAILED"] = count
+        elif s in ["PENDING", "ANALYZING", "EXTRACTING"]:
+            summary_stats[m]["PENDING"] += count
+
+    # When a failures list is supplied, use it to refine the FAILED counts
+    # (it also catches task-level failures that didn't flip doc status yet).
+    # Without one, the FAILED counts fall back to the raw status aggregation
+    # above, so calling this helper independently stays correct.
+    mime_to_failed_docs = defaultdict(set)
+    if failures:
+        for f in failures:
+            mime_to_failed_docs[f["mime_type"] or "unknown"].add(f["document_id"])
+
+    for mime, doc_ids in mime_to_failed_docs.items():
+        summary_stats[mime]["FAILED"] = len(doc_ids)
+
+    # Sort by frequency of FAILED descending
+    sorted_mimes = sorted(
+        summary_stats.items(), key=lambda x: x[1]["FAILED"], reverse=True
+    )
+
+    return sorted_mimes
+
+
+async def report_failures(output_format="table", task_filter=None, ext_filter=None):
+    """
+    Generate a report of pipeline failures from the database.
+
+    Args:
+        output_format (str): Output format, either "table" (Rich) or "json".
+        task_filter (str, optional): Name of a specific task to filter by.
+        ext_filter (str, optional): File extension to filter by (e.g., ".pdf").
+    """
+    await init_db()
+
+    failures = await get_failures_data(task_filter, ext_filter)
 
     if output_format == "json":
         print(json.dumps(failures, indent=2))
@@ -122,65 +216,7 @@ async def report_failures(output_format="table", task_filter=None, ext_filter=No
 
     console.print(table)
 
-    # Fetch summary stats for the summary table
-    async with async_session_maker() as session:
-        from sqlalchemy import func
-
-        # Query: count(id), status, mime_type GROUP BY status, mime_type
-        stats_query = select(
-            Document.status, Document.mime_type, func.count(Document.id)
-        )
-
-        if ext_filter:
-            stats_query = stats_query.where(
-                Document.path.endswith(ext_filter, autoescape=True)
-            )
-
-        if task_filter:
-            # If filtering by task, we need to join AnalysisTask to correctly count
-            # but note that simple COMPLETED/PENDING might not make sense if we only
-            # look at documents that have at least one of that specific task.
-            # For simplicity, we filter the doc set to those that have the task.
-            stats_query = stats_query.join(AnalysisTask).where(
-                AnalysisTask.task_name == task_filter
-            )
-
-        stats_query = stats_query.group_by(Document.status, Document.mime_type)
-
-        stats_result = await session.execute(stats_query)
-        raw_stats = stats_result.all()
-
-    # Aggregate stats: {mime: {"FAILED": X, "COMPLETED": Y, "PENDING": Z, "MISSING": W}}
-    from collections import defaultdict
-
-    summary_stats = defaultdict(
-        lambda: {"FAILED": 0, "COMPLETED": 0, "PENDING": 0, "MISSING": 0}
-    )
-
-    for status, mime, count in raw_stats:
-        m = mime or "unknown"
-        # Filter by extension logic moved to SQL stats_query
-        s = status.name if hasattr(status, "name") else str(status)
-        if s == "COMPLETED":
-            summary_stats[m]["COMPLETED"] = count
-        elif s == "NOT_PRESENT":
-            summary_stats[m]["MISSING"] = count
-        elif s in ["PENDING", "ANALYZING", "EXTRACTING"]:
-            summary_stats[m]["PENDING"] += count
-
-    # Use the failures list for the most accurate FAILED counts
-    # (handles task-level failures that didn't flip doc status yet)
-    mime_to_failed_docs = defaultdict(set)
-    for f in failures:
-        mime_to_failed_docs[f["mime_type"] or "unknown"].add(f["document_id"])
-
-    for mime, doc_ids in mime_to_failed_docs.items():
-        summary_stats[mime]["FAILED"] = len(doc_ids)
-
-    # Sort by frequency of FAILED descending
-    sorted_mimes = sorted(
-        summary_stats.items(), key=lambda x: x[1]["FAILED"], reverse=True
-    )
+    sorted_mimes = await get_summary_stats(task_filter, ext_filter, failures)
 
     summary_table = Table(
         title="\nSummary by MIME Type", show_header=True, header_style="bold cyan"
