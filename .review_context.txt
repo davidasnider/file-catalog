@@ -1,61 +1,84 @@
-PR #210 Review Context
+PR #195 Review Context
 =============================
 
 Recent Commits:
 ---------------
-d461d1d docs: update documentation to reflect code modifications (#208)
+689518c 🛡️ Sentinel: [CRITICAL/HIGH] Fix SQL injection risks
 
 PR Discussion History:
 ----------------------
-### PR #210: docs: update documentation to reflect code modifications
-**URL:** https://github.com/davidasnider/file-catalog/pull/210
+### PR #195: 🛡️ Sentinel: [CRITICAL/HIGH] Fix SQL injection risks
+**URL:** https://github.com/davidasnider/file-catalog/pull/195
 
 **PR Description:**
-> This PR updates the project's documentation to reflect recent architectural and UI changes.
->
-> Modifications:
-> - `README.md`: Updated the "Vision Memory Safeguards" section to mention that the image resizing logic has been centralized into the `src/llm/vision_utils.py` utility module (as per PR #207). ...
+> 🚨 Severity: HIGH
+> 💡 Vulnerability: SQL injection risks due to f-strings with `.like()` in sql queries.
+> 🎯 Impact: Using `.like(f"%{user_input}%")` in SQLModel queries without escaping or parameterization is vulnerable to SQL injection.
+> 🔧 Fix: Replace `.like(f"%{user_input}%")` with `.contains(user_inp...
 
 **Reviews:**
 - **copilot-pull-request-reviewer** (COMMENTED): ### 🟡 Changes recommended
 
-The new `plan.md` appears to be an unintended internal agent plan artifact and is not aligned with the PR’s documented scope.
+Resolve the critical test failure and the predicate-matching and escaping issues before approval.
 
 *Once you've addressed the issues Copilot identified, you can request another Copilot review.*
 
 <details>
 <summary>Pull request overview</summary>
 
-Updates project documentation to match recent refactors and Streamlit UX/accessibility improvements, ensuring the README and contributor guidance reflect current architecture and UI behavior.
+This PR replaces interpolated SQL `LIKE` filters with safer SQLModel predicates and documents the remediation.
 
 **Changes:**
-- Documented that vision image resizing/OOM safeguards are centralized in `src/llm/vision_utils.py`.
-- Expanded Streamlit documentation to cover `help=` tooltips across filters/columns and actionable empty-state guidance.
-- Added `plan.md` containing an internal agent execution plan.
+- Updates failure, invalidation, and path filtering queries.
+- Adds a SQLAlchemy probe file.
+- Documents the Sentinel SQL-filtering fix.
 </details>
 
 <details>
 <summary>File summaries</summary>
 
-| File | Description |
-| ---- | ----------- |
-| README.md | Updates user-facing docs to reference centralized vision resizing utilities and expanded Streamlit tooltip/empty-state behavior. |
-| AGENTS.md | Updates contributor guidance on Streamlit tooltips and empty-state messaging expectations. |
-| plan.md | Adds an internal execution plan artifact that appears unrelated to the stated documentation updates. |
+| File | Review summary |
+|---|---|
+| `test_sqla.py` | Critical pytest collection failure from duplicate `Document` table registration. |
+| `src/scripts/report_failures.py` | Moderate suffix-matching regression. |
+| `src/scripts/invalidate_failed_tasks.py` | Moderate double-escaping issue. |
+| `src/scripts/inspect_file.py` | Moderate matching and double-escaping issues. |
+| `.jules/sentinel.md` | Documents the SQL-filtering remediation. |
 </details>
 
 <details>
 <summary>Review details</summary>
 
-- **Files reviewed:** 3/3 changed files
-- **Comments generated:** 1
+### Suppressed comments (2)
+
+**src/scripts/inspect_file.py:579**
+* The basename fallback has the same regression: `contains` broadens the old suffix match and `escaped_basename` is then auto-escaped again, so filenames containing wildcard or backslash characters can fail to match. Pass the raw basename to `endswith(..., autoescape=True)` instead.
+```
+                Document.path.contains(escaped_basename, autoescape=True)
+```
+**test_sqla.py:21**
+* Because this new file matches pytest's default `test_*.py` pattern, `asyncio.run(main())` executes during collection, creating a database engine and printing SQL before any test runs. `main` contains no assertions, so this is a collection-time side effect rather than a regression test; convert it to a real pytest test with assertions, or rename it and guard the standalone entry point.
+```
+asyncio.run(main())
+```
+
+- **Files reviewed:** 5/5 changed files
+- **Comments generated:** 4
 - **Review effort level:** Lite
 </details>
 
 ---
 
-💡 <a href="/davidasnider/file-catalog/new/main?filename=.github/skills/code-review/SKILL.md" class="Link--inTextBlock" target="_blank" rel="noopener noreferrer">Add a `code-review` agent skill</a> or configure MCP servers for context-aware, tailored reviews. <a href="https://docs.github.com/copilot/how-tos/use-copilot-agents/request-a-code-review/use-code-review?tool=webui#mcp-servers-and-agent-skills" class="Link--inTextBlock" target="_blank" rel="noopener noreferrer">Learn more in the docs.</a>
+💡 <a href="/davidasnider/file-catalog/new/main?filename=.github/skills/code-review/SKILL.md" class="Link--inTextBlock" target="_blank" rel="noopener noreferrer">Add a `code-review` agent skill</a> or configure MCP servers for context-aware, tailored reviews. <a href="https://docs.github.com/en/copilot/how-tos/use-copilot-agents/request-a-code-review/use-code-review#mcp-servers-and-agent-skills" class="Link--inTextBlock" target="_blank" rel="noopener noreferrer">Learn more in the docs.</a>
 
 **Code Review Threads (Inline):**
-- **copilot-pull-request-reviewer** on `plan.md` line 5 (Unresolved):
-> `plan.md` looks like a transient agent execution plan (mentions internal tools like `run_in_bash_session`, `submit`, `request_code_review`) rather than project documentation. Including it at repo root is likely accidental and also not described in the PR description; consider removing it from the PR (or relocating it to an internal/ignored location if it needs to be kept).
+- **copilot-pull-request-reviewer** on `src/scripts/inspect_file.py` line 567 (Unresolved):
+> The previous predicate was a suffix match (`LIKE '%{escaped_path}'`), but `contains` matches the fragment anywhere, so an input such as `Appointments.txt` can also return `/archive/Appointments.txt.bak` or an unrelated directory match. This also passes the manually escaped value into `autoescape=True`, causing literal `%`, `_`, and backslash characters to be escaped twice. Remove the manual escaping and use `endswith(path, autoescape=True)` to preserve the original behavior.
+>
+> This issue also appears on line 579 of the same file.
+- **copilot-pull-request-reviewer** on `src/scripts/invalidate_failed_tasks.py` line 54 (Unresolved):
+> The filter is manually escaped before being passed to `contains(..., autoescape=True)`. `autoescape` escapes the raw value itself, so an `error_filter` containing `%`, `_`, or `\\` is double-escaped and no longer matches the actual error text. Pass `error_filter` directly and remove the `escaped` transformation.
+- **copilot-pull-request-reviewer** on `src/scripts/report_failures.py` line 137 (Unresolved):
+> `ext_filter` is documented and applied above as an extension/suffix filter (`doc.path.lower().endswith(...)`), and the previous SQL predicate was `LIKE '%<filter>'`. `contains` now includes paths that merely contain `.pdf` (for example, `/a.pdf.backup`), so the summary counts can disagree with the filtered failures. Use `endswith` with `autoescape=True` here to preserve the suffix semantics.
+- **copilot-pull-request-reviewer** on `test_sqla.py` line 9 (Unresolved):
+> Because this new root-level file matches pytest's default `test_*.py` discovery, importing it registers a second `Document` table in the global `SQLModel.metadata`. The real `src.db.models.Document` is then imported by the suite and raises SQLAlchemy's duplicate-table error during collection (regardless of import order). Remove this scratch probe or make it use the production model in a proper test module.
