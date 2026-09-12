@@ -16,7 +16,7 @@ async def cleanup():
     async with async_session_maker() as session:
         # Query only Document IDs to save memory (case-insensitive path match)
         statement = select(Document.id).where(
-            (func.lower(Document.path).endswith(".xml", autoescape=True))
+            (func.lower(Document.path).like("%.xml"))
             | (
                 Document.mime_type.in_(
                     [
