@@ -85,6 +85,15 @@ async def get_failures_data(task_filter=None, ext_filter=None):
 async def get_summary_stats(task_filter=None, ext_filter=None, failures=None):
     """
     Fetch summary statistics from the database.
+
+    Args:
+        task_filter (str, optional): Name of a specific task to filter by.
+        ext_filter (str, optional): File extension to filter by (e.g., ".pdf").
+        failures (list, optional): Failure entries from `get_failures_data()`.
+            When provided, it refines the FAILED counts (including task-level
+            failures whose document status has not flipped to FAILED yet).
+            When omitted, documents with status FAILED are still counted from
+            the raw status aggregation, so the helper is correct on its own.
     """
     # Fetch summary stats for the summary table
     async with async_session_maker() as session:
@@ -129,11 +138,15 @@ async def get_summary_stats(task_filter=None, ext_filter=None, failures=None):
             summary_stats[m]["COMPLETED"] = count
         elif s == "NOT_PRESENT":
             summary_stats[m]["MISSING"] = count
+        elif s == "FAILED":
+            summary_stats[m]["FAILED"] = count
         elif s in ["PENDING", "ANALYZING", "EXTRACTING"]:
             summary_stats[m]["PENDING"] += count
 
-    # Use the failures list for the most accurate FAILED counts
-    # (handles task-level failures that didn't flip doc status yet)
+    # When a failures list is supplied, use it to refine the FAILED counts
+    # (it also catches task-level failures that didn't flip doc status yet).
+    # Without one, the FAILED counts fall back to the raw status aggregation
+    # above, so calling this helper independently stays correct.
     mime_to_failed_docs = defaultdict(set)
     if failures:
         for f in failures:
