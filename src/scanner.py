@@ -193,9 +193,10 @@ async def ingest_directory(
 
     base_path_resolved = base_path.resolve()
     # Filter documents in DB by path prefix to avoid loading the entire database
-    search_pattern = f"{base_path_resolved}%"
     result = await session.execute(
-        select(Document).where(Document.path.like(search_pattern))
+        select(Document).where(
+            Document.path.startswith(str(base_path_resolved), autoescape=True)
+        )
     )
     existing_docs: Dict[str, Document] = {
         doc.path: doc for doc in result.scalars().all()
