@@ -101,7 +101,7 @@ python -m src.scripts.remove_xml_records
 ---
 
 ### 8. Report Failures (`report_failures.py`)
-Generate a report of pipeline failures from the database.
+Generate a report of pipeline failures from the database, utilizing a refactored architecture that separates database fetching logic from presentation logic.
 
 **Examples:**
 ```bash
