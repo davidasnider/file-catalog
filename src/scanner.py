@@ -6,7 +6,7 @@ import logging
 import os
 from pathlib import Path
 from typing import Dict, List, Tuple
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 from rich.progress import (
@@ -587,9 +587,6 @@ async def _batch_check_doc_errors(
             is_sqlite = session.bind.dialect.name == "sqlite"
 
             if is_sqlite:
-                import json
-                from sqlalchemy import text
-
                 doc_ids_json = json.dumps(list(processed_doc_ids))
                 stmt = (
                     select(AnalysisTask.result_data)
@@ -1335,9 +1332,6 @@ async def run_standalone_judge():
     async with async_session_maker() as session:
         is_sqlite = session.bind.dialect.name == "sqlite"
         if is_sqlite:
-            import json
-            from sqlalchemy import text
-
             doc_ids_json = json.dumps(doc_ids)
             stmt = (
                 select(AnalysisTask)
