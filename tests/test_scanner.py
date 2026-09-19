@@ -931,3 +931,21 @@ async def test_batch_check_doc_errors_non_sqlite_fallback(
     assert "fallback-model" in next(iter(missing_models))
     assert len(missing_libraries) == 1
     assert "llama-cpp-python is not installed" in next(iter(missing_libraries))
+
+
+@pytest.mark.asyncio
+async def test_ingest_directory_path_with_wildcard_characters(db_session, tmp_path):
+    """Verify ingest_directory safely handles directory paths containing LIKE wildcard characters (% and _)."""
+    special_dir = tmp_path / "test_%dir"
+    special_dir.mkdir()
+    test_file = special_dir / "sample.txt"
+    test_file.write_text("hello world")
+
+    # Ingest once
+    processed_ids, _ = await ingest_directory(str(special_dir), db_session)
+    assert len(processed_ids) == 1
+
+    # Ingest second time - unchanged file should be recognized in existing_docs
+    processed_ids2, _ = await ingest_directory(str(special_dir), db_session)
+    assert len(processed_ids2) == 1
+    assert processed_ids == processed_ids2
