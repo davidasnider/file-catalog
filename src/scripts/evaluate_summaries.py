@@ -113,10 +113,12 @@ async def get_summary_pairs(session: AsyncSession, limit: int) -> List[Dict[str,
 
     logger.info(f"Found {len(doc_ids)} documents with completed summaries.")
 
-    if not doc_ids:
+    if not doc_ids or limit <= 0:
         return []
 
     sampled_ids = random.sample(doc_ids, min(len(doc_ids), limit))
+    if not sampled_ids:
+        return []
 
     # ⚡ Bolt Performance Optimization:
     # Replaced O(N) database queries with a single batch fetch for Documents and AnalysisTasks
