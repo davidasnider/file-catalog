@@ -38,7 +38,7 @@ def safe_extract_zip(zip_ref: zipfile.ZipFile, dest_dir: Path):
 
 def safe_extract_7z(archive: "py7zr.SevenZipFile", dest_dir: Path):
     """Safely extracts a 7z file, checking for path traversal."""
-    for member in archive.get_files():
+    for member in archive.list():
         member_path = (dest_dir / member.filename).resolve()
         if not is_within_directory(dest_dir, member_path):
             raise Exception(f"Potential path traversal attempt: {member.filename}")
@@ -57,7 +57,7 @@ def safe_extract_7z(archive: "py7zr.SevenZipFile", dest_dir: Path):
                     f"Potential path traversal attempt (link target outside): {member.filename} -> {member.link_target}"
                 )
 
-    archive.extract(targets=[m.filename for m in archive.get_files()], path=dest_dir)
+    archive.extract(targets=[m.filename for m in archive.list()], path=dest_dir)
 
 
 def safe_extract_tar(tar_ref: tarfile.TarFile, dest_dir: Path):
