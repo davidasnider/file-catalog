@@ -6,7 +6,7 @@ import logging
 import os
 from pathlib import Path
 from typing import Dict, List, Tuple
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 from rich.progress import (
@@ -193,9 +193,10 @@ async def ingest_directory(
 
     base_path_resolved = base_path.resolve()
     # Filter documents in DB by path prefix to avoid loading the entire database
-    search_pattern = f"{base_path_resolved}%"
     result = await session.execute(
-        select(Document).where(Document.path.like(search_pattern))
+        select(Document).where(
+            Document.path.startswith(str(base_path_resolved), autoescape=True)
+        )
     )
     existing_docs: Dict[str, Document] = {
         doc.path: doc for doc in result.scalars().all()
@@ -260,6 +261,7 @@ async def ingest_directory(
 
             # FIX: Re-detect MIME type for .wma files misidentified as video.
             # This MUST run even for COMPLETED files to ensure they are correctly re-classified.
+            #
             current_mime = doc.mime_type if doc else None
             if file_path.lower().endswith(".wma") and (
                 not current_mime or current_mime.startswith("video/")
@@ -583,17 +585,27 @@ async def _batch_check_doc_errors(
 
     try:
         async with async_session_maker() as session:
-            # Use chunk_size = 900 to stay under SQLite's maximum parameter limit (999).
-            doc_ids_list = list(processed_doc_ids)
-            chunk_size = 900
-            for i in range(0, len(doc_ids_list), chunk_size):
-                chunk = doc_ids_list[i : i + chunk_size]
-                result = await session.execute(
+            # Use SQLite's json_each to expand the list without hitting the 999 parameter limit
+            is_sqlite = (
+                session.bind is not None and session.bind.dialect.name == "sqlite"
+            )
+
+            if is_sqlite:
+                doc_ids_json = json.dumps(list(processed_doc_ids))
+                stmt = (
                     select(AnalysisTask.result_data)
-                    .where(AnalysisTask.document_id.in_(chunk))
+                    .where(
+                        AnalysisTask.document_id.in_(
+                            select(text("value")).select_from(
+                                text("json_each(:doc_ids)")
+                            )
+                        )
+                    )
                     .where(AnalysisTask.result_data.isnot(None))
                     .where(AnalysisTask.result_data.like('%"error"%'))
+                    .params(doc_ids=doc_ids_json)
                 )
+                result = await session.execute(stmt)
                 for result_data in result.scalars().all():
                     if result_data:
                         try:
@@ -606,6 +618,29 @@ async def _batch_check_doc_errors(
                                     missing_libraries.add(err)
                         except (json.JSONDecodeError, TypeError):
                             pass
+            else:
+                doc_ids_list = list(processed_doc_ids)
+                chunk_size = 900
+                for i in range(0, len(doc_ids_list), chunk_size):
+                    chunk = doc_ids_list[i : i + chunk_size]
+                    result = await session.execute(
+                        select(AnalysisTask.result_data)
+                        .where(AnalysisTask.document_id.in_(chunk))
+                        .where(AnalysisTask.result_data.isnot(None))
+                        .where(AnalysisTask.result_data.like('%"error"%'))
+                    )
+                    for result_data in result.scalars().all():
+                        if result_data:
+                            try:
+                                data = json.loads(result_data)
+                                if isinstance(data, dict):
+                                    err = data.get("error", "")
+                                    if "model not found" in err.lower():
+                                        missing_models.add(err)
+                                    elif "llama-cpp-python is not installed" in err:
+                                        missing_libraries.add(err)
+                            except (json.JSONDecodeError, TypeError):
+                                pass
     except Exception as e:
         logger.exception("Error checking document tasks: %s", e)
 
@@ -1299,12 +1334,19 @@ async def run_standalone_judge():
     doc_ids = list({doc.id for _, doc in tasks_with_docs})
     doc_contexts = {}
     async with async_session_maker() as session:
-        chunk_size = 900
-        for i in range(0, len(doc_ids), chunk_size):
-            chunk = doc_ids[i : i + chunk_size]
-            all_tasks_res = await session.execute(
-                select(AnalysisTask).where(AnalysisTask.document_id.in_(chunk))
+        is_sqlite = session.bind is not None and session.bind.dialect.name == "sqlite"
+        if is_sqlite:
+            doc_ids_json = json.dumps(doc_ids)
+            stmt = (
+                select(AnalysisTask)
+                .where(
+                    AnalysisTask.document_id.in_(
+                        select(text("value")).select_from(text("json_each(:doc_ids)"))
+                    )
+                )
+                .params(doc_ids=doc_ids_json)
             )
+            all_tasks_res = await session.execute(stmt)
             for t in all_tasks_res.scalars().all():
                 if t.result_data:
                     try:
@@ -1313,6 +1355,21 @@ async def run_standalone_judge():
                         )
                     except Exception:
                         pass
+        else:
+            chunk_size = 900
+            for i in range(0, len(doc_ids), chunk_size):
+                chunk = doc_ids[i : i + chunk_size]
+                all_tasks_res = await session.execute(
+                    select(AnalysisTask).where(AnalysisTask.document_id.in_(chunk))
+                )
+                for t in all_tasks_res.scalars().all():
+                    if t.result_data:
+                        try:
+                            doc_contexts.setdefault(t.document_id, {})[t.task_name] = (
+                                json.loads(t.result_data)
+                            )
+                        except Exception:
+                            pass
 
     failed_count = 0
     passed_count = 0
