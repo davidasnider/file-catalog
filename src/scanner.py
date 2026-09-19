@@ -260,6 +260,7 @@ async def ingest_directory(
 
             # FIX: Re-detect MIME type for .wma files misidentified as video.
             # This MUST run even for COMPLETED files to ensure they are correctly re-classified.
+            #
             current_mime = doc.mime_type if doc else None
             if file_path.lower().endswith(".wma") and (
                 not current_mime or current_mime.startswith("video/")
@@ -584,7 +585,9 @@ async def _batch_check_doc_errors(
     try:
         async with async_session_maker() as session:
             # Use SQLite's json_each to expand the list without hitting the 999 parameter limit
-            is_sqlite = session.bind.dialect.name == "sqlite"
+            is_sqlite = (
+                session.bind is not None and session.bind.dialect.name == "sqlite"
+            )
 
             if is_sqlite:
                 doc_ids_json = json.dumps(list(processed_doc_ids))
@@ -1330,7 +1333,7 @@ async def run_standalone_judge():
     doc_ids = list({doc.id for _, doc in tasks_with_docs})
     doc_contexts = {}
     async with async_session_maker() as session:
-        is_sqlite = session.bind.dialect.name == "sqlite"
+        is_sqlite = session.bind is not None and session.bind.dialect.name == "sqlite"
         if is_sqlite:
             doc_ids_json = json.dumps(doc_ids)
             stmt = (
