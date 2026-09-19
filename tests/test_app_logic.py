@@ -276,3 +276,44 @@ class TestDashboardUI:
         assert "Document Index" in [s.value for s in at.subheader]
         assert "Document Index" not in [s.value for s in at.sidebar.subheader]
         assert len(at.sidebar.dataframe) == 0
+
+    def test_empty_documents_shows_warning(self):
+        """Verify warning message is displayed when filtering yields no documents."""
+        from streamlit.testing.v1 import AppTest
+
+        at = AppTest.from_file("app.py")
+        at.run(timeout=10)
+
+        search_input = next(
+            t for t in at.sidebar.text_input if "Search path" in t.label
+        )
+        search_input.input("nonexistent_filter_xyz_123").run(timeout=10)
+
+        warnings = [w.value for w in at.warning]
+        assert any(
+            "No documents found matching your filters. Try adjusting your criteria in the sidebar."
+            in w
+            for w in warnings
+        )
+
+    def test_unselected_status_shows_info(self):
+        """Verify info message is displayed when no document status is selected."""
+        from streamlit.testing.v1 import AppTest
+
+        at = AppTest.from_file("app.py")
+        at.run(timeout=10)
+
+        status_ms = next(
+            ms
+            for ms in at.sidebar.multiselect
+            if "Filter by Document Status" in ms.label
+        )
+        for s in list(status_ms.value):
+            status_ms.unselect(s)
+        status_ms.run(timeout=10)
+
+        infos = [i.value for i in at.info]
+        assert any(
+            "All documents are hidden because no Document Status is selected." in i
+            for i in infos
+        )
