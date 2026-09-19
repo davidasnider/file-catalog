@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import json
+from collections import defaultdict
 import logging
 import random
 from typing import List, Dict, Any
@@ -112,23 +113,35 @@ async def get_summary_pairs(session: AsyncSession, limit: int) -> List[Dict[str,
 
     logger.info(f"Found {len(doc_ids)} documents with completed summaries.")
 
-    if not doc_ids:
+    if not doc_ids or limit <= 0:
         return []
 
     sampled_ids = random.sample(doc_ids, min(len(doc_ids), limit))
+    if not sampled_ids:
+        return []
+
+    # ⚡ Bolt Performance Optimization:
+    # Replaced O(N) database queries with a single batch fetch for Documents and AnalysisTasks
+    # resolving an N+1 query problem during summary evaluation.
+    docs_stmt = select(Document).where(Document.id.in_(sampled_ids))
+    docs_res = await session.execute(docs_stmt)
+    docs_dict = {d.id: d for d in docs_res.scalars().all()}
+
+    tasks_stmt = select(AnalysisTask).where(AnalysisTask.document_id.in_(sampled_ids))
+    tasks_res = await session.execute(tasks_stmt)
+
+    tasks_dict = defaultdict(list)
+    for task in tasks_res.scalars().all():
+        tasks_dict[task.document_id].append(task)
 
     pairs = []
     for doc_id in sampled_ids:
-        doc_stmt = select(Document).where(Document.id == doc_id)
-        doc_res = await session.execute(doc_stmt)
-        doc = doc_res.scalar_one_or_none()
+        doc = docs_dict.get(doc_id)
 
         if not doc:
             continue
 
-        task_stmt = select(AnalysisTask).where(AnalysisTask.document_id == doc_id)
-        task_result = await session.execute(task_stmt)
-        tasks = task_result.scalars().all()
+        tasks = tasks_dict.get(doc_id, [])
 
         context = build_context_from_tasks(tasks)
         source_text = get_all_extracted_text(context)
