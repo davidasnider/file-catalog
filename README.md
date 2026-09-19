@@ -30,6 +30,7 @@ A deeply integrated, locally-hosted AI document analysis pipeline. This system i
 
 ### 5. Rich Text & Metadata Extraction
 - **Broad File Support**: Extract metadata and content from PDFs (`pdfplumber`), Word Docs (`python-docx`), HTML web pages (`BeautifulSoup4`), and standard text/code files. The `TextExtractorPlugin` includes robust fallback parsing for malformed emails (e.g., Eudora) and HTML body extraction using BeautifulSoup cleanup and graceful charset handling. Blocking file I/O operations are offloaded using `asyncio.to_thread` for optimal performance.
+- **MIME Type Correction**: Automatically re-detects and corrects MIME types for .wma files misidentified by libmagic as video.
 - **Optical Character Recognition (OCR) & Vision Analysis**: Automatically detects images and extracts text using Tesseract OCR (`pytesseract`) or optionally through **Google Cloud Document AI** (`DocumentAIExtractorPlugin`) for highly accurate cloud-based extraction. The `OCRConfidenceScorerPlugin` scores the quality of local OCR extraction. Separately, `VisionAnalyzerPlugin` unconditionally runs on all images to utilize a multimodal Vision LLM to describe the visual content, maintaining a clear separation of concerns.
 - **Vision Memory Safeguards**: Implements proactive image resizing (configurable via `VISION_MAX_PIXELS`) to prevent out-of-memory (OOM) crashes during local inference of high-resolution scans. This logic is centralized in the `src/llm/vision_utils.py` utility module.
 
