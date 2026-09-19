@@ -295,7 +295,7 @@ def main():
                 "Select one or more statuses in the sidebar to show documents."
             )
         else:
-            st.info(
+            st.warning(
                 "No documents found matching your filters. Try adjusting your "
                 "criteria in the sidebar."
             )
@@ -602,7 +602,9 @@ def main():
             tasks = sorted(main_tasks, key=task_sort_key)
 
             if not tasks:
-                st.info("No analysis tasks recorded for this document.")
+                st.info(
+                    "No analysis tasks recorded for this document. It may still be processing or waiting in the queue."
+                )
             else:
                 for task in tasks:
                     is_skipped = get_task_status_color(task) == "⚪"
@@ -692,7 +694,7 @@ def main():
                 "Select a document from the table above in the main view to view its analysis details."
             )
         else:
-            st.info(
+            st.warning(
                 "No documents match the current filters. Adjust your search or smart filters in the sidebar."
             )
 
