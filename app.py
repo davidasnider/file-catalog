@@ -217,10 +217,6 @@ def get_task_status_color(task: AnalysisTask) -> str:
 
 def main():
     st.title("📂 Local AI File Catalog")
-
-    if st.session_state.get("_show_toast"):
-        st.toast("Cache refreshed successfully!", icon="✅")
-        st.session_state._show_toast = False
     st.markdown("Analyze and interact with your digitally archived documents.")
 
     # Sidebar Filters
@@ -231,7 +227,6 @@ def main():
             "🔄 Refresh Cache", help="Clear cached data and reload from the database"
         ):
             st.cache_data.clear()
-            st.session_state._show_toast = True
             st.rerun()
 
         # Get unique statuses for the multiselect (cached)
@@ -295,7 +290,7 @@ def main():
                 "Select one or more statuses in the sidebar to show documents."
             )
         else:
-            st.warning(
+            st.info(
                 "No documents found matching your filters. Try adjusting your "
                 "criteria in the sidebar."
             )
@@ -422,44 +417,46 @@ def main():
             except Exception as e:
                 st.sidebar.error(f"FTS Search Error: {e}")
 
-    st.divider()
-    st.subheader("Document Index")
+    # Render Document Index inside the Sidebar
+    with st.sidebar:
+        st.divider()
+        st.subheader("Document Index")
 
-    selected_row = None
-    if filtered_docs:
-        table_data = []
-        for doc in filtered_docs:
-            table_data.append(
-                {
-                    "Document Status": f"{get_status_color(doc.status.name)}",  # Simplified
-                    "File": os.path.basename(doc.path),
-                    "ID": doc.id,
-                }
+        selected_row = None
+        if filtered_docs:
+            table_data = []
+            for doc in filtered_docs:
+                table_data.append(
+                    {
+                        "Document Status": f"{get_status_color(doc.status.name)}",  # Simplified
+                        "File": os.path.basename(doc.path),
+                        "ID": doc.id,
+                    }
+                )
+
+            df = pd.DataFrame(table_data)
+
+            # Interactive Dataframe in sidebar
+            event = st.dataframe(
+                df[["Document Status", "File"]],
+                height=400,
+                width="stretch",
+                hide_index=True,
+                column_config={
+                    "Document Status": st.column_config.TextColumn(
+                        "Status", width="small", help="Current processing status"
+                    ),
+                    "File": st.column_config.TextColumn(
+                        "File", width="large", help="Document file name"
+                    ),
+                },
+                on_select="rerun",
+                selection_mode="single-row",
             )
 
-        df = pd.DataFrame(table_data)
-
-        # Interactive Dataframe in main view
-        event = st.dataframe(
-            df[["Document Status", "File"]],
-            height=400,
-            width="stretch",
-            hide_index=True,
-            column_config={
-                "Document Status": st.column_config.TextColumn(
-                    "Status", width="small", help="Current processing status"
-                ),
-                "File": st.column_config.TextColumn(
-                    "File", width="large", help="Document file name"
-                ),
-            },
-            on_select="rerun",
-            selection_mode="single-row",
-        )
-
-        if len(event.selection.rows) > 0:
-            selected_idx = event.selection.rows[0]
-            selected_row = df.iloc[selected_idx]
+            if len(event.selection.rows) > 0:
+                selected_idx = event.selection.rows[0]
+                selected_row = df.iloc[selected_idx]
 
     # Metrics Row
     metrics = get_global_metrics()
@@ -603,7 +600,8 @@ def main():
 
             if not tasks:
                 st.info(
-                    "No analysis tasks recorded for this document. It may still be processing or waiting in the queue."
+                    "No analysis tasks recorded for this document. "
+                    "It may still be processing or waiting in the queue."
                 )
             else:
                 for task in tasks:
@@ -690,11 +688,9 @@ def main():
 
     else:
         if filtered_docs:
-            st.info(
-                "Select a document from the table above in the main view to view its analysis details."
-            )
+            st.info("Select a document from the table to view its analysis details.")
         else:
-            st.warning(
+            st.info(
                 "No documents match the current filters. Adjust your search or smart filters in the sidebar."
             )
 

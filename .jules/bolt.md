@@ -4,7 +4,5 @@
 
 ## 2025-02-27 - Replace DB queries for distinct statuses with Enum iteration
 **Learning:** The `get_all_statuses` and `get_all_task_statuses` functions in the Streamlit app queried the database for distinct statuses using `SELECT DISTINCT`. These statuses are statically defined in `DocumentStatus` and `TaskStatus` enums. Querying a potentially large table for static enum values is unnecessary overhead.
-
-## 2026-09-12 - SQLite json_each for IN clauses
-**Learning:** SQLite's default parameter limit is 999, requiring chunking of `IN()` clauses for large batches. This causes N+1 queries. Using SQLite's `json_each()` table-valued function on a JSON-serialized list of IDs allows for single-query expansion, eliminating round trips while supporting large `IN()` clauses natively.
-**Action:** Always prefer `json_each` over chunked `IN()` clauses for batch SQLite queries when dealing with large lists of identifiers.
+**Action:** Replace `SELECT DISTINCT` queries on enum columns with direct iteration over the Python Enum values to avoid database queries entirely.
+##
