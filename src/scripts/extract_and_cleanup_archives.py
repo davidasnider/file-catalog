@@ -57,7 +57,7 @@ def safe_extract_7z(archive: "py7zr.SevenZipFile", dest_dir: Path):
                     f"Potential path traversal attempt (link target outside): {member.filename} -> {member.link_target}"
                 )
 
-    archive.extractall(path=dest_dir)
+    archive.extract(targets=[m.filename for m in archive.get_files()], path=dest_dir)
 
 
 def safe_extract_tar(tar_ref: tarfile.TarFile, dest_dir: Path):
