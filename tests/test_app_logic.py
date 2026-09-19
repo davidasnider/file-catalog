@@ -231,3 +231,48 @@ class TestFetchAllTasksForDocuments:
         assert result[1][0].task_name == "TextExtractor"
         assert len(result[2]) == 1
         assert result[2][0].task_name == "Summarizer"
+
+
+class TestDashboardUI:
+    """Tests for dashboard UI components and interaction flows in app.py."""
+
+    def test_refresh_cache_toast_flow(self):
+        """Verify that clicking Refresh Cache triggers a toast notification and clears session state flag."""
+        from streamlit.testing.v1 import AppTest
+
+        at = AppTest.from_file("app.py")
+        at.run(timeout=10)
+        assert len(at.toast) == 0
+
+        refresh_button = next(
+            (b for b in at.sidebar.button if "Refresh Cache" in b.label), None
+        )
+        assert refresh_button is not None
+        refresh_button.click().run(timeout=10)
+
+        assert len(at.toast) == 1
+        assert "Cache refreshed successfully!" in at.toast[0].value
+        assert at.session_state["_show_toast"] is False
+
+    def test_toast_displays_when_session_state_flag_set(self):
+        """Verify that when _show_toast is set in session state, toast is displayed and flag reset."""
+        from streamlit.testing.v1 import AppTest
+
+        at = AppTest.from_file("app.py")
+        at.session_state["_show_toast"] = True
+        at.run(timeout=10)
+
+        assert len(at.toast) == 1
+        assert "Cache refreshed successfully!" in at.toast[0].value
+        assert at.session_state["_show_toast"] is False
+
+    def test_document_index_rendered_in_main_view(self):
+        """Verify Document Index dataframe is placed in main layout rather than sidebar."""
+        from streamlit.testing.v1 import AppTest
+
+        at = AppTest.from_file("app.py")
+        at.run(timeout=10)
+
+        assert "Document Index" in [s.value for s in at.subheader]
+        assert "Document Index" not in [s.value for s in at.sidebar.subheader]
+        assert len(at.sidebar.dataframe) == 0
