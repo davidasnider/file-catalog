@@ -6,3 +6,7 @@
 **Learning:** The `get_all_statuses` and `get_all_task_statuses` functions in the Streamlit app queried the database for distinct statuses using `SELECT DISTINCT`. These statuses are statically defined in `DocumentStatus` and `TaskStatus` enums. Querying a potentially large table for static enum values is unnecessary overhead.
 **Action:** Replace `SELECT DISTINCT` queries on enum columns with direct iteration over the Python Enum values to avoid database queries entirely.
 ##
+
+## 2023-10-27 - Batch Fetching to Resolve N+1 Queries
+**Learning:** In script utilities like `evaluate_summaries.py`, fetching related data (like `Document` and `AnalysisTask`) inside a loop for each item (N+1 query problem) can cause significant performance bottlenecks, especially since the `session.execute` round trips are asynchronous and add overhead.
+**Action:** When fetching related data for a known list of IDs, use a single batch fetch with `Column.in_(ids)` and construct a Python dictionary (e.g., `defaultdict`) to map the results back to the original entities. This replaces O(N) queries with O(1) queries.
