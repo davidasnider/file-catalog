@@ -10,6 +10,7 @@ try:
 
     HAS_7Z = True
 except ImportError:
+    py7zr = None
     HAS_7Z = False
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -38,13 +39,19 @@ def safe_extract_zip(zip_ref: zipfile.ZipFile, dest_dir: Path):
 
 def safe_extract_7z(archive: "py7zr.SevenZipFile", dest_dir: Path):
     """Safely extracts a 7z file, checking for path traversal."""
+    targets = []
     for member in archive.list():
         member_path = (dest_dir / member.filename).resolve()
         if not is_within_directory(dest_dir, member_path):
             raise Exception(f"Potential path traversal attempt: {member.filename}")
 
         # Check for symlinks if supported by the member object
-        if hasattr(member, "is_symlink") and member.is_symlink():
+        is_symlink = (
+            member.is_symlink()
+            if callable(getattr(member, "is_symlink", None))
+            else getattr(member, "is_symlink", False)
+        )
+        if is_symlink:
             link_target = Path(member.link_target)
             if link_target.is_absolute():
                 raise Exception(
@@ -57,7 +64,10 @@ def safe_extract_7z(archive: "py7zr.SevenZipFile", dest_dir: Path):
                     f"Potential path traversal attempt (link target outside): {member.filename} -> {member.link_target}"
                 )
 
-    archive.extract(targets=[m.filename for m in archive.list()], path=dest_dir)
+        targets.append(member.filename)
+
+    if targets:
+        archive.extract(targets=targets, path=dest_dir)
 
 
 def safe_extract_tar(tar_ref: tarfile.TarFile, dest_dir: Path):

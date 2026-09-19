@@ -3,7 +3,6 @@ import types
 import zipfile
 import tarfile
 import io
-from src.scripts.extract_and_cleanup_archives import extract_archive, process_directory
 
 try:
     import py7zr
@@ -16,6 +15,8 @@ except ImportError:
         pass
 
     py7zr.SevenZipFile = SevenZipFile  # type: ignore
+
+from src.scripts.extract_and_cleanup_archives import extract_archive, process_directory
 
 
 def test_extract_zip(tmp_path):
@@ -98,10 +99,10 @@ def test_process_directory_naming_tar_gz(tmp_path):
 
 
 def test_path_traversal_7z_mocked(tmp_path, mocker):
-    # Mock py7zr to simulate a malicious entry
     mock_7z = mocker.Mock()
     mock_file = mocker.Mock()
     mock_file.filename = "../malicious.txt"
+    mock_7z.list.return_value = [mock_file]
     mock_7z.get_files.return_value = [mock_file]
 
     mocker.patch(
@@ -111,6 +112,7 @@ def test_path_traversal_7z_mocked(tmp_path, mocker):
         ),
     )
     mocker.patch("src.scripts.extract_and_cleanup_archives.HAS_7Z", True)
+    mocker.patch("src.scripts.extract_and_cleanup_archives.py7zr", py7zr)
 
     archive_path = tmp_path / "test.7z"
     archive_path.write_text("dummy")
@@ -169,6 +171,7 @@ def test_path_traversal_7z_absolute_symlink_mocked(tmp_path, mocker):
     mock_file.filename = "abs_link"
     mock_file.is_symlink.return_value = True
     mock_file.link_target = "/tmp/outside"
+    mock_7z.list.return_value = [mock_file]
     mock_7z.get_files.return_value = [mock_file]
 
     mocker.patch(
@@ -178,6 +181,7 @@ def test_path_traversal_7z_absolute_symlink_mocked(tmp_path, mocker):
         ),
     )
     mocker.patch("src.scripts.extract_and_cleanup_archives.HAS_7Z", True)
+    mocker.patch("src.scripts.extract_and_cleanup_archives.py7zr", py7zr)
 
     archive_path = tmp_path / "test_abs_link.7z"
     archive_path.write_text("dummy")
@@ -235,6 +239,7 @@ def test_path_traversal_7z_symlink_mocked(tmp_path, mocker):
     mock_file.filename = "malicious_link"
     mock_file.is_symlink.return_value = True
     mock_file.link_target = "../../outside"
+    mock_7z.list.return_value = [mock_file]
     mock_7z.get_files.return_value = [mock_file]
 
     mocker.patch(
@@ -244,6 +249,7 @@ def test_path_traversal_7z_symlink_mocked(tmp_path, mocker):
         ),
     )
     mocker.patch("src.scripts.extract_and_cleanup_archives.HAS_7Z", True)
+    mocker.patch("src.scripts.extract_and_cleanup_archives.py7zr", py7zr)
 
     archive_path = tmp_path / "test_link.7z"
     archive_path.write_text("dummy")
@@ -290,3 +296,49 @@ def test_main_no_yes_cancel(tmp_path, mocker):
 
     # Since they cancelled, the archive file should still exist
     assert zip_path.exists()
+
+
+def test_safe_extract_7z_mocked(tmp_path, mocker):
+    mock_7z = mocker.Mock()
+    mock_file = mocker.Mock()
+    mock_file.filename = "safe_file.txt"
+    mock_file.is_symlink.return_value = False
+    mock_7z.list.return_value = [mock_file]
+    mock_7z.get_files.return_value = [mock_file]
+
+    mocker.patch(
+        "py7zr.SevenZipFile",
+        return_value=mocker.MagicMock(
+            __enter__=lambda x: mock_7z, __exit__=lambda x, *args: None
+        ),
+    )
+    mocker.patch("src.scripts.extract_and_cleanup_archives.HAS_7Z", True)
+    mocker.patch("src.scripts.extract_and_cleanup_archives.py7zr", py7zr)
+
+    archive_path = tmp_path / "safe.7z"
+    archive_path.write_text("dummy")
+
+    assert extract_archive(archive_path, tmp_path / "out") is True
+    mock_7z.extract.assert_called_once_with(
+        targets=["safe_file.txt"], path=tmp_path / "out"
+    )
+
+
+def test_safe_extract_7z_empty_archive_mocked(tmp_path, mocker):
+    mock_7z = mocker.Mock()
+    mock_7z.list.return_value = []
+
+    mocker.patch(
+        "py7zr.SevenZipFile",
+        return_value=mocker.MagicMock(
+            __enter__=lambda x: mock_7z, __exit__=lambda x, *args: None
+        ),
+    )
+    mocker.patch("src.scripts.extract_and_cleanup_archives.HAS_7Z", True)
+    mocker.patch("src.scripts.extract_and_cleanup_archives.py7zr", py7zr)
+
+    archive_path = tmp_path / "empty.7z"
+    archive_path.write_text("dummy")
+
+    assert extract_archive(archive_path, tmp_path / "out") is True
+    mock_7z.extract.assert_not_called()
