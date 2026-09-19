@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.core.judge import TaskJudge
 from src.core.config import config
@@ -246,3 +246,179 @@ async def test_run_standalone_judge_retry_and_persist(db_session, test_engine, m
         },
     )
     mock_sync_fts.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_run_standalone_judge_preload_contexts_sqlite(
+    db_session, test_engine, mocker
+):
+    """Verify run_standalone_judge correctly preloads contexts for multiple documents using json_each."""
+    from src.scanner import run_standalone_judge
+    from src.db.models import Document, AnalysisTask, TaskStatus, DocumentStatus
+    from src.core.analyzer_names import SUMMARIZER_NAME, TEXT_EXTRACTOR_NAME
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlmodel import SQLModel
+
+    async with test_engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+
+    # 1. Create two documents
+    doc1 = Document(
+        id=101,
+        path="/path/to/doc1.txt",
+        mime_type="text/plain",
+        file_hash="hash101",
+        file_size=100,
+        mtime=1.0,
+        status=DocumentStatus.COMPLETED,
+    )
+    doc2 = Document(
+        id=102,
+        path="/path/to/doc2.txt",
+        mime_type="text/plain",
+        file_hash="hash102",
+        file_size=200,
+        mtime=2.0,
+        status=DocumentStatus.COMPLETED,
+    )
+    db_session.add_all([doc1, doc2])
+    await db_session.commit()
+
+    # Add tasks for doc1 and doc2
+    t1_extract = AnalysisTask(
+        document_id=doc1.id,
+        task_name=TEXT_EXTRACTOR_NAME,
+        status=TaskStatus.COMPLETED,
+        result_data='{"text": "Content of doc 1"}',
+    )
+    t1_sum = AnalysisTask(
+        document_id=doc1.id,
+        task_name=SUMMARIZER_NAME,
+        status=TaskStatus.COMPLETED,
+        result_data='{"summary": "Summary of doc 1"}',
+    )
+    t2_extract = AnalysisTask(
+        document_id=doc2.id,
+        task_name=TEXT_EXTRACTOR_NAME,
+        status=TaskStatus.COMPLETED,
+        result_data='{"text": "Content of doc 2"}',
+    )
+    t2_sum = AnalysisTask(
+        document_id=doc2.id,
+        task_name=SUMMARIZER_NAME,
+        status=TaskStatus.COMPLETED,
+        result_data='{"summary": "Summary of doc 2"}',
+    )
+    db_session.add_all([t1_extract, t1_sum, t2_extract, t2_sum])
+    await db_session.commit()
+
+    mock_maker = sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+    mocker.patch("src.scanner.async_session_maker", side_effect=mock_maker)
+    mocker.patch("src.db.engine.async_session_maker", side_effect=mock_maker)
+    mocker.patch("src.db.engine.init_db", AsyncMock())
+    mocker.patch("src.scanner.init_db", AsyncMock())
+    mocker.patch("rich.console.Console", MagicMock())
+    mocker.patch("src.scanner.input", return_value="")
+
+    mock_judge_instance = AsyncMock()
+    mock_judge_instance.judge_task.return_value = "PASSED"
+    mocker.patch("src.core.judge.TaskJudge", return_value=mock_judge_instance)
+
+    await run_standalone_judge()
+
+    # Verify judge_task was called for the tasks and received the populated document_contexts
+    assert mock_judge_instance.judge_task.call_count == 4
+    for call_args in mock_judge_instance.judge_task.call_args_list:
+        doc_path = call_args[0][1]
+        context = call_args[0][3]
+
+        if doc_path == "/path/to/doc1.txt":
+            assert context == {
+                TEXT_EXTRACTOR_NAME: {"text": "Content of doc 1"},
+                SUMMARIZER_NAME: {"summary": "Summary of doc 1"},
+            }
+        elif doc_path == "/path/to/doc2.txt":
+            assert context == {
+                TEXT_EXTRACTOR_NAME: {"text": "Content of doc 2"},
+                SUMMARIZER_NAME: {"summary": "Summary of doc 2"},
+            }
+
+
+@pytest.mark.asyncio
+async def test_run_standalone_judge_preload_contexts_non_sqlite_fallback(
+    db_session, test_engine, mocker
+):
+    """Verify run_standalone_judge fallback path preloads contexts properly on non-SQLite backends."""
+    from src.scanner import run_standalone_judge
+    from src.db.models import Document, AnalysisTask, TaskStatus, DocumentStatus
+    from src.core.analyzer_names import SUMMARIZER_NAME
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlmodel import SQLModel
+
+    async with test_engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+
+    # 1. Create two documents
+    doc1 = Document(
+        id=201,
+        path="/path/to/doc201.txt",
+        mime_type="text/plain",
+        file_hash="hash201",
+        file_size=100,
+        mtime=1.0,
+        status=DocumentStatus.COMPLETED,
+    )
+    doc2 = Document(
+        id=202,
+        path="/path/to/doc202.txt",
+        mime_type="text/plain",
+        file_hash="hash202",
+        file_size=200,
+        mtime=2.0,
+        status=DocumentStatus.COMPLETED,
+    )
+    db_session.add_all([doc1, doc2])
+    await db_session.commit()
+
+    t1_sum = AnalysisTask(
+        document_id=doc1.id,
+        task_name=SUMMARIZER_NAME,
+        status=TaskStatus.COMPLETED,
+        result_data='{"summary": "Fallback summary 1"}',
+    )
+    t2_sum = AnalysisTask(
+        document_id=doc2.id,
+        task_name=SUMMARIZER_NAME,
+        status=TaskStatus.COMPLETED,
+        result_data='{"summary": "Fallback summary 2"}',
+    )
+    db_session.add_all([t1_sum, t2_sum])
+    await db_session.commit()
+
+    # Simulate non-SQLite dialect
+    mocker.patch.object(test_engine.dialect, "name", "postgresql")
+
+    mock_maker = sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+    mocker.patch("src.scanner.async_session_maker", side_effect=mock_maker)
+    mocker.patch("src.db.engine.async_session_maker", side_effect=mock_maker)
+    mocker.patch("src.db.engine.init_db", AsyncMock())
+    mocker.patch("src.scanner.init_db", AsyncMock())
+    mocker.patch("rich.console.Console", MagicMock())
+    mocker.patch("src.scanner.input", return_value="")
+
+    mock_judge_instance = AsyncMock()
+    mock_judge_instance.judge_task.return_value = "PASSED"
+    mocker.patch("src.core.judge.TaskJudge", return_value=mock_judge_instance)
+
+    await run_standalone_judge()
+
+    assert mock_judge_instance.judge_task.call_count == 2
+    for call_args in mock_judge_instance.judge_task.call_args_list:
+        doc_path = call_args[0][1]
+        context = call_args[0][3]
+        if doc_path == "/path/to/doc201.txt":
+            assert context == {SUMMARIZER_NAME: {"summary": "Fallback summary 1"}}
+        elif doc_path == "/path/to/doc202.txt":
+            assert context == {SUMMARIZER_NAME: {"summary": "Fallback summary 2"}}

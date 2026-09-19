@@ -897,3 +897,37 @@ async def test_batch_check_doc_errors_mixed_scenario(
     assert "tinyllama" in next(iter(missing_models))
     assert len(missing_libraries) == 1
     assert "llama-cpp-python is not installed" in next(iter(missing_libraries))
+
+
+@pytest.mark.asyncio
+async def test_batch_check_doc_errors_non_sqlite_fallback(
+    async_session_maker, seeded_db, db_session, test_engine, mocker
+):
+    """Fallback chunked path executes properly on non-SQLite backends without UnboundLocalError."""
+    await _create_analysis_task(
+        db_session,
+        seeded_db[0],
+        "summarize",
+        json.dumps({"error": "model not found: fallback-model"}),
+    )
+    await _create_analysis_task(
+        db_session,
+        seeded_db[1],
+        "summarize",
+        json.dumps({"error": "llama-cpp-python is not installed"}),
+    )
+    await db_session.commit()
+
+    # Simulate non-SQLite dialect
+    mocker.patch.object(test_engine.dialect, "name", "postgresql")
+
+    missing_models = set()
+    missing_libraries = set()
+    await _batch_check_doc_errors(
+        async_session_maker, set(seeded_db), missing_models, missing_libraries
+    )
+
+    assert len(missing_models) == 1
+    assert "fallback-model" in next(iter(missing_models))
+    assert len(missing_libraries) == 1
+    assert "llama-cpp-python is not installed" in next(iter(missing_libraries))
