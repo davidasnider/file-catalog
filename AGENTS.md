@@ -91,9 +91,9 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
 
 ## 🏛 Architecture & Domain Concepts
 
-- **Optimized Batch Loading:** `fetch_all_tasks_for_documents` leverages SQLite's `json_each()` function to expand JSON arrays into rows. This allows batching queries efficiently, avoiding parameter limits (usually 999) without chunking, while maintaining a chunked `.in_()` clause fallback for non-SQLite backends.
+- **Optimized Batch Loading:** `fetch_all_tasks_for_documents` leverages SQLite's `json_each()` function to expand JSON arrays into rows. This allows batching queries efficiently, avoiding parameter limits (usually 999) without chunking, while maintaining a chunked `.in_()` clause fallback for non-SQLite backends. Additionally, resolve N+1 queries in evaluation scripts by replacing loops containing individual `select` queries with a single batch fetch using `.in_()` on a list of IDs, mapping results in Python memory.
 - **Database Sessions**: Database sessions are configured with `expire_on_commit=False` by default (see `src/db/engine.py`), which allows model instances to remain valid and accessible after a session commit without requiring explicit re-fetching or refreshing.
-- **Archive Extraction**: Archive extraction (Tar, Zip, 7z) must be hardened against path traversal. For Tar files on Python 3.12+, use `extractall(dest, filter="data")`. For 7z archives, explicitly validate that both member paths and link targets (symlinks) resolve within the target destination directory. For ZIP files, validate member paths to prevent traversal (note: symlink link targets are not checked per-member).
+- **Archive Extraction**: Archive extraction (Tar, Zip, 7z) must be hardened against path traversal. For Tar files on Python 3.12+, use `extractall(dest, filter="data")`. For 7z archives using `py7zr`, `extractall` lacks a safe filter; use a manual extraction loop iterating over `archive.list()` and extract specific targets using `archive.extract(..., targets=[...])`. For ZIP files, validate member paths to prevent traversal (note: symlink link targets are not checked per-member).
 - **Text Extraction Offloading**: The `TextExtractorPlugin` uses `asyncio.to_thread` to offload
   blocking file I/O operations (like reading PDFs or HTML) to separate threads. It also includes
   robust fallback parsing for malformed emails (e.g., Eudora) and HTML body extraction using
@@ -122,7 +122,7 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
   `TextExtractorPlugin`) are offloaded to separate threads using `asyncio.to_thread` for optimal
   performance.
 - **Enum Iteration**: Replace `SELECT DISTINCT` queries on static Enum columns (like `DocumentStatus`) with direct Python Enum iteration to avoid unnecessary database queries.
-- **Streamlit UI Tooltips & Empty States**: Utilize `help='...'` parameters on interactive components like `st.metric`, `st.multiselect`, and dataframe columns to provide accessible tooltips. Do not use `border=True` on `st.metric` as it is unsupported by the project's Streamlit version and will cause component errors and CI failures. When implementing empty states, provide actionable guidance rather than generic messages.
+- **Streamlit UI Tooltips & Empty States**: Utilize `help='...'` parameters on interactive components like `st.metric`, `st.multiselect`, and dataframe columns to provide accessible tooltips. Do not use `border=True` on `st.metric` as it is unsupported by the project's Streamlit version and will cause component errors and CI failures. When implementing or updating empty states, use `st.warning` to better highlight the need for user adjustment and provide helpful context to explain why it might be empty.
 - **Dashboard Metrics Optimization**: The Streamlit dashboard's global metrics query has been
   optimized to reduce database round-trips. It consolidates multiple sequential scalar queries
   into a single query using conditional aggregation (e.g., `func.sum(case(...))`), which reduces
