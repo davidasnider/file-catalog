@@ -288,6 +288,9 @@ def main():
     with st.spinner("Fetching documents..."):
         documents = fetch_documents(selected_doc_statuses, search_query)
 
+    st.divider()
+    st.subheader("Document Index")
+
     if not documents:
         if not selected_doc_statuses:
             st.info(
@@ -421,9 +424,6 @@ def main():
                 filtered_docs = [d for d in filtered_docs if d.id in fts_results]
             except Exception as e:
                 st.sidebar.error(f"FTS Search Error: {e}")
-
-    st.divider()
-    st.subheader("Document Index")
 
     selected_row = None
     if filtered_docs:

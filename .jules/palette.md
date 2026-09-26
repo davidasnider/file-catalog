@@ -30,3 +30,7 @@ then checking and clearing it at the top of the script to display an
 `st.toast()`.
 **Action:** Always place dataframes in the main layout and use
 `st.session_state` for cross-rerun UI feedback.
+
+## 2024-05-18 - Document Index Layout Consistency
+**Learning:** Hiding structural UI elements like section headers (e.g., `st.subheader("Document Index")`) when the content beneath them is empty (like a filtered-out dataframe) causes jarring layout shifts and context loss. Users benefit from seeing the header remain in place, acting as an anchor, even if the content below it is an empty state warning.
+**Action:** Always render structural headers before evaluating conditional logic that might early-return or display empty states, ensuring the layout remains consistent regardless of filter results.
