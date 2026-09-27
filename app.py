@@ -426,6 +426,12 @@ def main():
                 st.sidebar.error(f"FTS Search Error: {e}")
 
     selected_row = None
+    if not filtered_docs:
+        st.warning(
+            "No documents remain after applying the task status, smart, and "
+            "full-text filters. Try widening or clearing a filter."
+        )
+
     if filtered_docs:
         table_data = []
         for doc in filtered_docs:
