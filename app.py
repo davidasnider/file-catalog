@@ -699,10 +699,6 @@ def main():
             st.info(
                 "Select a document from the table above in the main view to view its analysis details."
             )
-        else:
-            st.warning(
-                "No documents match the current filters. Adjust your search or smart filters in the sidebar."
-            )
 
 
 if __name__ == "__main__":
