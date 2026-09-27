@@ -288,6 +288,9 @@ def main():
     with st.spinner("Fetching documents..."):
         documents = fetch_documents(selected_doc_statuses, search_query)
 
+    st.divider()
+    st.subheader("Document Index")
+
     if not documents:
         if not selected_doc_statuses:
             st.info(
@@ -422,10 +425,13 @@ def main():
             except Exception as e:
                 st.sidebar.error(f"FTS Search Error: {e}")
 
-    st.divider()
-    st.subheader("Document Index")
-
     selected_row = None
+    if not filtered_docs:
+        st.warning(
+            "No documents remain after applying the task status, smart, and "
+            "full-text filters. Try widening or clearing a filter."
+        )
+
     if filtered_docs:
         table_data = []
         for doc in filtered_docs:
@@ -692,10 +698,6 @@ def main():
         if filtered_docs:
             st.info(
                 "Select a document from the table above in the main view to view its analysis details."
-            )
-        else:
-            st.warning(
-                "No documents match the current filters. Adjust your search or smart filters in the sidebar."
             )
 
 
