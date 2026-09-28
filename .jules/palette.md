@@ -40,13 +40,3 @@ if the content below it is an empty state warning.
 **Action:** Always render structural headers before evaluating conditional
 logic that might early-return or display empty states, ensuring the layout
 remains consistent regardless of filter results.
-
-## 2026-09-28 - Structural UI Visibility During Empty States
-**Learning:** Hiding structural UI elements like section headers (e.g.,
-`st.subheader("Document Index")`) when the content beneath them is empty
-(like a filtered-out dataframe) causes jarring layout shifts and context loss.
-Users benefit from seeing the header remain in place, acting as an anchor, even
-if the content below it is an empty state warning.
-**Action:** Always render structural headers before evaluating conditional
-logic that might early-return or display empty states, ensuring the layout
-remains consistent regardless of filter results.
