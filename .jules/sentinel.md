@@ -19,3 +19,8 @@ uses `archive.list()` not `archive.get_files()`.
 **Prevention:** Iterating over `archive.list()` and extracting specific targets
 using `archive.extract(..., targets=[...])` is the safer approach for 7z files
 in `py7zr`.
+
+## 2024-10-02 - SQL Injection vulnerability in like statement
+**Vulnerability:** Found `func.lower(Document.path).like("%.xml")` in `src/scripts/remove_xml_records.py`. This uses `.like()` with a hardcoded wildcard without parameterization.
+**Learning:** For safely filtering by extensions or substrings without SQL injection vulnerability and complying with codebase security best practices, we should use `.endswith(".xml")` which automatically handles parameterization and wildcards safely inside SQLModel.
+**Prevention:** Avoid using `.like()` directly for substring checks. Instead, use the built-in SQLAlchemy operators like `.endswith()`, `.contains()`, or `.startswith()`.
