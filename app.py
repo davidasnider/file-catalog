@@ -293,7 +293,7 @@ def main():
 
     if not documents:
         if not selected_doc_statuses:
-            st.info(
+            st.warning(
                 "All documents are hidden because no Document Status is selected. "
                 "Select one or more statuses in the sidebar to show documents."
             )
@@ -608,7 +608,7 @@ def main():
             tasks = sorted(main_tasks, key=task_sort_key)
 
             if not tasks:
-                st.info(
+                st.warning(
                     "No analysis tasks recorded for this document. It may still be processing or waiting in the queue."
                 )
             else:
