@@ -297,7 +297,7 @@ class TestDashboardUI:
         )
 
     def test_unselected_status_shows_info(self):
-        """Verify info message is displayed when no document status is selected."""
+        """Verify warning message is displayed when no document status is selected."""
         from streamlit.testing.v1 import AppTest
 
         at = AppTest.from_file("app.py")
@@ -312,8 +312,8 @@ class TestDashboardUI:
             status_ms.unselect(s)
         status_ms.run(timeout=10)
 
-        infos = [i.value for i in at.info]
+        warnings = [w.value for w in at.warning]
         assert any(
-            "All documents are hidden because no Document Status is selected." in i
-            for i in infos
+            "All documents are hidden because no Document Status is selected." in w
+            for w in warnings
         )
