@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     llm_provider: str = "openai"
     vision_provider: str = "openai"
     openai_base_url: str = "http://127.0.0.1:8000/v1"
-    openai_api_key: str = "sk-no-key-required"
+    openai_api_key: str | None = None
     use_cloud_fallback: bool = False
     use_document_ai: bool = False
     llm_model_path: str = "mlx-community/Qwen3.6-35B-A3B-4bit"
