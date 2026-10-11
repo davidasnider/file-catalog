@@ -37,3 +37,7 @@ for single-query expansion, eliminating round trips while supporting large
 `IN()` clauses natively.
 **Action:** Always prefer `json_each` over chunked `IN()` clauses for batch
 SQLite queries when dealing with large lists of identifiers.
+
+## 2026-03-31 - Offloading Synchronous File Hashing in Async Context
+**Learning:** Calling synchronous file I/O operations (such as computing file hashes chunk by chunk) inside `async def` methods blocks the asyncio event loop thread, causing severe latency spikes (e.g., ~610ms event loop blocking) for concurrent tasks.
+**Action:** Always wrap synchronous disk or CPU bound operations in `await asyncio.to_thread(...)` when operating within an async call path.
