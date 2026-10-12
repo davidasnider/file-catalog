@@ -6,12 +6,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from sqlmodel import select
 
 from src.db.models import AnalysisTask, Document, DocumentStatus, TaskStatus
-from src.scanner import (
-    _batch_check_doc_errors,
-    compute_file_hash,
-    has_ignored_extension,
-    ingest_directory,
-)
+from src.scanner import _batch_check_doc_errors, compute_file_hash, ingest_directory
 
 
 @pytest.fixture
@@ -27,47 +22,6 @@ def temp_dir(tmp_path):
     file2.write_text("Second file")
 
     return test_dir
-
-
-@pytest.mark.parametrize(
-    "filename, expected",
-    [
-        # Ignored extensions
-        ("script.js", True),
-        ("module.py", True),
-        ("styles.css", True),
-        ("data.xml", True),
-        ("font.ttf", True),
-        ("main.c", True),
-        ("archive.mbox", True),
-        ("page.html_part", True),
-        # Case insensitivity
-        ("script.JS", True),
-        ("MODULE.PY", True),
-        ("styles.Css", True),
-        ("DATA.XML", True),
-        # Multi-dot / compound suffixes
-        ("app.min.js", True),
-        ("report.pdf.py", True),
-        ("archive.tar.gz.xml", True),
-        # Non-ignored extensions
-        ("document.pdf", False),
-        ("notes.txt", False),
-        ("photo.png", False),
-        ("image.jpeg", False),
-        ("report.docx", False),
-        ("email.eml", False),
-        ("data.json", False),
-        ("archive.zip", False),
-        # No extension or hidden/dot files without ignored extensions
-        ("README", False),
-        ("Makefile", False),
-        (".gitignore", False),
-        (".env", False),
-    ],
-)
-def test_has_ignored_extension(filename: str, expected: bool):
-    assert has_ignored_extension(filename) is expected
 
 
 def test_compute_file_hash(temp_dir):

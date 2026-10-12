@@ -41,9 +41,8 @@ class OpenAIProvider(LLMProvider):
 
     def __init__(self, model_name: str, **kwargs):
         self.model_name = model_name
-        self.client = AsyncOpenAI(
-            base_url=config.openai_base_url, api_key=config.openai_api_key
-        )
+        api_key = config.openai_api_key or "sk-no-key-required"
+        self.client = AsyncOpenAI(base_url=config.openai_base_url, api_key=api_key)
         logger.info(
             f"Initializing OpenAIProvider with model: {self.model_name} at {config.openai_base_url}"
         )

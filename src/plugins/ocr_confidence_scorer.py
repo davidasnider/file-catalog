@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import statistics
 from typing import Dict, Any
@@ -38,14 +37,10 @@ class OCRConfidenceScorerPlugin(AnalyzerBase):
         logger.info(f"Scoring OCR confidence for {file_path}")
 
         try:
-
-            def _get_ocr_data():
-                with Image.open(file_path) as img:
-                    return pytesseract.image_to_data(
-                        img, output_type=pytesseract.Output.DICT
-                    )
-
-            data = await asyncio.to_thread(_get_ocr_data)
+            with Image.open(file_path) as img:
+                data = pytesseract.image_to_data(
+                    img, output_type=pytesseract.Output.DICT
+                )
 
             # Filter to actual words with valid confidence scores
             # pytesseract returns -1 for non-word elements

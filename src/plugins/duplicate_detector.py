@@ -1,4 +1,3 @@
-import asyncio
 import hashlib
 import logging
 from typing import Dict, Any
@@ -37,7 +36,7 @@ class DuplicateDetectorPlugin(AnalyzerBase):
         logger.info(f"Running duplicate detection for {file_path}")
 
         try:
-            file_hash = await asyncio.to_thread(self._compute_hash, file_path)
+            file_hash = self._compute_hash(file_path)
         except Exception as e:
             logger.error(f"Failed to compute hash for {file_path}: {e}")
             raise Exception(f"Duplicate detection failed: {str(e)}")
