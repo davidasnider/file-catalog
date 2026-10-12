@@ -19,6 +19,7 @@ def clean_env(monkeypatch):
             "MAX_CONCURRENT",
             "LLM_MODEL_PATH",
             "VISION_MODEL_PATH",
+            "OPENAI_API_KEY",
         ]
     ]
     for key in keys_to_clear:
@@ -32,6 +33,7 @@ def test_settings_defaults(clean_env):
     assert settings.llm_provider == "openai"
     assert settings.vision_provider == "openai"
     assert settings.vision_max_pixels == 1048576
+    assert settings.openai_api_key is None
 
 
 def test_settings_properties():
