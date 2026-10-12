@@ -62,7 +62,11 @@ Configuration is centrally managed via `pydantic-settings` in `src/core/config.p
 - `GOOGLE_CLOUD_PROJECT`: Google Cloud project ID for Document AI.
 - `DOCUMENT_AI_LOCATION`: Location for Document AI (e.g., 'us', 'eu').
 - `OPENAI_BASE_URL`: Base URL of the OpenAI-compatible endpoint when using the `openai` provider (default: `http://127.0.0.1:8000/v1`). Point this at your local vLLM, Ollama, or LM Studio server.
-- `OPENAI_API_KEY`: API key sent with each request to the OpenAI-compatible endpoint (default: `sk-no-key-required`). Most local servers accept any non-empty value.
+- `OPENAI_API_KEY`: API key sent with each request to the OpenAI-compatible endpoint (no default).
+  Required when using the `openai` provider: if neither this setting nor the `OPENAI_API_KEY`
+  environment variable provides a value, client construction fails and the provider factory
+  reports `PROVIDER_INIT_FAILED`. Most local servers ignore auth, so any non-empty placeholder
+  is sufficient for a local endpoint.
 - `USE_DOCUMENT_AI`: Set to `True` to enable Google Cloud Document AI for text extraction in PDFs and Images.
 - `GOOGLE_CLOUD_PROJECT`: The Google Cloud Project ID (required for Document AI and Gemini cloud fallback).
 - `DOC_AI_PROCESSOR_ID`: The processor ID for Google Cloud Document AI (must be set as an environment variable).
