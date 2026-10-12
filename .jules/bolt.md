@@ -43,3 +43,11 @@ SQLite queries when dealing with large lists of identifiers.
 blocking CPU/I/O-heavy OCR extraction (e.g. `pytesseract.image_to_data`) called directly
 inside async plugin methods block the main asyncio event loop, slowing down concurrent document processing.
 **Action:** Offload synchronous image file operations and pytesseract calls to worker threads using `asyncio.to_thread`.
+
+## 2026-03-31 - Offloading Synchronous File Hashing in Async Context
+**Learning:** Calling synchronous file I/O operations (such as computing
+file hashes chunk by chunk) inside `async def` methods blocks the asyncio
+event loop thread, causing severe latency spikes (e.g., ~610ms event loop
+blocking) for concurrent tasks.
+**Action:** Always wrap synchronous disk or CPU bound operations in
+`await asyncio.to_thread(...)` when operating within an async call path.
