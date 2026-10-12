@@ -38,6 +38,12 @@ for single-query expansion, eliminating round trips while supporting large
 **Action:** Always prefer `json_each` over chunked `IN()` clauses for batch
 SQLite queries when dealing with large lists of identifiers.
 
+## 2026-10-15 - Offloading Blocking OCR and Image File I/O in Async Contexts
+**Learning:** Synchronous image file operations (e.g. `PIL.Image.open`) and
+blocking CPU/I/O-heavy OCR extraction (e.g. `pytesseract.image_to_data`) called directly
+inside async plugin methods block the main asyncio event loop, slowing down concurrent document processing.
+**Action:** Offload synchronous image file operations and pytesseract calls to worker threads using `asyncio.to_thread`.
+
 ## 2026-03-31 - Offloading Synchronous File Hashing in Async Context
 **Learning:** Calling synchronous file I/O operations (such as computing
 file hashes chunk by chunk) inside `async def` methods blocks the asyncio
