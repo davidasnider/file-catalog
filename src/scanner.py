@@ -135,17 +135,10 @@ def setup_logging(debug: bool = False):
 logger = logging.getLogger(__name__)
 
 
-def compute_file_hash(file_path: str, chunk_size: int = 8192) -> str:
+def compute_file_hash(file_path: str) -> str:
     """Compute SHA-256 hash of a file."""
-    if hasattr(hashlib, "file_digest"):
-        with open(file_path, "rb") as f:
-            return hashlib.file_digest(f, "sha256").hexdigest()
-    else:
-        hasher = hashlib.sha256()
-        with open(file_path, "rb") as f:
-            while chunk := f.read(chunk_size):
-                hasher.update(chunk)
-        return hasher.hexdigest()
+    with open(file_path, "rb") as f:
+        return hashlib.file_digest(f, "sha256").hexdigest()
 
 
 async def ingest_directory(
