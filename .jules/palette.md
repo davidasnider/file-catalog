@@ -40,3 +40,7 @@ if the content below it is an empty state warning.
 **Action:** Always render structural headers before evaluating conditional
 logic that might early-return or display empty states, ensuring the layout
 remains consistent regardless of filter results.
+
+## 2026-10-17 - Selection Empty State Visibility
+**Learning:** Using `st.info` for the primary selection prompt empty state ("Select a document from the table above...") is often overlooked by users because it blends in too much with the UI, especially when data is present in the table but nothing is selected. `st.warning` is more effective at drawing attention to actionable next steps when the detail view is empty.
+**Action:** Use `st.warning` instead of `st.info` for empty states that require user action to populate the view, even if it's just selecting an item from a list.

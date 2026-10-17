@@ -696,7 +696,7 @@ def main():
 
     else:
         if filtered_docs:
-            st.info(
+            st.warning(
                 "Select a document from the table above in the main view to view its analysis details."
             )
 
