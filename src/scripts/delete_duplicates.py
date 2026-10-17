@@ -20,11 +20,8 @@ def _setup_logging() -> None:
 
 def compute_sha256(file_path: str, chunk_size: int = 8192) -> str:
     """Compute SHA-256 hash of a file efficiently by reading it in chunks."""
-    hasher = hashlib.sha256()
     with open(file_path, "rb") as f:
-        while chunk := f.read(chunk_size):
-            hasher.update(chunk)
-    return hasher.hexdigest()
+        return hashlib.file_digest(f, "sha256").hexdigest()
 
 
 def find_duplicates(directory: str) -> dict[str, list[str]] | None:
