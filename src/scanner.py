@@ -137,15 +137,11 @@ logger = logging.getLogger(__name__)
 
 def compute_file_hash(file_path: str, chunk_size: int = 8192) -> str:
     """Compute SHA-256 hash of a file."""
-    if hasattr(hashlib, "file_digest"):
-        with open(file_path, "rb") as f:
-            return hashlib.file_digest(f, "sha256").hexdigest()
-    else:
-        hasher = hashlib.sha256()
-        with open(file_path, "rb") as f:
-            while chunk := f.read(chunk_size):
-                hasher.update(chunk)
-        return hasher.hexdigest()
+    hasher = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        while chunk := f.read(chunk_size):
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
 async def ingest_directory(
@@ -606,7 +602,7 @@ async def _batch_check_doc_errors(
                         )
                     )
                     .where(AnalysisTask.result_data.isnot(None))
-                    .where(AnalysisTask.result_data.contains('"error"'))
+                    .where(AnalysisTask.result_data.like('%"error"%'))
                     .params(doc_ids=doc_ids_json)
                 )
                 result = await session.execute(stmt)
@@ -631,7 +627,7 @@ async def _batch_check_doc_errors(
                         select(AnalysisTask.result_data)
                         .where(AnalysisTask.document_id.in_(chunk))
                         .where(AnalysisTask.result_data.isnot(None))
-                        .where(AnalysisTask.result_data.contains('"error"'))
+                        .where(AnalysisTask.result_data.like('%"error"%'))
                     )
                     for result_data in result.scalars().all():
                         if result_data:
@@ -792,8 +788,8 @@ async def run_scanner(
                     AnalysisTask.task_name,
                     AnalysisTask.status,
                     case(
-                        (AnalysisTask.result_data.contains('"skipped": true'), True),
-                        (AnalysisTask.result_data.contains('"skipped":true'), True),
+                        (AnalysisTask.result_data.like('%"skipped": true%'), True),
+                        (AnalysisTask.result_data.like('%"skipped":true%'), True),
                         else_=False,
                     ).label("is_skipped"),
                     func.count(AnalysisTask.id).label("count"),
@@ -801,8 +797,8 @@ async def run_scanner(
                     AnalysisTask.task_name,
                     AnalysisTask.status,
                     case(
-                        (AnalysisTask.result_data.contains('"skipped": true'), True),
-                        (AnalysisTask.result_data.contains('"skipped":true'), True),
+                        (AnalysisTask.result_data.like('%"skipped": true%'), True),
+                        (AnalysisTask.result_data.like('%"skipped":true%'), True),
                         else_=False,
                     ),
                 )

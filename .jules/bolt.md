@@ -51,7 +51,3 @@ event loop thread, causing severe latency spikes (e.g., ~610ms event loop
 blocking) for concurrent tasks.
 **Action:** Always wrap synchronous disk or CPU bound operations in
 `await asyncio.to_thread(...)` when operating within an async call path.
-
-## 2026-10-17 - Fast Native Hashlib Operations
-**Learning:** Python 3.11+ introduced `hashlib.file_digest(file_obj, "sha256")`, which implements native hashing in C. Iterating through files in chunks in pure Python and calling `hasher.update(chunk)` is consistently slower and more memory intensive than relying on the native C implementation.
-**Action:** Always prefer `hashlib.file_digest` for computing file hashes.
