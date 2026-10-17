@@ -48,7 +48,14 @@ class DuplicateDetectorPlugin(AnalyzerBase):
         }
 
     @staticmethod
-    def _compute_hash(file_path: str) -> str:
+    def _compute_hash(file_path: str, chunk_size: int = 8192) -> str:
         """Compute SHA-256 hash of a file."""
-        with open(file_path, "rb") as f:
-            return hashlib.file_digest(f, "sha256").hexdigest()
+        if hasattr(hashlib, "file_digest"):
+            with open(file_path, "rb") as f:
+                return hashlib.file_digest(f, "sha256").hexdigest()
+        else:
+            hasher = hashlib.sha256()
+            with open(file_path, "rb") as f:
+                while chunk := f.read(chunk_size):
+                    hasher.update(chunk)
+            return hasher.hexdigest()
