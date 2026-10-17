@@ -602,7 +602,7 @@ async def _batch_check_doc_errors(
                         )
                     )
                     .where(AnalysisTask.result_data.isnot(None))
-                    .where(AnalysisTask.result_data.like('%"error"%'))
+                    .where(AnalysisTask.result_data.contains('"error"'))
                     .params(doc_ids=doc_ids_json)
                 )
                 result = await session.execute(stmt)
@@ -627,7 +627,7 @@ async def _batch_check_doc_errors(
                         select(AnalysisTask.result_data)
                         .where(AnalysisTask.document_id.in_(chunk))
                         .where(AnalysisTask.result_data.isnot(None))
-                        .where(AnalysisTask.result_data.like('%"error"%'))
+                        .where(AnalysisTask.result_data.contains('"error"'))
                     )
                     for result_data in result.scalars().all():
                         if result_data:
@@ -788,8 +788,8 @@ async def run_scanner(
                     AnalysisTask.task_name,
                     AnalysisTask.status,
                     case(
-                        (AnalysisTask.result_data.like('%"skipped": true%'), True),
-                        (AnalysisTask.result_data.like('%"skipped":true%'), True),
+                        (AnalysisTask.result_data.contains('"skipped": true'), True),
+                        (AnalysisTask.result_data.contains('"skipped":true'), True),
                         else_=False,
                     ).label("is_skipped"),
                     func.count(AnalysisTask.id).label("count"),
@@ -797,8 +797,8 @@ async def run_scanner(
                     AnalysisTask.task_name,
                     AnalysisTask.status,
                     case(
-                        (AnalysisTask.result_data.like('%"skipped": true%'), True),
-                        (AnalysisTask.result_data.like('%"skipped":true%'), True),
+                        (AnalysisTask.result_data.contains('"skipped": true'), True),
+                        (AnalysisTask.result_data.contains('"skipped":true'), True),
                         else_=False,
                     ),
                 )
