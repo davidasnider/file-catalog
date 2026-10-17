@@ -25,7 +25,7 @@ in `py7zr`.
 **Learning:** For safely filtering by extensions or substrings without SQL injection vulnerability and complying with codebase security best practices, we should use `.endswith(".xml")` which automatically handles parameterization and wildcards safely inside SQLModel.
 **Prevention:** Avoid using `.like()` directly for substring checks. Instead, use the built-in SQLAlchemy operators like `.endswith()`, `.contains()`, or `.startswith()`.
 
-## 2024-10-17 - Avoid .like() with hardcoded strings that might resemble SQL Injection Patterns
+## 2026-10-17 - Avoid .like() with hardcoded strings that might resemble SQL Injection Patterns
 **Vulnerability:** Found `AnalysisTask.result_data.like('%"error"%')` and similar usage in `src/scanner.py`. While safe (since the string is hardcoded and not user-controlled), it violates the principle of using `contains()` to eliminate any ambiguity around wildcard characters and SQL injection vulnerabilities.
 **Learning:** `contains()` should be used over `.like()` even for hardcoded strings to maintain a consistent and unambiguously safe codebase pattern.
 **Prevention:** Avoid `.like()` for substring search. Use `.contains()` instead.
