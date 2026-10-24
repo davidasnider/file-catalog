@@ -44,3 +44,7 @@ remains consistent regardless of filter results.
 ## 2026-10-17 - Selection Empty State Visibility
 **Learning:** Using `st.info` for the primary selection prompt empty state ("Select a document from the table above...") is often overlooked by users because it blends in too much with the UI, especially when data is present in the table but nothing is selected. `st.warning` is more effective at drawing attention to actionable next steps when the detail view is empty.
 **Action:** Use `st.warning` instead of `st.info` for empty states that require user action to populate the view, even if it's just selecting an item from a list.
+
+## 2026-10-24 - Empty State Actionability
+**Learning:** Using `st.write` or generic strings for empty states (like "No text extracted" or "No result data available") fails to provide users with actionable next steps or context on *why* the data is missing. Replacing these with `st.warning` visually draws the user's attention, and providing explicit context (e.g., "The task may still be processing" or "Try ensuring the file... requires OCR") significantly reduces user frustration and confusion.
+**Action:** Always use `st.warning` for empty data states, and accompany the warning with specific context or troubleshooting steps explaining the absence of data.
