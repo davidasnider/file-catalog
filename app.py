@@ -586,7 +586,10 @@ def main():
                 if os.path.exists(selected_doc.path):
                     st.image(selected_doc.path)
                 else:
-                    st.warning("Image file not found on disk.")
+                    st.warning(
+                        "Image file not found on disk. It may have been moved "
+                        "or deleted."
+                    )
                 st.divider()
 
             # 3. Extraction Tasks Section (Bottom)
@@ -663,7 +666,10 @@ def main():
                                             disabled=True,
                                         )
                                     else:
-                                        st.write("No text extracted.")
+                                        st.warning(
+                                            "No text extracted. Try ensuring the file is "
+                                            "not empty or requires OCR."
+                                        )
 
                                 else:
                                     # Generic raw JSON dump => formatted list
@@ -692,7 +698,10 @@ def main():
                                 st.warning("Failed to parse result data.")
                                 st.code(task.result_data)
                         else:
-                            st.write("No result data available.")
+                            st.warning(
+                                "No result data available. The task may still be "
+                                "processing or encountered an error."
+                            )
 
     else:
         if filtered_docs:
