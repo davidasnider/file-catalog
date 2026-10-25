@@ -51,3 +51,7 @@ event loop thread, causing severe latency spikes (e.g., ~610ms event loop
 blocking) for concurrent tasks.
 **Action:** Always wrap synchronous disk or CPU bound operations in
 `await asyncio.to_thread(...)` when operating within an async call path.
+
+## 2026-10-24 - Faster File Hashing with hashlib.file_digest
+**Learning:** In Python 3.11+, `hashlib.file_digest(file_obj, "algorithm")` provides a fast, C-optimized way to compute file hashes instead of manually reading files in chunks and calling `hasher.update()`. This significantly reduces overhead for large files.
+**Action:** Always prefer `hashlib.file_digest` over manual chunked reading when computing file hashes. Provide a fallback using `hasattr(hashlib, 'file_digest')` for environments using older Python versions.
