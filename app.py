@@ -666,10 +666,15 @@ def main():
                                             disabled=True,
                                         )
                                     else:
-                                        st.warning(
-                                            "No text extracted. Try ensuring the file is "
-                                            "not empty or requires OCR."
-                                        )
+                                        if task.task_name == "OCRExtractor":
+                                            st.info(
+                                                "OCR completed but found no text in this file."
+                                            )
+                                        else:
+                                            st.warning(
+                                                "No text extracted. The file may be empty or "
+                                                "image-only (see the OCR task, if present)."
+                                            )
 
                                 else:
                                     # Generic raw JSON dump => formatted list
