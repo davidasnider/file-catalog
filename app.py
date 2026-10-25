@@ -666,7 +666,11 @@ def main():
                                             disabled=True,
                                         )
                                     else:
-                                        if task.task_name == "OCRExtractor":
+                                        if data.get("skipped"):
+                                            st.warning(
+                                                f"Skipped: {data.get('reason', 'Unknown reason')}"
+                                            )
+                                        elif task.task_name == "OCRExtractor":
                                             st.info(
                                                 "OCR completed but found no text in this file."
                                             )
