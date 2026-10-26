@@ -137,6 +137,7 @@ python -m src.scripts.scan_text_failures "/path/to/directory"
   - Set during incremental scans when a file is no longer found (bypasses the standard processing pipeline).
   - Automatically purges the document from the Full-Text Search (FTS) index, preventing stale search results.
 
+- **File Hashing Optimization**: In Python 3.11+, use `hashlib.file_digest(file_obj, "algorithm")` (e.g., `hashlib.file_digest(f, "sha256")`) for faster, C-optimized file hashing instead of manually reading files in chunks and calling `hasher.update()`. When refactoring existing hash functions, explicitly preserve original parameters (like `chunk_size`) to avoid breaking positional callers, and include a `hasattr(hashlib, 'file_digest')` fallback for environments using older Python versions.
 - **Truncation Mitigation**: The test execution and review environment truncates the
   standard output of terminal commands (like `cat`, `read_file`, or multi-file `grep`)
   to 1000 characters, indicating truncation with a marker like `(1000 / 1588 characters shown)`.
