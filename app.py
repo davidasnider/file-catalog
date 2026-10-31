@@ -671,8 +671,8 @@ def main():
                                                 f"Skipped: {data.get('reason', 'Unknown reason')}"
                                             )
                                         elif task.task_name == "OCRExtractor":
-                                            st.info(
-                                                "OCR completed but found no text in this file."
+                                            st.warning(
+                                                "OCR completed but found no text in this file. The image may be blank, unreadable, or lack text content."
                                             )
                                         else:
                                             st.warning(
