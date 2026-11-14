@@ -240,7 +240,7 @@ class TestDashboardUI:
         """Verify that clicking Refresh Cache triggers a toast notification and clears session state flag."""
         from streamlit.testing.v1 import AppTest
 
-        at = AppTest.from_file("app.py")
+        at = AppTest.from_file("../app.py")
         at.run(timeout=10)
         assert len(at.toast) == 0
 
@@ -258,7 +258,7 @@ class TestDashboardUI:
         """Verify that when _show_toast is set in session state, toast is displayed and flag reset."""
         from streamlit.testing.v1 import AppTest
 
-        at = AppTest.from_file("app.py")
+        at = AppTest.from_file("../app.py")
         at.session_state["_show_toast"] = True
         at.run(timeout=10)
 
@@ -270,7 +270,7 @@ class TestDashboardUI:
         """Verify Document Index dataframe is placed in main layout rather than sidebar."""
         from streamlit.testing.v1 import AppTest
 
-        at = AppTest.from_file("app.py")
+        at = AppTest.from_file("../app.py")
         at.run(timeout=10)
 
         assert "Document Index" in [s.value for s in at.subheader]
@@ -281,7 +281,7 @@ class TestDashboardUI:
         """Verify warning message is displayed when filtering yields no documents."""
         from streamlit.testing.v1 import AppTest
 
-        at = AppTest.from_file("app.py")
+        at = AppTest.from_file("../app.py")
         at.run(timeout=10)
 
         search_input = next(
@@ -300,7 +300,7 @@ class TestDashboardUI:
         """Verify warning message is displayed when no document status is selected."""
         from streamlit.testing.v1 import AppTest
 
-        at = AppTest.from_file("app.py")
+        at = AppTest.from_file("../app.py")
         at.run(timeout=10)
 
         status_ms = next(
