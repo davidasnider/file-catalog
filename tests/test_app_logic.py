@@ -1,3 +1,4 @@
+import pytest
 from unittest.mock import patch
 from contextlib import asynccontextmanager
 from src.db.models import AnalysisTask, Document
@@ -235,6 +236,31 @@ class TestFetchAllTasksForDocuments:
 
 class TestDashboardUI:
     """Tests for dashboard UI components and interaction flows in app.py."""
+
+    @pytest.fixture(autouse=True)
+    def isolated_db(self, tmp_path, monkeypatch):
+        """Point app.py at an empty temp database instead of ./file_catalog.db."""
+        import asyncio
+
+        import streamlit as st
+        from sqlalchemy.pool import NullPool
+
+        import src.db.engine as db_engine
+
+        # NullPool: app.py opens a fresh event loop per query via asyncio.run()
+        engine = create_async_engine(
+            f"sqlite+aiosqlite:///{tmp_path / 'test_catalog.db'}", poolclass=NullPool
+        )
+        monkeypatch.setattr(db_engine, "engine", engine)
+        monkeypatch.setattr(
+            db_engine,
+            "async_session_maker",
+            sessionmaker(engine, class_=AsyncSession, expire_on_commit=False),
+        )
+        asyncio.run(db_engine.init_db())
+        st.cache_data.clear()
+        yield
+        st.cache_data.clear()
 
     def test_refresh_cache_toast_flow(self):
         """Verify that clicking Refresh Cache triggers a toast notification and clears session state flag."""
