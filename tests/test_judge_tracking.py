@@ -143,6 +143,8 @@ async def test_judge_tracking_error_handling(db_session, test_engine, mocker):
     mock_maker = sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
     mocker.patch("src.scanner.async_session_maker", side_effect=mock_maker)
     mocker.patch("src.db.engine.async_session_maker", side_effect=mock_maker)
+    mocker.patch("src.db.engine.init_db", AsyncMock())
+    mocker.patch("src.scanner.init_db", AsyncMock())
     mocker.patch("rich.console.Console", MagicMock())
     mocker.patch("src.scanner.input", return_value="")
 
