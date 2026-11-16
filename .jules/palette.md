@@ -48,3 +48,7 @@ remains consistent regardless of filter results.
 ## 2026-10-24 - Empty State Actionability
 **Learning:** Using `st.write` or generic strings for empty states (like "No text extracted" or "No result data available") fails to provide users with actionable next steps or context on *why* the data is missing. Replacing these with `st.warning` visually draws the user's attention, and providing explicit context (e.g., "The task may still be processing" or "Try ensuring the file... requires OCR") significantly reduces user frustration and confusion.
 **Action:** Always use `st.warning` for empty data states, and accompany the warning with specific context or troubleshooting steps explaining the absence of data.
+
+## 2026-11-16 - CLI Surface Untouched by Earlier Runs
+**Learning:** All prior Palette work targeted the Streamlit dashboard, but this repo's CLI (src/scanner.py plus the scripts in src/scripts/) is also an interface. Most of it is already well-behaved: bad directory paths are caught with logger.error, and inspect_file.py reports errors through a rich Console (stderr by default). src/scanner.py's missing-directory error was the lone offender, printing "Error:" plus full help to stdout; it is now on stderr (exit code 1 unchanged).
+**Action:** If looking for more CLI candidates, try checklist B-6 (add an epilog with a real example to scanner.py --help) or raw value formatting in CLI output; verify whether errors already reach stderr before assuming they don't.
