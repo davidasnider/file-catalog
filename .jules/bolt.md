@@ -55,3 +55,18 @@ blocking) for concurrent tasks.
 ## 2026-10-24 - Faster File Hashing with hashlib.file_digest
 **Learning:** In Python 3.11+, `hashlib.file_digest(file_obj, "algorithm")` provides a fast, C-optimized way to compute file hashes instead of manually reading files in chunks and calling `hasher.update()`. This significantly reduces overhead for large files.
 **Action:** Always prefer `hashlib.file_digest` over manual chunked reading when computing file hashes. Do not include a `hasattr(hashlib, 'file_digest')` fallback or unused `chunk_size` parameters, as they are considered dead code.
+
+## 2026-11-16 - TaskEngine per-plugin session.refresh was redundant
+**Learning:** `TaskEngine.process_document` ran `await session.refresh(task)` after
+committing each plugin task, issuing one extra SELECT per executed plugin run. It was
+redundant: the row is created/modified in that same session, sessions are configured with
+`expire_on_commit=False`, and new-task ids are assigned at flush (commit) time, so the
+in-memory attributes were already current. Related non-issue: `session.get(AnalysisTask, ...)`
+inside `execute_plugin`'s retry loop is an identity-map hit on the same session, NOT a DB
+round trip — it only looks like per-retry queries. Also noticed (not fixed):
+`src/scripts/inspect_file.py::get_matching_files` still queries tasks per matched document,
+but it is a CLI utility that almost always matches one file, so impact is low.
+**Action:** When auditing TaskEngine for query waste, ignore `session.get()` calls on a
+shared session (identity-map hits) and focus on real round trips: `session.execute`,
+`session.refresh`, and reads across *different* sessions. Removed the refresh (verified by
+full suite, 269 passed).

@@ -303,8 +303,11 @@ class TaskEngine:
                             )
                             session.add(task)
 
+                        # No session.refresh() needed here: the task row was just
+                        # created/updated in this same session, expire_on_commit=False
+                        # keeps all attributes (including the flush-assigned id) current,
+                        # so a re-read SELECT per plugin would be pure overhead.
                         await session.commit()
-                        await session.refresh(task)
 
                         self._trigger(
                             "plugin_start",
