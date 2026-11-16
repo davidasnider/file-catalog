@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
 from sqlalchemy import func, text
@@ -1627,10 +1628,11 @@ def main():
         asyncio.run(run_standalone_judge())
     else:
         if not args.directory:
-            print("Error: directory argument is required unless running --judge mode.")
-            parser.print_help()
-            import sys
-
+            print(
+                "Error: directory argument is required unless running --judge mode.",
+                file=sys.stderr,
+            )
+            parser.print_help(sys.stderr)
             sys.exit(1)
 
         asyncio.run(
