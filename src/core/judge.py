@@ -4,6 +4,7 @@ import asyncio
 import os
 from typing import Dict, Any, Optional
 from rich.console import Console
+from rich.markup import escape
 from src.core.config import config
 from src.core.text_utils import repair_and_load_json, get_all_extracted_text
 from src.core.analyzer_names import (
@@ -160,7 +161,7 @@ Text (Truncated):
                 justify="center",
             )
             console.print(
-                f"Task: [bold cyan]{task_name}[/bold cyan] | File: [dim]{doc_path}[/dim]",
+                f"Task: [bold cyan]{escape(task_name)}[/bold cyan] | File: [dim]{escape(str(doc_path))}[/dim]",
                 justify="center",
             )
             console.print("-" * 80)
@@ -193,7 +194,7 @@ Text (Truncated):
             )
 
             console.print(
-                f"[bold red]Judge/Error Reasoning:[/bold red] {eval_data.get('reasoning', 'No reasoning provided')}"
+                f"[bold red]Judge/Error Reasoning:[/bold red] {escape(str(eval_data.get('reasoning', 'No reasoning provided')))}"
             )
             console.print("=" * 80, style="bold red")
 

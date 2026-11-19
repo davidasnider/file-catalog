@@ -1,9 +1,13 @@
-import pytest
+import io
+import re
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.core.judge import TaskJudge
-from src.core.config import config
+import pytest
+from rich.console import Console
+
 from src.core.analyzer_names import SUMMARIZER_NAME
+from src.core.config import config
+from src.core.judge import TaskJudge
 
 
 @pytest.fixture
@@ -25,6 +29,99 @@ async def test_judge_disabled(judge):
     with patch.object(config, "judge_enabled", False):
         status = await judge.judge_task("SomeTask", "test.txt", {}, {})
         assert status == "SKIPPED"
+
+
+def _capture_judge_console(monkeypatch) -> io.StringIO:
+    """Redirect the judge module's Rich console to an in-memory buffer."""
+    buf = io.StringIO()
+    monkeypatch.setattr(
+        "src.core.judge.console",
+        Console(file=buf, width=120, color_system="standard"),
+    )
+    return buf
+
+
+def _active_styles_around(out: str, needle: str) -> list[str]:
+    """Return the SGR style codes active at each occurrence of ``needle``."""
+    styles = []
+    for m in re.finditer(re.escape(needle), out):
+        before = out[: m.start()]
+        seqs = list(re.finditer(r"\x1b\[([0-9;]*)m", before))
+        styles.append(seqs[-1].group(1) if seqs else "")
+    return styles
+
+
+def _assert_no_red_foreground(out: str, needle: str):
+    """Assert that ``needle`` is never rendered with a red foreground (SGR 31)."""
+    styles = _active_styles_around(out, needle)
+    assert styles, f"{needle!r} not found in output"
+    for style in styles:
+        codes = {c for c in style.split(";") if c.isdigit()}
+        assert "31" not in codes, f"{needle!r} rendered with red foreground: {style}"
+
+
+@pytest.mark.asyncio
+async def test_judge_failure_panel_escapes_doc_path(judge, monkeypatch):
+    """An attacker-controlled doc.path must not inject Rich markup into the failure panel header."""
+    buf = _capture_judge_console(monkeypatch)
+    evil_path = "x[bold red]FAKE ERROR[/bold red]"
+
+    with patch.object(config, "judge_enabled", True):
+        status = await judge.judge_task(
+            SUMMARIZER_NAME, evil_path, {"status": "FAILED", "error": "boom"}, {}
+        )
+
+    assert status == "FAILED"
+    out = buf.getvalue()
+    # The forged bold-red style must not be applied to the injected text.
+    _assert_no_red_foreground(out, "FAKE ERROR")
+    # The path is still displayed, as inert literal text.
+    assert "FAKE ERROR" in re.sub(r"\x1b\[[0-9;]*m", "", out)
+
+
+@pytest.mark.asyncio
+async def test_judge_failure_panel_survives_unbalanced_tags(judge, monkeypatch):
+    """A path containing an unbalanced closing tag must not raise MarkupError."""
+    buf = _capture_judge_console(monkeypatch)
+
+    with patch.object(config, "judge_enabled", True):
+        status = await judge.judge_task(
+            SUMMARIZER_NAME,
+            "y[/dim][bold red]z",  # unbalanced closing tag
+            {"status": "FAILED", "error": "boom"},
+            {},
+        )
+
+    assert status == "FAILED"
+    # The raw tag text survives as literal output instead of crashing the judge loop.
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", buf.getvalue())
+    assert "y[/dim][bold red]z" in plain
+
+
+@pytest.mark.asyncio
+async def test_judge_failure_panel_escapes_llm_reasoning(
+    judge, mock_provider, monkeypatch
+):
+    """LLM-derived reasoning (attacker-influenced via file content) must not inject Rich markup."""
+    buf = _capture_judge_console(monkeypatch)
+    mock_provider.generate.return_value = (
+        '{"accuracy": 1, "coverage": 1, "hallucination_free": 1,'
+        ' "reasoning": "[bold red]FOGGED JUDGE[/bold red]"}'
+    )
+    context = {"TextExtractor": {"text": "some text"}}
+    result = {"summary": "some summary"}
+
+    with patch.object(config, "judge_enabled", True):
+        status = await judge.judge_task(
+            SUMMARIZER_NAME, "/tmp/normal.txt", result, context
+        )
+
+    assert status == "FAILED"
+    out = buf.getvalue()
+    # The forged bold-red style must not be applied to the injected text.
+    _assert_no_red_foreground(out, "FOGGED JUDGE")
+    # The reasoning text is still displayed, as inert literal words.
+    assert "FOGGED JUDGE" in re.sub(r"\x1b\[[0-9;]*m", "", out)
 
 
 @pytest.mark.asyncio
