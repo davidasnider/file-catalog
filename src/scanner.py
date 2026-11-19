@@ -25,6 +25,7 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.table import Table
 from rich.columns import Columns
+from rich.markup import escape
 
 from src.db.engine import init_db, async_session_maker
 from src.db.models import Document, DocumentStatus, AnalysisTask, TaskStatus
@@ -140,6 +141,16 @@ def compute_file_hash(file_path: str) -> str:
     """Compute SHA-256 hash of a file."""
     with open(file_path, "rb") as f:
         return hashlib.file_digest(f, "sha256").hexdigest()
+
+
+def escape_filename_for_rich(filename: str) -> str:
+    """Escape an untrusted file name for interpolation into Rich markup.
+
+    File names come from the scanned directory and may contain '[' or ']' (or
+    newlines) that Rich would otherwise interpret as markup in the progress UI,
+    letting a crafted file name forge styled terminal output.
+    """
+    return escape(filename)
 
 
 async def ingest_directory(
@@ -1075,7 +1086,8 @@ async def run_scanner(
                 path = id_to_path.get(did, f"Doc {did}")
                 filename = os.path.basename(path)
                 waiting_tasks[did] = progress.add_task(
-                    f"  [dim]Waiting: {filename}[/dim]", total=None
+                    f"  [dim]Waiting: {escape_filename_for_rich(filename)}[/dim]",
+                    total=None,
                 )
 
             # Keep total updated if ingest is streaming
@@ -1092,7 +1104,7 @@ async def run_scanner(
 
             filename = os.path.basename(path) if path else f"Doc {doc_id}"
             active_tasks[doc_id] = progress.add_task(
-                f"  [dim]{filename}[/dim]",
+                f"  [dim]{escape_filename_for_rich(filename)}[/dim]",
                 total=None,
             )
             update_waiting()
@@ -1103,7 +1115,7 @@ async def run_scanner(
                 filename = os.path.basename(path) if path else f"Doc {doc_id}"
                 progress.update(
                     task_id,
-                    description=f"  [magenta]{filename}:[/magenta] {plugin_name}",
+                    description=f"  [magenta]{escape_filename_for_rich(filename)}:[/magenta] {plugin_name}",
                 )
 
         post_process_semaphore = asyncio.Semaphore(max_concurrent + 1)
