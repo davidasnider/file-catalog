@@ -52,3 +52,16 @@ remains consistent regardless of filter results.
 ## 2026-11-16 - CLI Surface Untouched by Earlier Runs
 **Learning:** All prior Palette work targeted the Streamlit dashboard, but this repo's CLI (src/scanner.py plus the scripts in src/scripts/) is also an interface. Most of it is already well-behaved: bad directory paths are caught with logger.error, and inspect_file.py reports errors through a rich Console (stderr by default). src/scanner.py's missing-directory error was the lone offender, printing "Error:" plus full help to stdout; it is now on stderr (exit code 1 unchanged).
 **Action:** If looking for more CLI candidates, try checklist B-6 (add an epilog with a real example to scanner.py --help) or raw value formatting in CLI output; verify whether errors already reach stderr before assuming they don't.
+
+## 2026-11-21 - Exit code and stderr for bad-directory errors
+**Learning:** `src/scripts/scan_text_failures.py` printed its "not a valid directory"
+error to stdout (this repo's rich version defaults `Console()` to stdout) and returned,
+exiting 0 — so a typo'd path looked like a successful scan. Fixed by adding the same
+`parser.error(...)` guard in `main()` that `delete_duplicates.py` already uses (stderr,
+exit 2). Note: an earlier journal entry called rich Console "stderr by default"; in the
+installed version the default is stdout — scripts that look like they report errors via a
+plain `Console()` may still be writing to stdout.
+**Action:** Other directory-taking scripts were not re-audited for the same exit-0
+pattern; check any script whose error path does `console.print(...)` + `return` before
+assuming it signals failure correctly. The scanner.py --help epilog (B-6) is still an
+open, known-good candidate.
