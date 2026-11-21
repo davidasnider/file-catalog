@@ -117,6 +117,10 @@ def main():
     )
 
     args = parser.parse_args()
+
+    if not Path(args.directory).is_dir():
+        parser.error(f"'{args.directory}' is not a valid directory.")
+
     asyncio.run(scan_directory_for_failures(args.directory, args.limit))
 
 
