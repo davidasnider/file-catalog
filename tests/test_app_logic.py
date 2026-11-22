@@ -74,6 +74,35 @@ def test_render_snippet_missing_start_then_end():
     assert render_snippet(text) == expected
 
 
+def test_get_task_status_color_deterministic_for_repeated_calls():
+    """get_task_status_color must be stable across repeated calls.
+
+    The dashboard detail view now computes the color once per task and reuses it
+    for both the skip decision and the expander label, so the function must
+    return identical results when called multiple times on the same task.
+    """
+    from app import get_task_status_color
+    from src.db.models import TaskStatus
+
+    skipped = AnalysisTask(
+        document_id=1,
+        task_name="Summarizer",
+        status=TaskStatus.COMPLETED,
+        result_data='{"skipped": true, "reason": "small file"}',
+    )
+    failed_extraction = AnalysisTask(
+        document_id=1,
+        task_name="TextExtractor",
+        status=TaskStatus.COMPLETED,
+        result_data='{"extracted": false}',
+    )
+
+    for _ in range(3):
+        assert get_task_status_color(skipped) == "⚪"
+    for _ in range(3):
+        assert get_task_status_color(failed_extraction) == "🔴"
+
+
 def _build_test_db(task_configs):
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
 
