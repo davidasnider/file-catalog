@@ -616,9 +616,12 @@ def main():
                 )
             else:
                 for task in tasks:
-                    is_skipped = get_task_status_color(task) == "⚪"
+                    # Compute once: get_task_status_color parses the (potentially
+                    # large) result_data JSON, so avoid parsing it twice per task.
+                    status_color = get_task_status_color(task)
+                    is_skipped = status_color == "⚪"
                     with st.expander(
-                        f"{get_task_status_color(task)} {task.task_name} (v{task.plugin_version})",
+                        f"{status_color} {task.task_name} (v{task.plugin_version})",
                         expanded=not is_skipped,
                     ):
                         if task.status.name == "FAILED":

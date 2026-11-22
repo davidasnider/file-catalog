@@ -70,3 +70,18 @@ but it is a CLI utility that almost always matches one file, so impact is low.
 shared session (identity-map hits) and focus on real round trips: `session.execute`,
 `session.refresh`, and reads across *different* sessions. Removed the refresh (verified by
 full suite, 269 passed).
+
+## 2026-11-22 - app.py detail view parsed task result_data twice per task
+**Learning:** In `app.py`'s document detail view, `get_task_status_color(task)` (which does
+`json.loads` on potentially multi-MB `result_data`) was called once per task in the
+sort key AND twice inside the render loop (skip check + expander label). The loop double-call
+was fixed in this run. A further optimization remains: colors could be memoized once per task
+before sorting (3 parses -> 1), but that is a slightly bigger restructure. Also, in
+`src/plugins/text_extractor.py`, per-call `re.findall` with constant patterns is a non-issue:
+CPython's `re` module caches compiled patterns internally, so "regex in loop" candidates there
+save nothing. `TaskEngine.execute_plugin` commits on every status transition (crash-safety),
+so reducing commit frequency is NOT a safe Bolt change. `scanner.py::_load_and_queue_existing_docs`
+does blocking `os.path.exists` per doc in an async fn, but only at startup and each call is a
+single cheap syscall — not worth `asyncio.to_thread` (thread hop costs more).
+**Action:** Next run: consider memoizing task colors in app.py before sorting; skip the
+text_extractor regex, TaskEngine commit cadence, and startup os.path.exists candidates.
